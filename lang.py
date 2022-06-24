@@ -19,6 +19,7 @@ class TokenType(Enum):
     COMMA = auto()
     DOT = auto()
     MINUS = auto()
+    NEGATIVE = auto()
     PLUS = auto()
     ASTERISK = auto()
     SLASH = auto()
@@ -37,7 +38,9 @@ def scan_tokens(source):
     tokens = []
 
     token = ''
-    for c in source:
+    index = 0
+    while index < len(source):
+        c = source[index]
         if c == '(':
             tokens.append({'type': TokenType.LEFT_PAREN, 'lexeme': '('})
         elif c == ')':
@@ -49,7 +52,10 @@ def scan_tokens(source):
         elif c == '+':
             tokens.append({'type': TokenType.PLUS, 'lexeme': c})
         elif c == '-':
-            tokens.append({'type': TokenType.MINUS, 'lexeme': c})
+            if source[index+1].isdigit():
+                tokens.append({'type': TokenType.NEGATIVE, 'lexeme': c})
+            else:
+                tokens.append({'type': TokenType.MINUS, 'lexeme': c})
         elif c == '*':
             tokens.append({'type': TokenType.ASTERISK, 'lexeme': c})
         elif c == '/':
@@ -64,13 +70,17 @@ def scan_tokens(source):
         else:
             print(f'unknown char "{c}"')
 
+        index += 1
+
     return tokens
 
 
 def parse(tokens):
     ast = []
     stack_of_lists = [ast]
-    for token in tokens[1:-1]:
+    index = 1
+    while index < (len(tokens) - 1):
+        token = tokens[index]
         if token['type'] == TokenType.LEFT_PAREN:
             #start new expression
             new_list = []
@@ -81,8 +91,13 @@ def parse(tokens):
         else:
             if token['type'] == TokenType.NUMBER:
                 stack_of_lists[-1].append(int(token['lexeme']))
+            elif token['type'] == TokenType.NEGATIVE:
+                stack_of_lists[-1].append(int(tokens[index+1]['lexeme']) * -1)
+                # increment an extra time, since we're consuming two tokens here
+                index = index + 1
             else:
                 stack_of_lists[-1].append(token)
+        index = index + 1
     return ast
 
 
