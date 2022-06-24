@@ -80,6 +80,17 @@ def parse(tokens):
     return ast
 
 
+def evaluate(node):
+    if isinstance(node, list):
+        first = node[0]
+        rest = node[1:]
+        if first['type'] == TokenType.PLUS:
+            return sum([evaluate(n) for n in rest])
+        elif first['type'] == TokenType.MINUS:
+            return evaluate(rest[0]) - sum([evaluate(n) for n in rest[1:]])
+    return node
+
+
 def run(source):
     tokens = scan_tokens(source)
     for t in tokens:

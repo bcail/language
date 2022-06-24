@@ -1,5 +1,5 @@
 import unittest
-from lang import TokenType, scan_tokens, parse
+from lang import TokenType, scan_tokens, parse, evaluate
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) 5)'
@@ -52,6 +52,20 @@ class ParseTests(unittest.TestCase):
         self.maxDiff = None
         ast = parse(EXPECTED_TOKENS)
         self.assertEqual(ast, EXPECTED_AST)
+
+
+class EvalTests(unittest.TestCase):
+
+    def test(self):
+        tests = [
+            {'src': '(+ 1 2)', 'result': 3},
+            {'src': '(+ 1 (+ 1 1))', 'result': 3},
+            {'src': '(+ 1 (- 4 2))', 'result': 3},
+        ]
+
+        for test in tests:
+            with self.subTest(test=test):
+                self.assertEqual(evaluate(parse(scan_tokens(test['src']))), test['result'])
 
 
 if __name__ == '__main__':
