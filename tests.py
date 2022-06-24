@@ -61,6 +61,8 @@ class EvalTests(unittest.TestCase):
             {'src': '(+ 1 2)', 'result': 3},
             {'src': '(+ 1 (+ 1 1))', 'result': 3},
             {'src': '(+ 1 (- 4 2))', 'result': 3},
+            {'src': '(* 2 (- 4 2) 3)', 'result': 12},
+            {'src': '(/ 12 (- 4 2) 3)', 'result': 2},
         ]
 
         for test in tests:

@@ -20,6 +20,8 @@ class TokenType(Enum):
     DOT = auto()
     MINUS = auto()
     PLUS = auto()
+    ASTERISK = auto()
+    SLASH = auto()
     EQUAL = auto()
     GREATER = auto()
     GREATER_EQUAL = auto()
@@ -48,6 +50,10 @@ def scan_tokens(source):
             tokens.append({'type': TokenType.PLUS, 'lexeme': c})
         elif c == '-':
             tokens.append({'type': TokenType.MINUS, 'lexeme': c})
+        elif c == '*':
+            tokens.append({'type': TokenType.ASTERISK, 'lexeme': c})
+        elif c == '/':
+            tokens.append({'type': TokenType.SLASH, 'lexeme': c})
         elif c.isdigit():
             token += c
         elif c == ' ':
@@ -88,6 +94,16 @@ def evaluate(node):
             return sum([evaluate(n) for n in rest])
         elif first['type'] == TokenType.MINUS:
             return evaluate(rest[0]) - sum([evaluate(n) for n in rest[1:]])
+        elif first['type'] == TokenType.ASTERISK:
+            result = rest[0]
+            for n in rest[1:]:
+                result = result * evaluate(n)
+            return result
+        elif first['type'] == TokenType.SLASH:
+            result = rest[0]
+            for n in rest[1:]:
+                result = result / evaluate(n)
+            return result
     return node
 
 
