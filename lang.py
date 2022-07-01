@@ -31,42 +31,55 @@ class TokenType(Enum):
     IDENTIFIER = auto()
     STRING = auto()
     NUMBER = auto()
-    EOF = auto()
+    TRUE = auto()
+    FALSE = auto()
+    NIL = auto()
+
+
+def _get_token(token_buffer):
+    if token_buffer.isdigit():
+        return {'type': TokenType.NUMBER, 'lexeme': token_buffer}
+    elif token_buffer == 'true':
+        return {'type': TokenType.TRUE}
+    elif token_buffer == 'false':
+        return {'type': TokenType.FALSE}
+    elif token_buffer == 'nil':
+        return {'type': TokenType.NIL}
 
 
 def scan_tokens(source):
     tokens = []
 
-    token = ''
+    token_buffer = ''
     index = 0
     while index < len(source):
         c = source[index]
         if c == '(':
-            tokens.append({'type': TokenType.LEFT_PAREN, 'lexeme': '('})
+            tokens.append({'type': TokenType.LEFT_PAREN})
         elif c == ')':
-            if token:
-                if token.isdigit():
-                    tokens.append({'type': TokenType.NUMBER, 'lexeme': token})
-                token = ''
-            tokens.append({'type': TokenType.RIGHT_PAREN, 'lexeme': ')'})
+            if token_buffer:
+                tokens.append(_get_token(token_buffer))
+                token_buffer = ''
+            tokens.append({'type': TokenType.RIGHT_PAREN})
         elif c == '+':
-            tokens.append({'type': TokenType.PLUS, 'lexeme': c})
+            tokens.append({'type': TokenType.PLUS})
         elif c == '-':
             if source[index+1].isdigit():
-                tokens.append({'type': TokenType.NEGATIVE, 'lexeme': c})
+                tokens.append({'type': TokenType.NEGATIVE})
             else:
-                tokens.append({'type': TokenType.MINUS, 'lexeme': c})
+                tokens.append({'type': TokenType.MINUS})
         elif c == '*':
-            tokens.append({'type': TokenType.ASTERISK, 'lexeme': c})
+            tokens.append({'type': TokenType.ASTERISK})
         elif c == '/':
-            tokens.append({'type': TokenType.SLASH, 'lexeme': c})
-        elif c.isdigit():
-            token += c
+            tokens.append({'type': TokenType.SLASH})
+        elif c == '=':
+            tokens.append({'type': TokenType.EQUAL})
+        elif c.isalnum():
+            token_buffer += c
         elif c == ' ':
-            if token:
-                if token.isdigit():
-                    tokens.append({'type': TokenType.NUMBER, 'lexeme': token})
-                token = ''
+            if token_buffer:
+                tokens.append(_get_token(token_buffer))
+                token_buffer = ''
         else:
             print(f'unknown char "{c}"')
 
@@ -96,7 +109,7 @@ def parse(tokens):
                 # increment an extra time, since we're consuming two tokens here
                 index = index + 1
             else:
-                stack_of_lists[-1].append(token)
+                stack_of_lists[-1].append(token['type'])
         index = index + 1
     return ast
 
@@ -105,16 +118,16 @@ def evaluate(node):
     if isinstance(node, list):
         first = node[0]
         rest = node[1:]
-        if first['type'] == TokenType.PLUS:
+        if first == TokenType.PLUS:
             return sum([evaluate(n) for n in rest])
-        elif first['type'] == TokenType.MINUS:
+        elif first == TokenType.MINUS:
             return evaluate(rest[0]) - sum([evaluate(n) for n in rest[1:]])
-        elif first['type'] == TokenType.ASTERISK:
+        elif first == TokenType.ASTERISK:
             result = rest[0]
             for n in rest[1:]:
                 result = result * evaluate(n)
             return result
-        elif first['type'] == TokenType.SLASH:
+        elif first == TokenType.SLASH:
             result = rest[0]
             for n in rest[1:]:
                 result = result / evaluate(n)

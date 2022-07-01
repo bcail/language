@@ -4,32 +4,32 @@ from lang import TokenType, scan_tokens, parse, evaluate
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) 5)'
 EXPECTED_TOKENS = [
-    {'lexeme': '(', 'type': TokenType.LEFT_PAREN},
-    {'lexeme': '+', 'type': TokenType.PLUS},
-    {'lexeme': '10', 'type': TokenType.NUMBER},
-    {'lexeme': '2', 'type': TokenType.NUMBER},
-    {'lexeme': '(', 'type': TokenType.LEFT_PAREN},
-    {'lexeme': '-', 'type': TokenType.MINUS},
-    {'lexeme': '15', 'type': TokenType.NUMBER},
-    {'lexeme': '(', 'type': TokenType.LEFT_PAREN},
-    {'lexeme': '+', 'type': TokenType.PLUS},
-    {'lexeme': '4', 'type': TokenType.NUMBER},
-    {'lexeme': '4', 'type': TokenType.NUMBER},
-    {'lexeme': ')', 'type': TokenType.RIGHT_PAREN},
-    {'lexeme': ')', 'type': TokenType.RIGHT_PAREN},
-    {'lexeme': '5', 'type': TokenType.NUMBER},
-    {'lexeme': ')', 'type': TokenType.RIGHT_PAREN},
+    {'type': TokenType.LEFT_PAREN},
+    {'type': TokenType.PLUS},
+    {'type': TokenType.NUMBER, 'lexeme': '10'},
+    {'type': TokenType.NUMBER, 'lexeme': '2'},
+    {'type': TokenType.LEFT_PAREN},
+    {'type': TokenType.MINUS},
+    {'type': TokenType.NUMBER, 'lexeme': '15'},
+    {'type': TokenType.LEFT_PAREN},
+    {'type': TokenType.PLUS},
+    {'type': TokenType.NUMBER, 'lexeme': '4'},
+    {'type': TokenType.NUMBER, 'lexeme': '4'},
+    {'type': TokenType.RIGHT_PAREN},
+    {'type': TokenType.RIGHT_PAREN},
+    {'type': TokenType.NUMBER, 'lexeme': '5'},
+    {'type': TokenType.RIGHT_PAREN},
 ]
 
 EXPECTED_AST = [
-    {'lexeme': '+', 'type': TokenType.PLUS},
+    TokenType.PLUS,
     10,
     2,
     [
-        {'lexeme': '-', 'type': TokenType.MINUS},
+        TokenType.MINUS,
         15,
         [
-            {'lexeme': '+', 'type': TokenType.PLUS},
+            TokenType.PLUS,
             4,
             4,
         ]
@@ -44,6 +44,18 @@ class ScanTokenTests(unittest.TestCase):
         self.maxDiff = None
         tokens = scan_tokens(SOURCE)
         self.assertEqual(tokens, EXPECTED_TOKENS)
+
+    def test_keyword(self):
+        tokens = scan_tokens('(= 1 nil)')
+        self.assertEqual(tokens,
+                [
+                    {'type': TokenType.LEFT_PAREN},
+                    {'type': TokenType.EQUAL},
+                    {'type': TokenType.NUMBER, 'lexeme': '1'},
+                    {'type': TokenType.NIL},
+                    {'type': TokenType.RIGHT_PAREN},
+                ]
+            )
 
 
 class ParseTests(unittest.TestCase):
