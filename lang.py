@@ -101,15 +101,20 @@ def parse(tokens):
             stack_of_lists.append(new_list)
         elif token['type'] == TokenType.RIGHT_PAREN:
             stack_of_lists.pop(-1)
+        elif token['type'] == TokenType.NIL:
+            stack_of_lists[-1].append(None)
+        elif token['type'] == TokenType.TRUE:
+            stack_of_lists[-1].append(True)
+        elif token['type'] == TokenType.FALSE:
+            stack_of_lists[-1].append(False)
+        elif token['type'] == TokenType.NEGATIVE:
+            stack_of_lists[-1].append(int(tokens[index+1]['lexeme']) * -1)
+            # increment an extra time, since we're consuming two tokens here
+            index = index + 1
+        elif token['type'] == TokenType.NUMBER:
+            stack_of_lists[-1].append(int(token['lexeme']))
         else:
-            if token['type'] == TokenType.NUMBER:
-                stack_of_lists[-1].append(int(token['lexeme']))
-            elif token['type'] == TokenType.NEGATIVE:
-                stack_of_lists[-1].append(int(tokens[index+1]['lexeme']) * -1)
-                # increment an extra time, since we're consuming two tokens here
-                index = index + 1
-            else:
-                stack_of_lists[-1].append(token['type'])
+            stack_of_lists[-1].append(token['type'])
         index = index + 1
     return ast
 
@@ -132,6 +137,11 @@ def evaluate(node):
             for n in rest[1:]:
                 result = result / evaluate(n)
             return result
+        elif first == TokenType.EQUAL:
+            for n in rest[1:]:
+                if n != rest[0]:
+                    return False
+            return True
     return node
 
 

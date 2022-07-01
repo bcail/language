@@ -65,6 +65,23 @@ class ParseTests(unittest.TestCase):
         ast = parse(EXPECTED_TOKENS)
         self.assertEqual(ast, EXPECTED_AST)
 
+    def test_2(self):
+        tokens = [
+            {'type': TokenType.LEFT_PAREN},
+            {'type': TokenType.EQUAL},
+            {'type': TokenType.TRUE},
+            {'type': TokenType.NIL},
+            {'type': TokenType.RIGHT_PAREN},
+        ]
+        ast = parse(tokens)
+        self.assertEqual(ast,
+                [
+                    TokenType.EQUAL,
+                    True,
+                    None
+                ]
+            )
+
 
 class EvalTests(unittest.TestCase):
 
@@ -76,6 +93,10 @@ class EvalTests(unittest.TestCase):
             {'src': '(* 2 (- 4 2) 3)', 'result': 12},
             {'src': '(/ 12 (- 4 2) 3)', 'result': 2},
             {'src': '(+ 10 -2)', 'result': 8},
+            {'src': '(= 1 2)', 'result': False},
+            {'src': '(= 1 1 1)', 'result': True},
+            {'src': '(= true 2)', 'result': False},
+            {'src': '(= true nil)', 'result': False},
         ]
 
         for test in tests:
