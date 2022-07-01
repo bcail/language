@@ -34,6 +34,7 @@ class TokenType(Enum):
     TRUE = auto()
     FALSE = auto()
     NIL = auto()
+    IF = auto()
 
 
 def _get_token(token_buffer):
@@ -45,6 +46,10 @@ def _get_token(token_buffer):
         return {'type': TokenType.FALSE}
     elif token_buffer == 'nil':
         return {'type': TokenType.NIL}
+    elif token_buffer == 'if':
+        return {'type': TokenType.IF}
+    else:
+        print(f'unrecognized token: {token_buffer}')
 
 
 def scan_tokens(source):
@@ -142,6 +147,17 @@ def evaluate(node):
                 if n != rest[0]:
                     return False
             return True
+        elif first == TokenType.IF:
+            test_val = evaluate(rest[0])
+            true_val = evaluate(rest[1])
+            if len(rest) > 2:
+                false_val = evaluate(rest[2])
+            else:
+                false_val = None
+            if test_val in [False, None]:
+                return false_val
+            else:
+                return true_val
     return node
 
 

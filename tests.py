@@ -97,6 +97,9 @@ class EvalTests(unittest.TestCase):
             {'src': '(= 1 1 1)', 'result': True},
             {'src': '(= true 2)', 'result': False},
             {'src': '(= true nil)', 'result': False},
+            {'src': '(if true true false)', 'result': True},
+            {'src': '(if false true false)', 'result': False},
+            {'src': '(if false true)', 'result': None},
         ]
 
         for test in tests:
