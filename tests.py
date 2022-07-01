@@ -1,5 +1,5 @@
 import unittest
-from lang import TokenType, scan_tokens, parse, evaluate
+from lang import TokenType, scan_tokens, parse, evaluate, Var
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) 5)'
@@ -82,6 +82,36 @@ class ParseTests(unittest.TestCase):
                 ]
             )
 
+    def test_sequence_of_forms(self):
+        tokens = [
+            {'type': TokenType.LEFT_PAREN},
+            {'type': TokenType.DEF},
+            {'type': TokenType.IDENTIFIER, 'lexeme': 'a'},
+            {'type': TokenType.NUMBER, 'lexeme': '1'},
+            {'type': TokenType.RIGHT_PAREN},
+            {'type': TokenType.LEFT_PAREN},
+            {'type': TokenType.PLUS},
+            {'type': TokenType.IDENTIFIER, 'lexeme': 'a'},
+            {'type': TokenType.NUMBER, 'lexeme': '1'},
+            {'type': TokenType.RIGHT_PAREN},
+        ]
+        ast = parse(tokens)
+        self.assertEqual(ast,
+                [
+                    [
+                        TokenType.DEF,
+                        {'type': TokenType.IDENTIFIER, 'lexeme': 'a'},
+                        1
+                    ],
+                    [
+                        TokenType.PLUS,
+                        {'type': TokenType.IDENTIFIER, 'lexeme': 'a'},
+                        1
+                    ]
+                ]
+            )
+
+
 
 class EvalTests(unittest.TestCase):
 
@@ -99,7 +129,8 @@ class EvalTests(unittest.TestCase):
             {'src': '(= true nil)', 'result': False},
             {'src': '(if true true false)', 'result': True},
             {'src': '(if false true false)', 'result': False},
-            {'src': '(if false true)', 'result': None},
+            {'src': '(def a 1)', 'result': Var(name='a', value=1)},
+            {'src': '(def a 1) (+ a 2)', 'result': [Var(name='a', value=1), 3]},
         ]
 
         for test in tests:

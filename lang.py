@@ -1,6 +1,16 @@
 from enum import Enum, auto
 
 
+class Var:
+
+    def __init__(self, name, value=None):
+        self.name = name
+        self.value = value
+
+    def __eq__(self, other):
+        return self.name == other.name
+
+
 def _report(line_number, where, message):
     print(f'[line {line_number}] Error{where}: {message}')
 
@@ -35,6 +45,7 @@ class TokenType(Enum):
     FALSE = auto()
     NIL = auto()
     IF = auto()
+    DEF = auto()
 
 
 def _get_token(token_buffer):
@@ -46,10 +57,12 @@ def _get_token(token_buffer):
         return {'type': TokenType.FALSE}
     elif token_buffer == 'nil':
         return {'type': TokenType.NIL}
+    elif token_buffer == 'def':
+        return {'type': TokenType.DEF}
     elif token_buffer == 'if':
         return {'type': TokenType.IF}
     else:
-        print(f'unrecognized token: {token_buffer}')
+        return {'type': TokenType.IDENTIFIER, 'lexeme': token_buffer}
 
 
 def scan_tokens(source):
@@ -95,16 +108,19 @@ def scan_tokens(source):
 
 def parse(tokens):
     ast = []
-    stack_of_lists = [ast]
-    index = 1
-    while index < (len(tokens) - 1):
+    stack_of_lists = None
+    index = 0
+    while index < len(tokens):
         token = tokens[index]
         if token['type'] == TokenType.LEFT_PAREN:
             #start new expression
             new_list = []
+            if stack_of_lists is None:
+                stack_of_lists = [ast]
             stack_of_lists[-1].append(new_list)
             stack_of_lists.append(new_list)
         elif token['type'] == TokenType.RIGHT_PAREN:
+            #finish an expression
             stack_of_lists.pop(-1)
         elif token['type'] == TokenType.NIL:
             stack_of_lists[-1].append(None)
@@ -118,18 +134,32 @@ def parse(tokens):
             index = index + 1
         elif token['type'] == TokenType.NUMBER:
             stack_of_lists[-1].append(int(token['lexeme']))
+        elif token['type'] == TokenType.IDENTIFIER:
+            stack_of_lists[-1].append(token)
         else:
             stack_of_lists[-1].append(token['type'])
         index = index + 1
+
+    if len(ast) == 1 and isinstance(ast[0], list):
+        ast = ast[0]
     return ast
+
+
+environment = {}
 
 
 def evaluate(node):
     if isinstance(node, list):
         first = node[0]
         rest = node[1:]
-        if first == TokenType.PLUS:
-            return sum([evaluate(n) for n in rest])
+        if isinstance(first, list):
+            return [evaluate(n) for n in node]
+        elif first == TokenType.PLUS:
+            try:
+                return sum([evaluate(n) for n in rest])
+            except Exception:
+                print(f'{rest=}')
+                raise
         elif first == TokenType.MINUS:
             return evaluate(rest[0]) - sum([evaluate(n) for n in rest[1:]])
         elif first == TokenType.ASTERISK:
@@ -147,6 +177,13 @@ def evaluate(node):
                 if n != rest[0]:
                     return False
             return True
+        elif first == TokenType.DEF:
+            name = rest[0]['lexeme']
+            var = Var(name=name)
+            if len(rest) > 1:
+                var.value = rest[1]
+            environment[name] = var
+            return var
         elif first == TokenType.IF:
             test_val = evaluate(rest[0])
             true_val = evaluate(rest[1])
@@ -158,13 +195,15 @@ def evaluate(node):
                 return false_val
             else:
                 return true_val
+    if isinstance(node, dict) and node.get('type') == TokenType.IDENTIFIER:
+        return environment[node['lexeme']].value
     return node
 
 
 def run(source):
     tokens = scan_tokens(source)
-    for t in tokens:
-        print(t)
+    ast = parse(tokens)
+    evaluate(ast)
 
 
 def _run_file(file_name):
