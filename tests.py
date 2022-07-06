@@ -45,7 +45,7 @@ class ScanTokenTests(unittest.TestCase):
         tokens = scan_tokens(SOURCE)
         self.assertEqual(tokens, EXPECTED_TOKENS)
 
-    def test_keyword(self):
+    def test_nil(self):
         tokens = scan_tokens('(= 1 nil)')
         self.assertEqual(tokens,
                 [
@@ -56,6 +56,10 @@ class ScanTokenTests(unittest.TestCase):
                     {'type': TokenType.RIGHT_PAREN},
                 ]
             )
+
+    def test_number(self):
+        tokens = scan_tokens('2')
+        self.assertEqual(tokens, [{'type': TokenType.NUMBER, 'lexeme': '2'}])
 
 
 class ParseTests(unittest.TestCase):
@@ -117,6 +121,10 @@ class EvalTests(unittest.TestCase):
 
     def test(self):
         tests = [
+            {'src': '2', 'result': 2},
+            {'src': 'nil', 'result': None},
+            {'src': 'true', 'result': True},
+            {'src': 'false', 'result': False},
             {'src': '(+ 1 2)', 'result': 3},
             {'src': '(+ 1 (+ 1 1))', 'result': 3},
             {'src': '(+ 1 (- 4 2))', 'result': 3},

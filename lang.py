@@ -103,12 +103,16 @@ def scan_tokens(source):
 
         index += 1
 
+    if token_buffer:
+        tokens.append(_get_token(token_buffer))
+
     return tokens
 
 
 def parse(tokens):
     ast = []
     stack_of_lists = None
+    current_list = ast
     index = 0
     while index < len(tokens):
         token = tokens[index]
@@ -119,28 +123,30 @@ def parse(tokens):
                 stack_of_lists = [ast]
             stack_of_lists[-1].append(new_list)
             stack_of_lists.append(new_list)
+            current_list = stack_of_lists[-1]
         elif token['type'] == TokenType.RIGHT_PAREN:
             #finish an expression
             stack_of_lists.pop(-1)
+            current_list = stack_of_lists[-1]
         elif token['type'] == TokenType.NIL:
-            stack_of_lists[-1].append(None)
+            current_list.append(None)
         elif token['type'] == TokenType.TRUE:
-            stack_of_lists[-1].append(True)
+            current_list.append(True)
         elif token['type'] == TokenType.FALSE:
-            stack_of_lists[-1].append(False)
+            current_list.append(False)
         elif token['type'] == TokenType.NEGATIVE:
-            stack_of_lists[-1].append(int(tokens[index+1]['lexeme']) * -1)
+            current_list.append(int(tokens[index+1]['lexeme']) * -1)
             # increment an extra time, since we're consuming two tokens here
             index = index + 1
         elif token['type'] == TokenType.NUMBER:
-            stack_of_lists[-1].append(int(token['lexeme']))
+            current_list.append(int(token['lexeme']))
         elif token['type'] == TokenType.IDENTIFIER:
-            stack_of_lists[-1].append(token)
+            current_list.append(token)
         else:
-            stack_of_lists[-1].append(token['type'])
+            current_list.append(token['type'])
         index = index + 1
 
-    if len(ast) == 1 and isinstance(ast[0], list):
+    if len(ast) == 1:
         ast = ast[0]
     return ast
 
