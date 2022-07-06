@@ -79,6 +79,13 @@ def scan_tokens(source):
                 tokens.append(_get_token(token_buffer))
                 token_buffer = ''
             tokens.append({'type': TokenType.RIGHT_PAREN})
+        elif c == '[':
+            tokens.append({'type': TokenType.LEFT_BRACKET})
+        elif c == ']':
+            if token_buffer:
+                tokens.append(_get_token(token_buffer))
+                token_buffer = ''
+            tokens.append({'type': TokenType.RIGHT_BRACKET})
         elif c == '+':
             tokens.append({'type': TokenType.PLUS})
         elif c == '-':
@@ -116,7 +123,7 @@ def parse(tokens):
     index = 0
     while index < len(tokens):
         token = tokens[index]
-        if token['type'] == TokenType.LEFT_PAREN:
+        if token['type'] in [TokenType.LEFT_PAREN, TokenType.LEFT_BRACKET]:
             #start new expression
             new_list = []
             if stack_of_lists is None:
@@ -124,7 +131,7 @@ def parse(tokens):
             stack_of_lists[-1].append(new_list)
             stack_of_lists.append(new_list)
             current_list = stack_of_lists[-1]
-        elif token['type'] == TokenType.RIGHT_PAREN:
+        elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET]:
             #finish an expression
             stack_of_lists.pop(-1)
             current_list = stack_of_lists[-1]
