@@ -164,6 +164,57 @@ def parse(tokens):
 environment = {}
 
 
+def add(params):
+    return sum([evaluate(p) for p in params])
+
+
+def subtract(params):
+    return evaluate(params[0]) - sum([evaluate(n) for n in params[1:]])
+
+
+def multiply(params):
+    result = params[0]
+    for n in params[1:]:
+        result = result * evaluate(n)
+    return result
+
+
+def divide(params):
+    result = params[0]
+    for n in params[1:]:
+        result = result / evaluate(n)
+    return result
+
+
+def equal(params):
+    for n in params[1:]:
+        if n != params[0]:
+            return False
+    return True
+
+
+def define(params):
+    name = params[0]['lexeme']
+    var = Var(name=name)
+    if len(params) > 1:
+        var.value = params[1]
+    environment[name] = var
+    return var
+
+
+def if_form(params):
+    test_val = evaluate(params[0])
+    true_val = evaluate(params[1])
+    if len(params) > 2:
+        false_val = evaluate(params[2])
+    else:
+        false_val = None
+    if test_val in [False, None]:
+        return false_val
+    else:
+        return true_val
+
+
 def evaluate(node):
     if isinstance(node, list):
         first = node[0]
@@ -173,42 +224,19 @@ def evaluate(node):
         elif first == TokenType.QUOTE:
             return rest[0]
         elif first == TokenType.PLUS:
-            return sum([evaluate(n) for n in rest])
+            return add(rest)
         elif first == TokenType.MINUS:
-            return evaluate(rest[0]) - sum([evaluate(n) for n in rest[1:]])
+            return subtract(rest)
         elif first == TokenType.ASTERISK:
-            result = rest[0]
-            for n in rest[1:]:
-                result = result * evaluate(n)
-            return result
+            return multiply(rest)
         elif first == TokenType.SLASH:
-            result = rest[0]
-            for n in rest[1:]:
-                result = result / evaluate(n)
-            return result
+            return divide(rest)
         elif first == TokenType.EQUAL:
-            for n in rest[1:]:
-                if n != rest[0]:
-                    return False
-            return True
+            return equal(rest)
         elif first == TokenType.DEF:
-            name = rest[0]['lexeme']
-            var = Var(name=name)
-            if len(rest) > 1:
-                var.value = rest[1]
-            environment[name] = var
-            return var
+            return define(rest)
         elif first == TokenType.IF:
-            test_val = evaluate(rest[0])
-            true_val = evaluate(rest[1])
-            if len(rest) > 2:
-                false_val = evaluate(rest[2])
-            else:
-                false_val = None
-            if test_val in [False, None]:
-                return false_val
-            else:
-                return true_val
+            return if_form(rest)
     if isinstance(node, dict) and node.get('type') == TokenType.IDENTIFIER:
         return environment[node['lexeme']].value
     return node
