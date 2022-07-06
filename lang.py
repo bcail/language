@@ -46,6 +46,7 @@ class TokenType(Enum):
     NIL = auto()
     IF = auto()
     DEF = auto()
+    QUOTE = auto()
 
 
 def _get_token(token_buffer):
@@ -61,6 +62,8 @@ def _get_token(token_buffer):
         return {'type': TokenType.DEF}
     elif token_buffer == 'if':
         return {'type': TokenType.IF}
+    elif token_buffer == 'quote':
+        return {'type': TokenType.QUOTE}
     else:
         return {'type': TokenType.IDENTIFIER, 'lexeme': token_buffer}
 
@@ -167,12 +170,10 @@ def evaluate(node):
         rest = node[1:]
         if isinstance(first, list):
             return [evaluate(n) for n in node]
+        elif first == TokenType.QUOTE:
+            return rest[0]
         elif first == TokenType.PLUS:
-            try:
-                return sum([evaluate(n) for n in rest])
-            except Exception:
-                print(f'{rest=}')
-                raise
+            return sum([evaluate(n) for n in rest])
         elif first == TokenType.MINUS:
             return evaluate(rest[0]) - sum([evaluate(n) for n in rest[1:]])
         elif first == TokenType.ASTERISK:
