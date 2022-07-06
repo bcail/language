@@ -1,18 +1,18 @@
 import unittest
-from lang import TokenType, scan_tokens, parse, evaluate, Var
+from lang import TokenType, scan_tokens, parse, evaluate, Symbol, Var
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) 5)'
 EXPECTED_TOKENS = [
     {'type': TokenType.LEFT_PAREN},
-    {'type': TokenType.PLUS},
+    {'type': TokenType.SYMBOL, 'lexeme': '+'},
     {'type': TokenType.NUMBER, 'lexeme': '10'},
     {'type': TokenType.NUMBER, 'lexeme': '2'},
     {'type': TokenType.LEFT_PAREN},
     {'type': TokenType.MINUS},
     {'type': TokenType.NUMBER, 'lexeme': '15'},
     {'type': TokenType.LEFT_PAREN},
-    {'type': TokenType.PLUS},
+    {'type': TokenType.SYMBOL, 'lexeme': '+'},
     {'type': TokenType.NUMBER, 'lexeme': '4'},
     {'type': TokenType.NUMBER, 'lexeme': '4'},
     {'type': TokenType.RIGHT_PAREN},
@@ -22,14 +22,14 @@ EXPECTED_TOKENS = [
 ]
 
 EXPECTED_AST = [
-    TokenType.PLUS,
+    Symbol('+'),
     10,
     2,
     [
         TokenType.MINUS,
         15,
         [
-            TokenType.PLUS,
+            Symbol('+'),
             4,
             4,
         ]
@@ -50,7 +50,7 @@ class ScanTokenTests(unittest.TestCase):
         self.assertEqual(tokens,
                 [
                     {'type': TokenType.LEFT_PAREN},
-                    {'type': TokenType.EQUAL},
+                    {'type': TokenType.SYMBOL, 'lexeme': '='},
                     {'type': TokenType.NUMBER, 'lexeme': '1'},
                     {'type': TokenType.NIL},
                     {'type': TokenType.RIGHT_PAREN},
@@ -90,12 +90,12 @@ class ParseTests(unittest.TestCase):
         tokens = [
             {'type': TokenType.LEFT_PAREN},
             {'type': TokenType.DEF},
-            {'type': TokenType.IDENTIFIER, 'lexeme': 'a'},
+            {'type': TokenType.SYMBOL, 'lexeme': 'a'},
             {'type': TokenType.NUMBER, 'lexeme': '1'},
             {'type': TokenType.RIGHT_PAREN},
             {'type': TokenType.LEFT_PAREN},
             {'type': TokenType.PLUS},
-            {'type': TokenType.IDENTIFIER, 'lexeme': 'a'},
+            {'type': TokenType.SYMBOL, 'lexeme': 'a'},
             {'type': TokenType.NUMBER, 'lexeme': '1'},
             {'type': TokenType.RIGHT_PAREN},
         ]
@@ -104,12 +104,12 @@ class ParseTests(unittest.TestCase):
                 [
                     [
                         TokenType.DEF,
-                        {'type': TokenType.IDENTIFIER, 'lexeme': 'a'},
+                        Symbol('a'),
                         1
                     ],
                     [
                         TokenType.PLUS,
-                        {'type': TokenType.IDENTIFIER, 'lexeme': 'a'},
+                        Symbol('a'),
                         1
                     ]
                 ]

@@ -1,6 +1,24 @@
 from enum import Enum, auto
 
 
+class Symbol:
+
+    def __init__(self, name):
+        self.name = name
+
+    def __eq__(self, other):
+        try:
+            return self.name == other.name
+        except AttributeError:
+            return False
+
+    def __str__(self):
+        return f'<Symbol {self.name}>'
+
+    def __repr__(self):
+        return str(self)
+
+
 class Var:
 
     def __init__(self, name, value=None):
@@ -8,7 +26,16 @@ class Var:
         self.value = value
 
     def __eq__(self, other):
-        return self.name == other.name
+        try:
+            return self.name == other.name
+        except AttributeError:
+            return False
+
+    def __str__(self):
+        return f'<Var {self.name}: {self.value}>'
+
+    def __repr__(self):
+        return str(self)
 
 
 def _report(line_number, where, message):
@@ -38,7 +65,7 @@ class TokenType(Enum):
     GREATER_EQUAL = auto()
     LESS = auto()
     LESS_EQUAL = auto()
-    IDENTIFIER = auto()
+    SYMBOL = auto()
     STRING = auto()
     NUMBER = auto()
     TRUE = auto()
@@ -65,7 +92,7 @@ def _get_token(token_buffer):
     elif token_buffer == 'quote':
         return {'type': TokenType.QUOTE}
     else:
-        return {'type': TokenType.IDENTIFIER, 'lexeme': token_buffer}
+        return {'type': TokenType.SYMBOL, 'lexeme': token_buffer}
 
 
 def scan_tokens(source):
@@ -89,19 +116,13 @@ def scan_tokens(source):
                 tokens.append(_get_token(token_buffer))
                 token_buffer = ''
             tokens.append({'type': TokenType.RIGHT_BRACKET})
-        elif c == '+':
-            tokens.append({'type': TokenType.PLUS})
+        elif c in ['+', '*', '/', '=']:
+            token_buffer += c
         elif c == '-':
             if source[index+1].isdigit():
                 tokens.append({'type': TokenType.NEGATIVE})
             else:
                 tokens.append({'type': TokenType.MINUS})
-        elif c == '*':
-            tokens.append({'type': TokenType.ASTERISK})
-        elif c == '/':
-            tokens.append({'type': TokenType.SLASH})
-        elif c == '=':
-            tokens.append({'type': TokenType.EQUAL})
         elif c.isalnum():
             token_buffer += c
         elif c == ' ':
@@ -150,8 +171,8 @@ def parse(tokens):
             index = index + 1
         elif token['type'] == TokenType.NUMBER:
             current_list.append(int(token['lexeme']))
-        elif token['type'] == TokenType.IDENTIFIER:
-            current_list.append(token)
+        elif token['type'] == TokenType.SYMBOL:
+            current_list.append(Symbol(name=token['lexeme']))
         else:
             current_list.append(token['type'])
         index = index + 1
@@ -194,7 +215,7 @@ def equal(params):
 
 
 def define(params):
-    name = params[0]['lexeme']
+    name = params[0].name
     var = Var(name=name)
     if len(params) > 1:
         var.value = params[1]
@@ -221,24 +242,25 @@ def evaluate(node):
         rest = node[1:]
         if isinstance(first, list):
             return [evaluate(n) for n in node]
+        elif isinstance(first, Symbol):
+            if first.name == '+':
+                return add(rest)
+            elif first.name == '*':
+                return multiply(rest)
+            elif first.name == '/':
+                return divide(rest)
+            elif first.name == '=':
+                return equal(rest)
         elif first == TokenType.QUOTE:
             return rest[0]
-        elif first == TokenType.PLUS:
-            return add(rest)
         elif first == TokenType.MINUS:
             return subtract(rest)
-        elif first == TokenType.ASTERISK:
-            return multiply(rest)
-        elif first == TokenType.SLASH:
-            return divide(rest)
-        elif first == TokenType.EQUAL:
-            return equal(rest)
         elif first == TokenType.DEF:
             return define(rest)
         elif first == TokenType.IF:
             return if_form(rest)
-    if isinstance(node, dict) and node.get('type') == TokenType.IDENTIFIER:
-        return environment[node['lexeme']].value
+    if isinstance(node, Symbol):
+        return environment[node.name].value
     return node
 
 
