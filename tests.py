@@ -2,14 +2,14 @@ import unittest
 from lang import TokenType, scan_tokens, parse, evaluate, Symbol, Var
 
 
-SOURCE = '(+ 10 2 (- 15 (+ 4 4)) 5)'
+SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
 EXPECTED_TOKENS = [
     {'type': TokenType.LEFT_PAREN},
     {'type': TokenType.SYMBOL, 'lexeme': '+'},
     {'type': TokenType.NUMBER, 'lexeme': '10'},
     {'type': TokenType.NUMBER, 'lexeme': '2'},
     {'type': TokenType.LEFT_PAREN},
-    {'type': TokenType.MINUS},
+    {'type': TokenType.SYMBOL, 'lexeme': '-'},
     {'type': TokenType.NUMBER, 'lexeme': '15'},
     {'type': TokenType.LEFT_PAREN},
     {'type': TokenType.SYMBOL, 'lexeme': '+'},
@@ -17,7 +17,7 @@ EXPECTED_TOKENS = [
     {'type': TokenType.NUMBER, 'lexeme': '4'},
     {'type': TokenType.RIGHT_PAREN},
     {'type': TokenType.RIGHT_PAREN},
-    {'type': TokenType.NUMBER, 'lexeme': '5'},
+    {'type': TokenType.NUMBER, 'lexeme': '-5'},
     {'type': TokenType.RIGHT_PAREN},
 ]
 
@@ -26,7 +26,7 @@ EXPECTED_AST = [
     10,
     2,
     [
-        TokenType.MINUS,
+        Symbol('-'),
         15,
         [
             Symbol('+'),
@@ -34,7 +34,7 @@ EXPECTED_AST = [
             4,
         ]
     ],
-    5,
+    -5,
 ]
 
 
@@ -72,7 +72,7 @@ class ParseTests(unittest.TestCase):
     def test_2(self):
         tokens = [
             {'type': TokenType.LEFT_PAREN},
-            {'type': TokenType.EQUAL},
+            {'type': TokenType.SYMBOL, 'lexeme': '='},
             {'type': TokenType.TRUE},
             {'type': TokenType.NIL},
             {'type': TokenType.RIGHT_PAREN},
@@ -80,7 +80,7 @@ class ParseTests(unittest.TestCase):
         ast = parse(tokens)
         self.assertEqual(ast,
                 [
-                    TokenType.EQUAL,
+                    Symbol('='),
                     True,
                     None
                 ]
@@ -89,12 +89,12 @@ class ParseTests(unittest.TestCase):
     def test_sequence_of_forms(self):
         tokens = [
             {'type': TokenType.LEFT_PAREN},
-            {'type': TokenType.DEF},
+            {'type': TokenType.SYMBOL, 'lexeme': 'def'},
             {'type': TokenType.SYMBOL, 'lexeme': 'a'},
             {'type': TokenType.NUMBER, 'lexeme': '1'},
             {'type': TokenType.RIGHT_PAREN},
             {'type': TokenType.LEFT_PAREN},
-            {'type': TokenType.PLUS},
+            {'type': TokenType.SYMBOL, 'lexeme': '+'},
             {'type': TokenType.SYMBOL, 'lexeme': 'a'},
             {'type': TokenType.NUMBER, 'lexeme': '1'},
             {'type': TokenType.RIGHT_PAREN},
@@ -103,12 +103,12 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(ast,
                 [
                     [
-                        TokenType.DEF,
+                        Symbol('def'),
                         Symbol('a'),
                         1
                     ],
                     [
-                        TokenType.PLUS,
+                        Symbol('+'),
                         Symbol('a'),
                         1
                     ]

@@ -55,12 +55,6 @@ class TokenType(Enum):
     RIGHT_BRACKET = auto()
     COMMA = auto()
     DOT = auto()
-    MINUS = auto()
-    NEGATIVE = auto()
-    PLUS = auto()
-    ASTERISK = auto()
-    SLASH = auto()
-    EQUAL = auto()
     GREATER = auto()
     GREATER_EQUAL = auto()
     LESS = auto()
@@ -72,12 +66,10 @@ class TokenType(Enum):
     FALSE = auto()
     NIL = auto()
     IF = auto()
-    DEF = auto()
-    QUOTE = auto()
 
 
 def _get_token(token_buffer):
-    if token_buffer.isdigit():
+    if token_buffer.isdigit() or (token_buffer.startswith('-') and token_buffer[1:].isdigit()):
         return {'type': TokenType.NUMBER, 'lexeme': token_buffer}
     elif token_buffer == 'true':
         return {'type': TokenType.TRUE}
@@ -85,12 +77,8 @@ def _get_token(token_buffer):
         return {'type': TokenType.FALSE}
     elif token_buffer == 'nil':
         return {'type': TokenType.NIL}
-    elif token_buffer == 'def':
-        return {'type': TokenType.DEF}
     elif token_buffer == 'if':
         return {'type': TokenType.IF}
-    elif token_buffer == 'quote':
-        return {'type': TokenType.QUOTE}
     else:
         return {'type': TokenType.SYMBOL, 'lexeme': token_buffer}
 
@@ -120,9 +108,9 @@ def scan_tokens(source):
             token_buffer += c
         elif c == '-':
             if source[index+1].isdigit():
-                tokens.append({'type': TokenType.NEGATIVE})
+                token_buffer += c
             else:
-                tokens.append({'type': TokenType.MINUS})
+                tokens.append({'type': TokenType.SYMBOL, 'lexeme': '-'})
         elif c.isalnum():
             token_buffer += c
         elif c == ' ':
@@ -165,10 +153,6 @@ def parse(tokens):
             current_list.append(True)
         elif token['type'] == TokenType.FALSE:
             current_list.append(False)
-        elif token['type'] == TokenType.NEGATIVE:
-            current_list.append(int(tokens[index+1]['lexeme']) * -1)
-            # increment an extra time, since we're consuming two tokens here
-            index = index + 1
         elif token['type'] == TokenType.NUMBER:
             current_list.append(int(token['lexeme']))
         elif token['type'] == TokenType.SYMBOL:
@@ -245,18 +229,18 @@ def evaluate(node):
         elif isinstance(first, Symbol):
             if first.name == '+':
                 return add(rest)
+            if first.name == '-':
+                return subtract(rest)
             elif first.name == '*':
                 return multiply(rest)
             elif first.name == '/':
                 return divide(rest)
             elif first.name == '=':
                 return equal(rest)
-        elif first == TokenType.QUOTE:
-            return rest[0]
-        elif first == TokenType.MINUS:
-            return subtract(rest)
-        elif first == TokenType.DEF:
-            return define(rest)
+            elif first.name == 'def':
+                return define(rest)
+            elif first.name == 'quote':
+                return rest[0]
         elif first == TokenType.IF:
             return if_form(rest)
     if isinstance(node, Symbol):
