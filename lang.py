@@ -104,8 +104,17 @@ def scan_tokens(source):
                 tokens.append(_get_token(token_buffer))
                 token_buffer = ''
             tokens.append({'type': TokenType.RIGHT_BRACKET})
+        elif c == '{':
+            tokens.append({'type': TokenType.LEFT_BRACE})
+        elif c == '}':
+            if token_buffer:
+                tokens.append(_get_token(token_buffer))
+                token_buffer = ''
+            tokens.append({'type': TokenType.RIGHT_BRACE})
         elif c in ['+', '-', '*', '/', '=']:
             token_buffer += c
+        elif c == ',':
+            pass
         elif c.isalnum():
             token_buffer += c
         elif c == ' ':
@@ -121,6 +130,21 @@ def scan_tokens(source):
         tokens.append(_get_token(token_buffer))
 
     return tokens
+
+
+def _get_node(token):
+    if token['type'] == TokenType.NIL:
+        return None
+    elif token['type'] == TokenType.TRUE:
+        return True
+    elif token['type'] == TokenType.FALSE:
+        return False
+    elif token['type'] == TokenType.NUMBER:
+        return int(token['lexeme'])
+    elif token['type'] == TokenType.SYMBOL:
+        return Symbol(name=token['lexeme'])
+    else:
+        return token['type']
 
 
 def parse(tokens):
@@ -142,18 +166,17 @@ def parse(tokens):
             #finish an expression
             stack_of_lists.pop(-1)
             current_list = stack_of_lists[-1]
-        elif token['type'] == TokenType.NIL:
-            current_list.append(None)
-        elif token['type'] == TokenType.TRUE:
-            current_list.append(True)
-        elif token['type'] == TokenType.FALSE:
-            current_list.append(False)
-        elif token['type'] == TokenType.NUMBER:
-            current_list.append(int(token['lexeme']))
-        elif token['type'] == TokenType.SYMBOL:
-            current_list.append(Symbol(name=token['lexeme']))
+        elif token['type'] == TokenType.LEFT_BRACE:
+            map_tokens = []
+            while token['type'] != TokenType.RIGHT_BRACE:
+                index += 1
+                token = tokens[index]
+                if token['type'] != TokenType.RIGHT_BRACE:
+                    map_tokens.append(_get_node(token))
+            m = dict(zip(map_tokens[::2], map_tokens[1::2]))
+            current_list.append(m)
         else:
-            current_list.append(token['type'])
+            current_list.append(_get_node(token))
         index = index + 1
 
     if len(ast) == 1:

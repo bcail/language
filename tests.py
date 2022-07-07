@@ -127,6 +127,7 @@ class EvalTests(unittest.TestCase):
             {'src': 'false', 'result': False},
             {'src': '(quote (1 2))', 'result': [1, 2]},
             {'src': '[1 2]', 'result': [1, 2]},
+            {'src': '{1 5, 2 4}', 'result': {1: 5, 2: 4}},
             {'src': '1 [1 2] nil', 'result': [1, [1, 2], None]},
             {'src': '(+ 1 2)', 'result': 3},
             {'src': '(+ 1 (+ 1 1))', 'result': 3},
