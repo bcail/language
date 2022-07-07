@@ -215,6 +215,16 @@ def if_form(params):
         return true_val
 
 
+symbols = {
+    '+': add,
+    '-': subtract,
+    '*': multiply,
+    '/': divide,
+    '=': equal,
+    'def': define,
+}
+
+
 def evaluate(node):
     if isinstance(node, list):
         first = node[0]
@@ -222,18 +232,8 @@ def evaluate(node):
         if isinstance(first, list):
             return [evaluate(n) for n in node]
         elif isinstance(first, Symbol):
-            if first.name == '+':
-                return add(rest)
-            if first.name == '-':
-                return subtract(rest)
-            elif first.name == '*':
-                return multiply(rest)
-            elif first.name == '/':
-                return divide(rest)
-            elif first.name == '=':
-                return equal(rest)
-            elif first.name == 'def':
-                return define(rest)
+            if first.name in ['+', '-', '*', '/', '=', 'def']:
+                return symbols[first.name](rest)
             elif first.name == 'quote':
                 return rest[0]
         elif first == TokenType.IF:
