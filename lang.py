@@ -104,13 +104,8 @@ def scan_tokens(source):
                 tokens.append(_get_token(token_buffer))
                 token_buffer = ''
             tokens.append({'type': TokenType.RIGHT_BRACKET})
-        elif c in ['+', '*', '/', '=']:
+        elif c in ['+', '-', '*', '/', '=']:
             token_buffer += c
-        elif c == '-':
-            if source[index+1].isdigit():
-                token_buffer += c
-            else:
-                tokens.append({'type': TokenType.SYMBOL, 'lexeme': '-'})
         elif c.isalnum():
             token_buffer += c
         elif c == ' ':
