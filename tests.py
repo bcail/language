@@ -143,10 +143,13 @@ class EvalTests(unittest.TestCase):
             {'src': '(if false true false)', 'result': False},
             {'src': '(def a 1)', 'result': Var(name='a', value=1)},
             {'src': '(def a 1) (+ a 2)', 'result': [Var(name='a', value=1), 3]},
+            {'src': '(let [x 1] x)', 'result': 1},
+            # {'src': '((fn [x] x) 1)', 'result': 1},
         ]
 
         for test in tests:
             with self.subTest(test=test):
+                print(f'*** test: {test["src"]}')
                 self.assertEqual(evaluate(parse(scan_tokens(test['src']))), test['result'])
 
 

@@ -1,3 +1,4 @@
+import copy
 from enum import Enum, auto
 
 
@@ -184,9 +185,6 @@ def parse(tokens):
     return ast
 
 
-environment = {}
-
-
 def add(params):
     return sum([evaluate(p) for p in params])
 
@@ -238,31 +236,63 @@ def if_form(params):
         return true_val
 
 
-symbols = {
+def let(params):
+    bindings = params[0]
+    body = params[1]
+
+    paired_bindings = []
+    for i in range(0, len(bindings), 2):
+        paired_bindings.append(bindings[i:i+2])
+
+    local_env = copy.deepcopy(environment)
+    for binding in paired_bindings:
+        local_env[binding[0].name] = evaluate(binding[1], env=local_env)
+
+    return evaluate(body, env=local_env)
+
+
+def create_function(params):
+    print(f'{params=}')
+    def f(*args, **kwargs):
+        pass
+    return f
+
+
+environment = {
     '+': add,
     '-': subtract,
     '*': multiply,
     '/': divide,
     '=': equal,
     'def': define,
+    'let': let,
+    'fn': create_function,
 }
 
 
-def evaluate(node):
+def evaluate(node, env=environment):
     if isinstance(node, list):
         first = node[0]
         rest = node[1:]
         if isinstance(first, list):
             return [evaluate(n) for n in node]
         elif isinstance(first, Symbol):
-            if first.name in ['+', '-', '*', '/', '=', 'def']:
-                return symbols[first.name](rest)
+            if first.name in env:
+                if callable(env[first.name]):
+                    return env[first.name](rest)
+                else:
+                    return env[first.name]
             elif first.name == 'quote':
                 return rest[0]
+            else:
+                raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
             return if_form(rest)
+        elif callable(first):
+            return first(*rest)
     if isinstance(node, Symbol):
-        return environment[node.name].value
+        symbol = env[node.name]
+        return getattr(symbol, 'value', symbol)
     return node
 
 
