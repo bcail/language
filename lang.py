@@ -251,11 +251,22 @@ def let(params):
     return evaluate(body, env=local_env)
 
 
+class Function:
+
+    def __init__(self, params, body):
+        self.params = params
+        self.body = body
+
+    def __call__(self, args):
+        local_env = copy.deepcopy(environment)
+        bindings = zip(self.params, args)
+        for binding in bindings:
+            local_env[binding[0].name] = evaluate(binding[1], env=local_env)
+        return evaluate(self.body, env=local_env)
+
+
 def create_function(params):
-    print(f'{params=}')
-    def f(*args, **kwargs):
-        pass
-    return f
+    return Function(params=params[0], body=params[1])
 
 
 environment = {
@@ -275,7 +286,11 @@ def evaluate(node, env=environment):
         first = node[0]
         rest = node[1:]
         if isinstance(first, list):
-            return [evaluate(n) for n in node]
+            results = [evaluate(n) for n in node]
+            if callable(results[0]):
+                return evaluate(results, env=env)
+            else:
+                return results
         elif isinstance(first, Symbol):
             if first.name in env:
                 if callable(env[first.name]):
@@ -288,11 +303,13 @@ def evaluate(node, env=environment):
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
             return if_form(rest)
-        elif callable(first):
-            return first(*rest)
+        elif isinstance(first, Function):
+            return first(rest)
     if isinstance(node, Symbol):
         symbol = env[node.name]
         return getattr(symbol, 'value', symbol)
+    if isinstance(node, Function):
+        return node()
     return node
 
 
