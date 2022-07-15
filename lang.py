@@ -185,36 +185,36 @@ def parse(tokens):
     return ast
 
 
-def add(params):
-    return sum([evaluate(p) for p in params])
+def add(params, env):
+    return sum([evaluate(p, env=env) for p in params])
 
 
-def subtract(params):
-    return evaluate(params[0]) - sum([evaluate(n) for n in params[1:]])
+def subtract(params, env):
+    return evaluate(params[0]) - sum([evaluate(n, env=env) for n in params[1:]])
 
 
-def multiply(params):
+def multiply(params, env):
     result = params[0]
     for n in params[1:]:
-        result = result * evaluate(n)
+        result = result * evaluate(n, env=env)
     return result
 
 
-def divide(params):
+def divide(params, env):
     result = params[0]
     for n in params[1:]:
-        result = result / evaluate(n)
+        result = result / evaluate(n, env=env)
     return result
 
 
-def equal(params):
+def equal(params, env):
     for n in params[1:]:
         if n != params[0]:
             return False
     return True
 
 
-def define(params):
+def define(params, env):
     name = params[0].name
     var = Var(name=name)
     if len(params) > 1:
@@ -223,11 +223,11 @@ def define(params):
     return var
 
 
-def if_form(params):
-    test_val = evaluate(params[0])
-    true_val = evaluate(params[1])
+def if_form(params, env):
+    test_val = evaluate(params[0], env=env)
+    true_val = evaluate(params[1], env=env)
     if len(params) > 2:
-        false_val = evaluate(params[2])
+        false_val = evaluate(params[2], env=env)
     else:
         false_val = None
     if test_val in [False, None]:
@@ -236,19 +236,19 @@ def if_form(params):
         return true_val
 
 
-def let(params):
+def let(params, env):
     bindings = params[0]
-    body = params[1]
+    body = params[1:]
 
     paired_bindings = []
     for i in range(0, len(bindings), 2):
         paired_bindings.append(bindings[i:i+2])
 
-    local_env = copy.deepcopy(environment)
+    local_env = copy.deepcopy(env)
     for binding in paired_bindings:
         local_env[binding[0].name] = evaluate(binding[1], env=local_env)
 
-    return evaluate(body, env=local_env)
+    return evaluate(*body, env=local_env)
 
 
 class Function:
@@ -265,7 +265,7 @@ class Function:
         return evaluate(self.body, env=local_env)
 
 
-def create_function(params):
+def create_function(params, env):
     return Function(params=params[0], body=params[1])
 
 
@@ -286,7 +286,7 @@ def evaluate(node, env=environment):
         first = node[0]
         rest = node[1:]
         if isinstance(first, list):
-            results = [evaluate(n) for n in node]
+            results = [evaluate(n, env=env) for n in node]
             if callable(results[0]):
                 return evaluate(results, env=env)
             else:
@@ -294,7 +294,7 @@ def evaluate(node, env=environment):
         elif isinstance(first, Symbol):
             if first.name in env:
                 if callable(env[first.name]):
-                    return env[first.name](rest)
+                    return env[first.name](rest, env=env)
                 else:
                     return env[first.name]
             elif first.name == 'quote':
@@ -302,7 +302,7 @@ def evaluate(node, env=environment):
             else:
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
-            return if_form(rest)
+            return if_form(rest, env=env)
         elif isinstance(first, Function):
             return first(rest)
     if isinstance(node, Symbol):
