@@ -146,6 +146,7 @@ class EvalTests(unittest.TestCase):
             {'src': '(let [x 1] x)', 'result': 1},
             {'src': '((fn [x] x) 1)', 'result': 1},
             {'src': '(let [x 1 y 2] (+ x y))', 'result': 3},
+            {'src': '((fn [x y] (+ x y)) 1 2)', 'result': 3},
         ]
 
         for test in tests:
