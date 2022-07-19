@@ -125,6 +125,8 @@ class EvalTests(unittest.TestCase):
             {'src': 'nil', 'result': None},
             {'src': 'true', 'result': True},
             {'src': 'false', 'result': False},
+            {'src': '"hello"', 'result': 'hello'},
+            {'src': '"hello "', 'result': 'hello '},
             {'src': '(quote (1 2))', 'result': [1, 2]},
             {'src': '[1 2]', 'result': [1, 2]},
             {'src': '{1 5, 2 4}', 'result': {1: 5, 2: 4}},
@@ -147,6 +149,9 @@ class EvalTests(unittest.TestCase):
             {'src': '((fn [x] x) 1)', 'result': 1},
             {'src': '(let [x 1 y 2] (+ x y))', 'result': 3},
             {'src': '((fn [x y] (+ x y)) 1 2)', 'result': 3},
+            {'src': '(str)', 'result': ''},
+            {'src': '(str 1)', 'result': '1'},
+            {'src': '(str "hello " "world")', 'result': 'hello world'},
         ]
 
         for test in tests:

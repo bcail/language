@@ -87,11 +87,20 @@ def _get_token(token_buffer):
 def scan_tokens(source):
     tokens = []
 
+    inside_string = False
     token_buffer = ''
     index = 0
     while index < len(source):
         c = source[index]
-        if c == '(':
+
+        if inside_string:
+            if c == '"':
+                tokens.append({'type': TokenType.STRING, 'lexeme': token_buffer})
+                token_buffer = ''
+                inside_string = False
+            else:
+                token_buffer += c
+        elif c == '(':
             tokens.append({'type': TokenType.LEFT_PAREN})
         elif c == ')':
             if token_buffer:
@@ -122,6 +131,8 @@ def scan_tokens(source):
             if token_buffer:
                 tokens.append(_get_token(token_buffer))
                 token_buffer = ''
+        elif c == '"':
+            inside_string = True
         else:
             print(f'unknown char "{c}"')
 
@@ -142,6 +153,8 @@ def _get_node(token):
         return False
     elif token['type'] == TokenType.NUMBER:
         return int(token['lexeme'])
+    elif token['type'] == TokenType.STRING:
+        return token['lexeme']
     elif token['type'] == TokenType.SYMBOL:
         return Symbol(name=token['lexeme'])
     else:
@@ -251,6 +264,15 @@ def let(params, env):
     return evaluate(*body, env=local_env)
 
 
+def str_func(params, env):
+    if not params:
+        return ''
+    if len(params) == 1:
+        return str(params[0])
+    else:
+        return ''.join([p for p in params])
+
+
 class Function:
 
     def __init__(self, params, body):
@@ -278,6 +300,7 @@ environment = {
     'def': define,
     'let': let,
     'fn': create_function,
+    'str': str_func,
 }
 
 
