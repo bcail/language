@@ -56,6 +56,15 @@ class Var:
         return str(self)
 
 
+class Vector:
+
+    def __init__(self, items):
+        self.items = items
+
+    def __eq__(self, other):
+        return self.items == other.items
+
+
 def _report(line_number, where, message):
     print(f'[line {line_number}] Error{where}: {message}')
 
@@ -188,7 +197,7 @@ def parse(tokens):
     index = 0
     while index < len(tokens):
         token = tokens[index]
-        if token['type'] in [TokenType.LEFT_PAREN, TokenType.LEFT_BRACKET]:
+        if token['type'] == TokenType.LEFT_PAREN:
             #start new expression
             new_list = []
             if stack_of_lists is None:
@@ -196,7 +205,15 @@ def parse(tokens):
             stack_of_lists[-1].append(new_list)
             stack_of_lists.append(new_list)
             current_list = stack_of_lists[-1]
-        elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET]:
+        elif token['type'] == TokenType.LEFT_BRACKET:
+            vector_tokens = []
+            while token['type'] != TokenType.RIGHT_BRACKET:
+                index += 1
+                token = tokens[index]
+                if token['type'] != TokenType.RIGHT_BRACKET:
+                    vector_tokens.append(_get_node(token))
+            current_list.append(Vector(vector_tokens))
+        elif token['type'] == TokenType.RIGHT_PAREN:
             #finish an expression
             stack_of_lists.pop(-1)
             current_list = stack_of_lists[-1]
@@ -211,6 +228,7 @@ def parse(tokens):
             current_list.append(m)
         else:
             current_list.append(_get_node(token))
+
         index = index + 1
 
     for a in ast:
@@ -275,8 +293,8 @@ def let(params, env):
     body = params[1:]
 
     paired_bindings = []
-    for i in range(0, len(bindings), 2):
-        paired_bindings.append(bindings[i:i+2])
+    for i in range(0, len(bindings.items), 2):
+        paired_bindings.append(bindings.items[i:i+2])
 
     local_env = copy.deepcopy(env)
     for binding in paired_bindings:
@@ -338,7 +356,7 @@ class Function:
 
     def __call__(self, args):
         local_env = copy.deepcopy(environment)
-        bindings = zip(self.params, args)
+        bindings = zip(self.params.items, args)
         for binding in bindings:
             local_env[binding[0].name] = evaluate(binding[1], env=local_env)
         return evaluate(self.body, env=local_env)

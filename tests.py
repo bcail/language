@@ -1,5 +1,5 @@
 import unittest
-from lang import TokenType, scan_tokens, parse, evaluate, Symbol, Var
+from lang import TokenType, scan_tokens, parse, evaluate, Symbol, Var, Vector
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
@@ -131,10 +131,10 @@ class EvalTests(unittest.TestCase):
             {'src': '"hello"', 'result': 'hello'},
             {'src': '"hello "', 'result': 'hello '},
             {'src': '(quote (1 2))', 'result': [1, 2]},
-            # {'src': '[1 2]', 'result': [1, 2]},
+            {'src': '[1 2]', 'result': Vector([1, 2])},
             {'src': '{1 5, 2 4}', 'result': {1: 5, 2: 4}},
             {'src': '1 2 nil', 'result': [1, 2, None]}, #multiple forms, not a list
-            # {'src': '1 [1 2] nil', 'result': [1, [1, 2], None]}, #multiple forms, not a list
+            {'src': '1 [1 2] nil', 'result': [1, Vector([1, 2]), None]}, #multiple forms, not a list
             {'src': '(+ 1 2)', 'result': 3},
             {'src': '(+ 1 (+ 1 1))', 'result': 3},
             {'src': '(+ 1 (- 4 2))', 'result': 3},
