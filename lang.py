@@ -127,6 +127,8 @@ def scan_tokens(source):
             pass
         elif c.isalnum():
             token_buffer += c
+        elif c == '?':
+            token_buffer += c
         elif c == ' ':
             if token_buffer:
                 tokens.append(_get_token(token_buffer))
@@ -273,6 +275,42 @@ def str_func(params, env):
         return ''.join([p for p in params])
 
 
+def str_split(params, env):
+    return params[0].split()
+
+
+def map_get(params, env):
+    return params[0][params[1]]
+
+
+def map_keys(params, env):
+    return list(params[0].keys())
+
+
+def map_vals(params, env):
+    return list(params[0].values())
+
+
+def map_contains(params, env):
+    return params[1] in params[0]
+
+
+def map_assoc(params, env):
+    d = copy.deepcopy(params[0])
+    d[params[1]] = params[2]
+    return d
+
+
+def map_dissoc(params, env):
+    d = copy.deepcopy(params[0])
+    d.pop(params[1], None)
+    return d
+
+
+def println(params, env):
+    print(params[0])
+
+
 class Function:
 
     def __init__(self, params, body):
@@ -301,6 +339,14 @@ environment = {
     'let': let,
     'fn': create_function,
     'str': str_func,
+    'get': map_get,
+    'keys': map_keys,
+    'vals': map_vals,
+    'contains?': map_contains,
+    'assoc': map_assoc,
+    'dissoc': map_dissoc,
+    'str/split': str_split,
+    'println': println,
 }
 
 

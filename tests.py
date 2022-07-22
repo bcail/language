@@ -152,6 +152,15 @@ class EvalTests(unittest.TestCase):
             {'src': '(str)', 'result': ''},
             {'src': '(str 1)', 'result': '1'},
             {'src': '(str "hello " "world")', 'result': 'hello world'},
+            {'src': '(str/split "hello world")', 'result': ['hello', 'world']},
+            {'src': '(get {1 2} 1)', 'result': 2},
+            {'src': '(keys {1 2 "a" 3})', 'result': [1, 'a']},
+            {'src': '(vals {1 2 "a" 3})', 'result': [2, 3]},
+            {'src': '(contains? {1 2 "a" 3} 1)', 'result': True},
+            {'src': '(contains? {1 2 "a" 3} "not-found")', 'result': False},
+            {'src': '(assoc {1 2 "a" 3} "new-key" "new-val")', 'result': {1: 2, 'a': 3, 'new-key': 'new-val'}},
+            {'src': '(dissoc {1 2 "a" 3} 1)', 'result': {'a': 3}},
+            {'src': '(println "hello")', 'result': None},
         ]
 
         for test in tests:
