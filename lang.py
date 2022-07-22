@@ -2,6 +2,23 @@ import copy
 from enum import Enum, auto
 
 
+class AST:
+
+    def __init__(self):
+        self.forms = []
+
+    def add(self, form):
+        self.forms.append(form)
+
+    def evaluate(self):
+        results = [evaluate(f) for f in self.forms]
+
+        if len(results) == 1:
+            return results[0]
+        else:
+            return results
+
+
 class Symbol:
 
     def __init__(self, name):
@@ -164,6 +181,7 @@ def _get_node(token):
 
 
 def parse(tokens):
+    ast_obj = AST()
     ast = []
     stack_of_lists = None
     current_list = ast
@@ -195,9 +213,10 @@ def parse(tokens):
             current_list.append(_get_node(token))
         index = index + 1
 
-    if len(ast) == 1:
-        ast = ast[0]
-    return ast
+    for a in ast:
+        ast_obj.add(a)
+
+    return ast_obj
 
 
 def add(params, env):
@@ -359,13 +378,13 @@ def evaluate(node, env=environment):
             if callable(results[0]):
                 return evaluate(results, env=env)
             else:
-                return results
+                raise Exception('first element of list not callable: {results[0]}')
         elif isinstance(first, Symbol):
             if first.name in env:
                 if callable(env[first.name]):
                     return env[first.name](rest, env=env)
                 else:
-                    return env[first.name]
+                    raise Exception(f'symbol first in list and not callable: {first.name}')
             elif first.name == 'quote':
                 return rest[0]
             else:
@@ -374,6 +393,8 @@ def evaluate(node, env=environment):
             return if_form(rest, env=env)
         elif isinstance(first, Function):
             return first(rest)
+        else:
+            raise Exception(f'first element of list not callable: {first}')
     if isinstance(node, Symbol):
         symbol = env[node.name]
         return getattr(symbol, 'value', symbol)

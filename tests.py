@@ -21,20 +21,22 @@ EXPECTED_TOKENS = [
     {'type': TokenType.RIGHT_PAREN},
 ]
 
-EXPECTED_AST = [
-    Symbol('+'),
-    10,
-    2,
+EXPECTED_AST_FORMS = [
     [
-        Symbol('-'),
-        15,
+        Symbol('+'),
+        10,
+        2,
         [
-            Symbol('+'),
-            4,
-            4,
-        ]
-    ],
-    -5,
+            Symbol('-'),
+            15,
+            [
+                Symbol('+'),
+                4,
+                4,
+            ]
+        ],
+        -5,
+    ]
 ]
 
 
@@ -67,7 +69,7 @@ class ParseTests(unittest.TestCase):
     def test(self):
         self.maxDiff = None
         ast = parse(EXPECTED_TOKENS)
-        self.assertEqual(ast, EXPECTED_AST)
+        self.assertEqual(ast.forms, EXPECTED_AST_FORMS)
 
     def test_2(self):
         tokens = [
@@ -78,13 +80,15 @@ class ParseTests(unittest.TestCase):
             {'type': TokenType.RIGHT_PAREN},
         ]
         ast = parse(tokens)
-        self.assertEqual(ast,
+        self.assertEqual(ast.forms,
+            [
                 [
                     Symbol('='),
                     True,
                     None
                 ]
-            )
+            ]
+        )
 
     def test_sequence_of_forms(self):
         tokens = [
@@ -100,7 +104,7 @@ class ParseTests(unittest.TestCase):
             {'type': TokenType.RIGHT_PAREN},
         ]
         ast = parse(tokens)
-        self.assertEqual(ast,
+        self.assertEqual(ast.forms,
                 [
                     [
                         Symbol('def'),
@@ -116,7 +120,6 @@ class ParseTests(unittest.TestCase):
             )
 
 
-
 class EvalTests(unittest.TestCase):
 
     def test(self):
@@ -128,9 +131,10 @@ class EvalTests(unittest.TestCase):
             {'src': '"hello"', 'result': 'hello'},
             {'src': '"hello "', 'result': 'hello '},
             {'src': '(quote (1 2))', 'result': [1, 2]},
-            {'src': '[1 2]', 'result': [1, 2]},
+            # {'src': '[1 2]', 'result': [1, 2]},
             {'src': '{1 5, 2 4}', 'result': {1: 5, 2: 4}},
-            {'src': '1 [1 2] nil', 'result': [1, [1, 2], None]},
+            {'src': '1 2 nil', 'result': [1, 2, None]}, #multiple forms, not a list
+            # {'src': '1 [1 2] nil', 'result': [1, [1, 2], None]}, #multiple forms, not a list
             {'src': '(+ 1 2)', 'result': 3},
             {'src': '(+ 1 (+ 1 1))', 'result': 3},
             {'src': '(+ 1 (- 4 2))', 'result': 3},
@@ -166,7 +170,12 @@ class EvalTests(unittest.TestCase):
         for test in tests:
             with self.subTest(test=test):
                 print(f'*** test: {test["src"]}')
-                self.assertEqual(evaluate(parse(scan_tokens(test['src']))), test['result'])
+                self.assertEqual(parse(scan_tokens(test['src'])).evaluate(), test['result'])
+
+    def test_exceptions(self):
+        with self.assertRaises(Exception) as cm:
+            parse(scan_tokens('(1 2 3)')).evaluate()
+        self.assertIn('not callable', str(cm.exception))
 
 
 if __name__ == '__main__':
