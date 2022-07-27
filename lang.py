@@ -291,7 +291,7 @@ def define(params, env):
     name = params[0].name
     var = Var(name=name)
     if len(params) > 1:
-        var.value = params[1]
+        var.value = evaluate(params[1], env=env)
     environment[name] = var
     return var
 
@@ -420,10 +420,13 @@ def evaluate(node, env=environment):
                 raise Exception('first element of list not callable: {results[0]}')
         elif isinstance(first, Symbol):
             if first.name in env:
+                if isinstance(env[first.name], Var) and isinstance(env[first.name].value, Function):
+                    f = env[first.name].value
+                    return f(rest)
                 if callable(env[first.name]):
                     return env[first.name](rest, env=env)
                 else:
-                    raise Exception(f'symbol first in list and not callable: {first.name}')
+                    raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             elif first.name == 'quote':
                 return rest[0]
             else:
