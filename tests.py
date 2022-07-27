@@ -1,5 +1,5 @@
 import unittest
-from lang import TokenType, scan_tokens, parse, evaluate, Symbol, Var, Vector
+from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
@@ -128,6 +128,7 @@ class EvalTests(unittest.TestCase):
             {'src': 'nil', 'result': None},
             {'src': 'true', 'result': True},
             {'src': 'false', 'result': False},
+            {'src': ':hello', 'result': Keyword(':hello')},
             {'src': '"hello"', 'result': 'hello'},
             {'src': '"hello "', 'result': 'hello '},
             {'src': '(quote (1 2))', 'result': [1, 2]},

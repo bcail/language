@@ -19,6 +19,18 @@ class AST:
             return results
 
 
+class Keyword:
+
+    def __init__(self, name):
+        self.name = name
+
+    def __eq__(self, other):
+        try:
+            return self.name == other.name
+        except AttributeError:
+            return False
+
+
 class Symbol:
 
     def __init__(self, name):
@@ -86,6 +98,7 @@ class TokenType(Enum):
     GREATER_EQUAL = auto()
     LESS = auto()
     LESS_EQUAL = auto()
+    KEYWORD = auto()
     SYMBOL = auto()
     STRING = auto()
     NUMBER = auto()
@@ -106,6 +119,8 @@ def _get_token(token_buffer):
         return {'type': TokenType.NIL}
     elif token_buffer == 'if':
         return {'type': TokenType.IF}
+    elif token_buffer.startswith(':'):
+        return {'type': TokenType.KEYWORD, 'lexeme': token_buffer}
     else:
         return {'type': TokenType.SYMBOL, 'lexeme': token_buffer}
 
@@ -151,6 +166,10 @@ def scan_tokens(source):
             token_buffer += c
         elif c == ',':
             pass
+        elif c == ':':
+            if token_buffer:
+                raise Exception('invalid ":" char')
+            token_buffer += c
         elif c.isalnum():
             token_buffer += c
         elif c == '?':
@@ -185,6 +204,8 @@ def _get_node(token):
         return token['lexeme']
     elif token['type'] == TokenType.SYMBOL:
         return Symbol(name=token['lexeme'])
+    elif token['type'] == TokenType.KEYWORD:
+        return Keyword(name=token['lexeme'])
     else:
         return token['type']
 
