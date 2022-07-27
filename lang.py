@@ -387,6 +387,14 @@ def create_function(params, env):
     return Function(params=params[0], body=params[1])
 
 
+def defn(params, env):
+    name = params[0].name
+    var = Var(name=name)
+    var.value = Function(params=params[1], body=params[2])
+    environment[name] = var
+    return var
+
+
 environment = {
     '+': add,
     '-': subtract,
@@ -394,6 +402,7 @@ environment = {
     '/': divide,
     '=': equal,
     'def': define,
+    'defn': defn,
     'let': let,
     'fn': create_function,
     'str': str_func,
