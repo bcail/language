@@ -162,7 +162,7 @@ def scan_tokens(source):
                 tokens.append(_get_token(token_buffer))
                 token_buffer = ''
             tokens.append({'type': TokenType.RIGHT_BRACE})
-        elif c in ['+', '-', '*', '/', '=']:
+        elif c in ['+', '-', '*', '/', '=', '>', '<']:
             token_buffer += c
         elif c == ',':
             pass
@@ -287,6 +287,14 @@ def equal(params, env):
     return True
 
 
+def greater(params, env):
+    return bool(params[0] > params[1])
+
+
+def less(params, env):
+    return bool(params[0] < params[1])
+
+
 def define(params, env):
     name = params[0].name
     var = Var(name=name)
@@ -401,6 +409,8 @@ environment = {
     '*': multiply,
     '/': divide,
     '=': equal,
+    '>': greater,
+    '<': less,
     'def': define,
     'defn': defn,
     'let': let,
