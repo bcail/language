@@ -291,8 +291,16 @@ def greater(params, env):
     return bool(params[0] > params[1])
 
 
+def greater_equal(params, env):
+    return bool(params[0] >= params[1])
+
+
 def less(params, env):
     return bool(params[0] < params[1])
+
+
+def less_equal(params, env):
+    return bool(params[0] <= params[1])
 
 
 def define(params, env):
@@ -410,7 +418,9 @@ environment = {
     '/': divide,
     '=': equal,
     '>': greater,
+    '>=': greater_equal,
     '<': less,
+    '<=': less_equal,
     'def': define,
     'defn': defn,
     'let': let,
