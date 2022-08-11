@@ -369,9 +369,9 @@ def str_func(params, env):
     if not params:
         return ''
     if len(params) == 1:
-        return str(params[0])
+        return str(evaluate(params[0], env=env))
     else:
-        return ''.join([p for p in params])
+        return ''.join([evaluate(p, env=env) for p in params])
 
 
 def str_split(params, env):

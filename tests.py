@@ -187,6 +187,9 @@ class EvalTests(unittest.TestCase):
         results = parse(scan_tokens('(defn f1 [x y] (+ x y)) (f1 1 2)')).evaluate()
         self.assertEqual(results[1], 3)
 
+        results = parse(scan_tokens('(defn hello [name] (str "Hello, " name)) (hello "Someone")')).evaluate()
+        self.assertEqual(results[1], 'Hello, Someone')
+
     def test_exceptions(self):
         with self.assertRaises(Exception) as cm:
             parse(scan_tokens('(1 2 3)')).evaluate()
