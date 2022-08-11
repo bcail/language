@@ -506,7 +506,7 @@ def evaluate(node, env=environment):
 def run(source):
     tokens = scan_tokens(source)
     ast = parse(tokens)
-    evaluate(ast)
+    return ast.evaluate()
 
 
 def _run_file(file_name):
@@ -518,10 +518,14 @@ def _run_file(file_name):
 def _run_prompt():
     print('Running prompt')
     while True:
-        code = input('> ')
+        try:
+            code = input('> ')
+        except EOFError:
+            break
         if not code.strip():
             break
-        run(code)
+        result = run(code)
+        print(result)
 
 
 def main(file_name):
