@@ -263,26 +263,27 @@ def add(params, env):
 
 
 def subtract(params, env):
-    return evaluate(params[0]) - sum([evaluate(n, env=env) for n in params[1:]])
+    return evaluate(params[0], env=env) - sum([evaluate(n, env=env) for n in params[1:]])
 
 
 def multiply(params, env):
-    result = params[0]
+    result = evaluate(params[0], env=env)
     for n in params[1:]:
         result = result * evaluate(n, env=env)
     return result
 
 
 def divide(params, env):
-    result = params[0]
+    result = evaluate(params[0], env=env)
     for n in params[1:]:
         result = result / evaluate(n, env=env)
     return result
 
 
 def equal(params, env):
-    for n in params[1:]:
-        if n != params[0]:
+    first_param = evaluate(params[0], env=env)
+    for param in params[1:]:
+        if evaluate(param, env=env) != first_param:
             return False
     return True
 
@@ -338,6 +339,30 @@ def let(params, env):
         local_env[binding[0].name] = evaluate(binding[1], env=local_env)
 
     return evaluate(*body, env=local_env)
+
+
+def loop(params, env):
+    bindings = params[0]
+    body = params[1:]
+
+    loop_params = bindings.items[::2]
+    initial_args = bindings.items[1::2]
+
+    local_env = copy.deepcopy(env)
+
+    for index, loop_param in enumerate(loop_params):
+        local_env[loop_param.name] = evaluate(initial_args[index], env=local_env)
+
+
+    while True:
+        result = evaluate(*body, env=local_env)
+
+        if isinstance(result, tuple) and isinstance(result[0], Symbol) and result[0].name == 'recur':
+            new_args = result[1:]
+            for index, loop_param in enumerate(loop_params):
+                local_env[loop_param.name] = evaluate(new_args[index], env=local_env)
+        else:
+            return result
 
 
 def str_func(params, env):
@@ -424,6 +449,7 @@ environment = {
     'def': define,
     'defn': defn,
     'let': let,
+    'loop': loop,
     'fn': create_function,
     'str': str_func,
     'get': map_get,
@@ -458,6 +484,9 @@ def evaluate(node, env=environment):
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             elif first.name == 'quote':
                 return rest[0]
+            elif first.name == 'recur':
+                params = [evaluate(r, env) for r in rest]
+                return (first, *params)
             else:
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:

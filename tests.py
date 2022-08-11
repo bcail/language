@@ -172,6 +172,7 @@ class EvalTests(unittest.TestCase):
             {'src': '(assoc {1 2 "a" 3} "new-key" "new-val")', 'result': {1: 2, 'a': 3, 'new-key': 'new-val'}},
             {'src': '(dissoc {1 2 "a" 3} 1)', 'result': {'a': 3}},
             {'src': '(println "hello")', 'result': None},
+            {'src': '((fn [n] (loop [cnt n acc 1] (if (= 0 cnt) acc (recur (- cnt 1) (* acc cnt))))) 3)', 'result': 6},
         ]
 
         for test in tests:
