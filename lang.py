@@ -75,6 +75,8 @@ class Vector:
         self.items = items
 
     def __eq__(self, other):
+        if not isinstance(other, Vector):
+            raise Exception(f'{other} is not a Vector')
         return self.items == other.items
 
 
@@ -396,6 +398,14 @@ def str_subs(params, env):
         return s[start:]
 
 
+def conj(params, env):
+    l = evaluate(params[0], env=env).items
+    new_element = evaluate(params[1], env=env)
+    new_l = l[:]
+    new_l.append(new_element)
+    return Vector(new_l)
+
+
 def map_get(params, env):
     return params[0][params[1]]
 
@@ -471,6 +481,7 @@ environment = {
     'fn': create_function,
     'str': str_func,
     'subs': str_subs,
+    'conj': conj,
     'get': map_get,
     'keys': map_keys,
     'vals': map_vals,
