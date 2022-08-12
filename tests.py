@@ -170,6 +170,8 @@ class EvalTests(unittest.TestCase):
             {'src': '(subs "world" 0)', 'result': 'world'},
             {'src': '(subs "world" 0 2)', 'result': 'wo'},
             {'src': '(conj [1 2] 3)', 'result': Vector([1, 2, 3])},
+            {'src': '(subvec [1 2 3] 0)', 'result': Vector([1, 2, 3])},
+            {'src': '(subvec [1 2 3] 0 1)', 'result': Vector([1])},
             {'src': '(get {1 2} 1)', 'result': 2},
             {'src': '(keys {1 2 "a" 3})', 'result': [1, 'a']},
             {'src': '(vals {1 2 "a" 3})', 'result': [2, 3]},

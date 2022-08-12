@@ -79,6 +79,12 @@ class Vector:
             raise Exception(f'{other} is not a Vector')
         return self.items == other.items
 
+    def __str__(self):
+        return str(self.items)
+
+    def __repr__(self):
+        return str(self)
+
 
 def _report(line_number, where, message):
     print(f'[line {line_number}] Error{where}: {message}')
@@ -406,6 +412,17 @@ def conj(params, env):
     return Vector(new_l)
 
 
+def subvec(params, env):
+    l = evaluate(params[0], env=env).items
+    start = evaluate(params[1], env=env)
+
+    if len(params) > 2:
+        end = evaluate(params[2], env=env)
+        return Vector(l[start:end])
+    else:
+        return Vector(l[start:])
+
+
 def map_get(params, env):
     return params[0][params[1]]
 
@@ -482,6 +499,7 @@ environment = {
     'str': str_func,
     'subs': str_subs,
     'conj': conj,
+    'subvec': subvec,
     'get': map_get,
     'keys': map_keys,
     'vals': map_vals,
