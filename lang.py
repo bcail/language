@@ -378,6 +378,17 @@ def str_split(params, env):
     return params[0].split()
 
 
+def str_subs(params, env):
+    s = evaluate(params[0], env=env)
+    start = evaluate(params[1], env=env)
+
+    if len(params) > 2:
+        end = evaluate(params[2], env=env)
+        return s[start:end]
+    else:
+        return s[start:]
+
+
 def map_get(params, env):
     return params[0][params[1]]
 
@@ -452,6 +463,7 @@ environment = {
     'loop': loop,
     'fn': create_function,
     'str': str_func,
+    'subs': str_subs,
     'get': map_get,
     'keys': map_keys,
     'vals': map_vals,
