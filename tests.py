@@ -125,6 +125,9 @@ class EvalTests(unittest.TestCase):
     def test(self):
         tests = [
             {'src': '2', 'result': 2},
+            {'src': '-2', 'result': -2},
+            {'src': '2.3', 'result': 2.3},
+            {'src': '-2.3', 'result': -2.3},
             {'src': 'nil', 'result': None},
             {'src': 'true', 'result': True},
             {'src': 'false', 'result': False},

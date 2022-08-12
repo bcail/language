@@ -1,5 +1,6 @@
 import copy
 from enum import Enum, auto
+import re
 
 
 class AST:
@@ -102,15 +103,21 @@ class TokenType(Enum):
     SYMBOL = auto()
     STRING = auto()
     NUMBER = auto()
+    FLOAT = auto()
     TRUE = auto()
     FALSE = auto()
     NIL = auto()
     IF = auto()
 
 
+FLOAT_RE = re.compile('-?\d+\.?\d*')
+
+
 def _get_token(token_buffer):
     if token_buffer.isdigit() or (token_buffer.startswith('-') and token_buffer[1:].isdigit()):
         return {'type': TokenType.NUMBER, 'lexeme': token_buffer}
+    elif FLOAT_RE.match(token_buffer):
+        return {'type': TokenType.FLOAT, 'lexeme': token_buffer}
     elif token_buffer == 'true':
         return {'type': TokenType.TRUE}
     elif token_buffer == 'false':
@@ -170,9 +177,7 @@ def scan_tokens(source):
             if token_buffer:
                 raise Exception('invalid ":" char')
             token_buffer += c
-        elif c.isalnum():
-            token_buffer += c
-        elif c == '?':
+        elif c.isalnum() or c in ['?', '.']:
             token_buffer += c
         elif c == ' ':
             if token_buffer:
@@ -200,6 +205,8 @@ def _get_node(token):
         return False
     elif token['type'] == TokenType.NUMBER:
         return int(token['lexeme'])
+    elif token['type'] == TokenType.FLOAT:
+        return float(token['lexeme'])
     elif token['type'] == TokenType.STRING:
         return token['lexeme']
     elif token['type'] == TokenType.SYMBOL:
