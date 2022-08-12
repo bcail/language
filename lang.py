@@ -179,7 +179,7 @@ def scan_tokens(source):
             tokens.append({'type': TokenType.RIGHT_BRACE})
         elif c in ['+', '-', '*', '/', '=', '>', '<']:
             token_buffer += c
-        elif c == ',':
+        elif c in [',', '\n']:
             pass
         elif c == ':':
             if token_buffer:
@@ -386,7 +386,7 @@ def str_func(params, env):
     if len(params) == 1:
         return str(evaluate(params[0], env=env))
     else:
-        return ''.join([evaluate(p, env=env) for p in params])
+        return ''.join([str(evaluate(p, env=env)) for p in params])
 
 
 def str_split(params, env):

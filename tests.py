@@ -167,6 +167,7 @@ class EvalTests(unittest.TestCase):
             {'src': '(str)', 'result': ''},
             {'src': '(str 1)', 'result': '1'},
             {'src': '(str "hello " "world")', 'result': 'hello world'},
+            {'src': '(str "hello " 1 " world")', 'result': 'hello 1 world'},
             {'src': '(str/split "hello world")', 'result': ['hello', 'world']},
             {'src': '(subs "world" 0)', 'result': 'world'},
             {'src': '(subs "world" 0 2)', 'result': 'wo'},
