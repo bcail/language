@@ -451,6 +451,10 @@ def map_dissoc(params, env):
     return d
 
 
+def print_func(params, env):
+    print(evaluate(params[0], env=env), end='')
+
+
 def println(params, env):
     print(evaluate(params[0], env=env))
 
@@ -507,6 +511,7 @@ environment = {
     'assoc': map_assoc,
     'dissoc': map_dissoc,
     'str/split': str_split,
+    'print': print_func,
     'println': println,
 }
 

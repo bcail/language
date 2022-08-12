@@ -181,7 +181,6 @@ class EvalTests(unittest.TestCase):
             {'src': '(contains? {1 2 "a" 3} "not-found")', 'result': False},
             {'src': '(assoc {1 2 "a" 3} "new-key" "new-val")', 'result': {1: 2, 'a': 3, 'new-key': 'new-val'}},
             {'src': '(dissoc {1 2 "a" 3} 1)', 'result': {'a': 3}},
-            {'src': '(println "hello")', 'result': None},
             {'src': '((fn [n] (loop [cnt n acc 1] (if (= 0 cnt) acc (recur (- cnt 1) (* acc cnt))))) 3)', 'result': 6},
         ]
 
@@ -199,6 +198,18 @@ class EvalTests(unittest.TestCase):
 
         results = parse(scan_tokens('(defn hello [name] (str "Hello, " name)) (hello "Someone")')).evaluate()
         self.assertEqual(results[1], 'Hello, Someone')
+
+        with patch('builtins.print') as print_mock:
+            result = parse(scan_tokens('(print "1")')).evaluate()
+
+        print_mock.assert_called_with('1', end='')
+        self.assertIsNone(result)
+
+        with patch('builtins.print') as print_mock:
+            result = parse(scan_tokens('(println "1")')).evaluate()
+
+        print_mock.assert_called_with('1')
+        self.assertIsNone(result)
 
         with patch('builtins.print') as print_mock:
             result = parse(scan_tokens('(do (println "1") 2)')).evaluate()
