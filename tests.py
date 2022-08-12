@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector
 
 
@@ -197,6 +198,12 @@ class EvalTests(unittest.TestCase):
 
         results = parse(scan_tokens('(defn hello [name] (str "Hello, " name)) (hello "Someone")')).evaluate()
         self.assertEqual(results[1], 'Hello, Someone')
+
+        with patch('builtins.print') as print_mock:
+            result = parse(scan_tokens('(do (println "1") 2)')).evaluate()
+
+        print_mock.assert_called_with('1')
+        self.assertEqual(result, 2)
 
     def test_exceptions(self):
         with self.assertRaises(Exception) as cm:

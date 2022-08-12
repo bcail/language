@@ -304,19 +304,19 @@ def equal(params, env):
 
 
 def greater(params, env):
-    return bool(params[0] > params[1])
+    return bool(evaluate(params[0], env=env) > evaluate(params[1], env=env))
 
 
 def greater_equal(params, env):
-    return bool(params[0] >= params[1])
+    return bool(evaluate(params[0], env=env) >= evaluate(params[1], env=env))
 
 
 def less(params, env):
-    return bool(params[0] < params[1])
+    return bool(evaluate(params[0], env=env) < evaluate(params[1], env=env))
 
 
 def less_equal(params, env):
-    return bool(params[0] <= params[1])
+    return bool(evaluate(params[0], env=env) <= evaluate(params[1], env=env))
 
 
 def define(params, env):
@@ -452,7 +452,7 @@ def map_dissoc(params, env):
 
 
 def println(params, env):
-    print(params[0])
+    print(evaluate(params[0], env=env))
 
 
 class Function:
@@ -535,6 +535,9 @@ def evaluate(node, env=environment):
             elif first.name == 'recur':
                 params = [evaluate(r, env) for r in rest]
                 return (first, *params)
+            elif first.name == 'do':
+                results = [evaluate(n, env=env) for n in rest]
+                return results[-1]
             else:
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
@@ -560,7 +563,7 @@ def run(source):
 def _run_file(file_name):
     print(f'Running {file_name}')
     with open(file_name, 'rb') as f:
-        run(f.read().decode('utf8'))
+        run(f.read().decode('utf8').strip())
 
 
 def _run_prompt():
