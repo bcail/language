@@ -459,6 +459,11 @@ def println(params, env):
     print(evaluate(params[0], env=env))
 
 
+def read_line(params, env):
+    line = input()
+    return line
+
+
 class Function:
 
     def __init__(self, params, body):
@@ -513,6 +518,7 @@ environment = {
     'str/split': str_split,
     'print': print_func,
     'println': println,
+    'read-line': read_line,
 }
 
 

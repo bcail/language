@@ -211,6 +211,13 @@ class EvalTests(unittest.TestCase):
         print_mock.assert_called_with('1')
         self.assertIsNone(result)
 
+        with patch('builtins.input') as input_mock:
+            input_mock.return_value = 'line1'
+            result = parse(scan_tokens('(read-line)')).evaluate()
+
+        input_mock.assert_called_once()
+        self.assertEqual(result, 'line1')
+
         with patch('builtins.print') as print_mock:
             result = parse(scan_tokens('(do (println "1") 2)')).evaluate()
 
