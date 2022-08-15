@@ -71,8 +71,8 @@ class Var:
 
 class Vector:
 
-    def __init__(self, items):
-        self.items = items
+    def __init__(self, items=None):
+        self.items = items or []
 
     def __eq__(self, other):
         if not isinstance(other, Vector):
@@ -84,6 +84,9 @@ class Vector:
 
     def __repr__(self):
         return str(self)
+
+    def append(self, item):
+        self.items.append(item)
 
 
 def _report(line_number, where, message):
@@ -242,14 +245,14 @@ def parse(tokens):
             stack_of_lists.append(new_list)
             current_list = stack_of_lists[-1]
         elif token['type'] == TokenType.LEFT_BRACKET:
-            vector_tokens = []
-            while token['type'] != TokenType.RIGHT_BRACKET:
-                index += 1
-                token = tokens[index]
-                if token['type'] != TokenType.RIGHT_BRACKET:
-                    vector_tokens.append(_get_node(token))
-            current_list.append(Vector(vector_tokens))
-        elif token['type'] == TokenType.RIGHT_PAREN:
+            #start new expression
+            new_vector = Vector()
+            if stack_of_lists is None:
+                stack_of_lists = [ast]
+            stack_of_lists[-1].append(new_vector)
+            stack_of_lists.append(new_vector)
+            current_list = stack_of_lists[-1]
+        elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET]:
             #finish an expression
             stack_of_lists.pop(-1)
             current_list = stack_of_lists[-1]
@@ -562,6 +565,8 @@ def evaluate(node, env=environment):
         return getattr(symbol, 'value', symbol)
     if isinstance(node, Function):
         return node()
+    if isinstance(node, Vector):
+        return Vector([evaluate(n, env=env) for n in node.items])
     return node
 
 
