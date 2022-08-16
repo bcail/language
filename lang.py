@@ -493,6 +493,21 @@ def defn(params, env):
     return var
 
 
+def file_open(params, env):
+    file_name = evaluate(params[0], env=env)
+    return open(file_name, 'rb')
+
+
+def file_read(params, env):
+    f = evaluate(params[0], env=env)
+    return f.read()
+
+
+def file_close(params, env):
+    f = evaluate(params[0], env=env)
+    f.close()
+
+
 environment = {
     '+': add,
     '-': subtract,
@@ -522,6 +537,9 @@ environment = {
     'print': print_func,
     'println': println,
     'read-line': read_line,
+    'file/open': file_open,
+    'file/read': file_read,
+    'file/close': file_close,
 }
 
 

@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 from unittest.mock import patch
 from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector
@@ -162,6 +163,7 @@ class EvalTests(unittest.TestCase):
             {'src': '(def a 1)', 'result': Var(name='a', value=1)},
             {'src': '(def a 1) (+ a 2)', 'result': [Var(name='a', value=1), 3]},
             {'src': '(let [x 1] x)', 'result': 1},
+            {'src': '(let [x (+ 1 1)] x)', 'result': 2},
             {'src': '((fn [x] x) 1)', 'result': 1},
             {'src': '(let [x 1 y 2] (+ x y))', 'result': 3},
             {'src': '((fn [x y] (+ x y)) 1 2)', 'result': 3},
@@ -224,6 +226,12 @@ class EvalTests(unittest.TestCase):
 
         print_mock.assert_called_with('1')
         self.assertEqual(result, 2)
+
+        with tempfile.NamedTemporaryFile(mode='w+b') as f:
+            f.write('asdf'.encode('utf8'))
+            f.flush()
+            result = parse(scan_tokens(f'(let [f (file/open "{f.name}"), data (file/read f)] (do (file/close f) data))')).evaluate()
+        self.assertEqual(result, 'asdf'.encode('utf8'))
 
     def test_exceptions(self):
         with self.assertRaises(Exception) as cm:
