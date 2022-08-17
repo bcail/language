@@ -228,6 +228,15 @@ def _get_node(token):
         return token['type']
 
 
+class Dict:
+
+    def __init__(self):
+        self.items = []
+
+    def append(self, item):
+        self.items.append(item)
+
+
 def parse(tokens):
     ast_obj = AST()
     ast = []
@@ -252,19 +261,17 @@ def parse(tokens):
             stack_of_lists[-1].append(new_vector)
             stack_of_lists.append(new_vector)
             current_list = stack_of_lists[-1]
-        elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET]:
+        elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET, TokenType.RIGHT_BRACE]:
             #finish an expression
             stack_of_lists.pop(-1)
             current_list = stack_of_lists[-1]
         elif token['type'] == TokenType.LEFT_BRACE:
-            map_tokens = []
-            while token['type'] != TokenType.RIGHT_BRACE:
-                index += 1
-                token = tokens[index]
-                if token['type'] != TokenType.RIGHT_BRACE:
-                    map_tokens.append(_get_node(token))
-            m = dict(zip(map_tokens[::2], map_tokens[1::2]))
-            current_list.append(m)
+            new_dict = Dict()
+            if stack_of_lists is None:
+                stack_of_lists = [ast]
+            stack_of_lists[-1].append(new_dict)
+            stack_of_lists.append(new_dict)
+            current_list = stack_of_lists[-1]
         else:
             current_list.append(_get_node(token))
 
@@ -427,30 +434,38 @@ def subvec(params, env):
 
 
 def map_get(params, env):
-    return params[0][params[1]]
+    d = evaluate(params[0], env=env)
+    key = evaluate(params[1], env=env)
+    return d[key]
 
 
 def map_keys(params, env):
-    return list(params[0].keys())
+    d = evaluate(params[0], env=env)
+    return list(d.keys())
 
 
 def map_vals(params, env):
-    return list(params[0].values())
+    d = evaluate(params[0], env=env)
+    return list(d.values())
 
 
 def map_contains(params, env):
-    return params[1] in params[0]
+    d = evaluate(params[0], env=env)
+    key = evaluate(params[1], env=env)
+    return key in d
 
 
 def map_assoc(params, env):
-    d = copy.deepcopy(params[0])
-    d[params[1]] = params[2]
+    d = copy.deepcopy(evaluate(params[0], env=env))
+    key = evaluate(params[1], env=env)
+    d[key] = evaluate(params[2], env=env)
     return d
 
 
 def map_dissoc(params, env):
-    d = copy.deepcopy(params[0])
-    d.pop(params[1], None)
+    d = copy.deepcopy(evaluate(params[0], env=env))
+    key = evaluate(params[1], env=env)
+    d.pop(key, None)
     return d
 
 
@@ -585,6 +600,11 @@ def evaluate(node, env=environment):
         return node()
     if isinstance(node, Vector):
         return Vector([evaluate(n, env=env) for n in node.items])
+    if isinstance(node, Dict):
+        keys = [evaluate(k, env=env) for k in node.items[::2]]
+        values = [evaluate(v, env=env) for v in node.items[1::2]]
+        d = dict(zip(keys, values))
+        return d
     return node
 
 

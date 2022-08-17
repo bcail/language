@@ -140,6 +140,7 @@ class EvalTests(unittest.TestCase):
             {'src': '[1 2]', 'result': Vector([1, 2])},
             {'src': '[1 (+ 1 1)]', 'result': Vector([1, 2])},
             {'src': '{1 5, 2 4}', 'result': {1: 5, 2: 4}},
+            {'src': '{1 (+ 2 3), 2 4}', 'result': {1: 5, 2: 4}},
             {'src': '1 2 nil', 'result': [1, 2, None]}, #multiple forms, not a list
             {'src': '1 [1 2] nil', 'result': [1, Vector([1, 2]), None]}, #multiple forms, not a list
             {'src': '(+ 1 2)', 'result': 3},
