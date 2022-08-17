@@ -228,7 +228,7 @@ def _get_node(token):
         return token['type']
 
 
-class Dict:
+class DictBuilder:
 
     def __init__(self):
         self.items = []
@@ -266,7 +266,7 @@ def parse(tokens):
             stack_of_lists.pop(-1)
             current_list = stack_of_lists[-1]
         elif token['type'] == TokenType.LEFT_BRACE:
-            new_dict = Dict()
+            new_dict = DictBuilder()
             if stack_of_lists is None:
                 stack_of_lists = [ast]
             stack_of_lists[-1].append(new_dict)
@@ -600,7 +600,7 @@ def evaluate(node, env=environment):
         return node()
     if isinstance(node, Vector):
         return Vector([evaluate(n, env=env) for n in node.items])
-    if isinstance(node, Dict):
+    if isinstance(node, DictBuilder):
         keys = [evaluate(k, env=env) for k in node.items[::2]]
         values = [evaluate(v, env=env) for v in node.items[1::2]]
         d = dict(zip(keys, values))
