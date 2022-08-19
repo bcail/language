@@ -1,6 +1,9 @@
 import copy
 from enum import Enum, auto
+import os
+from pathlib import Path
 import re
+import tempfile
 
 
 class AST:
@@ -615,13 +618,11 @@ def run(source):
 
 
 def _run_file(file_name):
-    print(f'Running {file_name}')
     with open(file_name, 'rb') as f:
         run(f.read().decode('utf8').strip())
 
 
 def _run_prompt():
-    print('Running prompt')
     while True:
         try:
             code = input('> ')
@@ -635,17 +636,44 @@ def _run_prompt():
 
 def main(file_name):
     if file_name:
+        print(f'interpreting {file_name}...')
         _run_file(file_name)
     else:
         _run_prompt()
+
+
+def compile_to_c(file_name):
+    tmp = tempfile.mkdtemp(dir='.', prefix='tmp')
+    c_file = Path(tmp) / Path(f'{file_name.stem}.c')
+    print(f'compiling {file_name} to {c_file}...')
+    text = '''
+#include <stdio.h>
+
+int main()
+{
+    printf("Hello World");
+
+    return 0;
+}'''
+    with open(c_file, mode='wb') as f:
+        f.write(text.encode('utf8'))
+    executable = Path(tmp) / file_name.stem
+    print(f'Compile with: gcc -o {executable} {c_file}')
 
 
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='Random language')
+    parser.add_argument('-c', action='store_true', dest='compile', help='compile the file to C')
     parser.add_argument('file', type=str, nargs='?', help='file to compile')
 
     args = parser.parse_args()
 
-    main(args.file)
+    if args.compile:
+        if args.file:
+            compile_to_c(Path(args.file))
+        else:
+            print('no file to compile')
+    else:
+        main(args.file)
