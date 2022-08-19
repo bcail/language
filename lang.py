@@ -480,6 +480,11 @@ def println(params, env):
     print(evaluate(params[0], env=env))
 
 
+def println_c(params, env):
+    param = emit_c(params[0], env=env)
+    return f'printf({param});'
+
+
 def read_line(params, env):
     line = input()
     return line
@@ -611,6 +616,29 @@ def evaluate(node, env=environment):
     return node
 
 
+compile_env = {
+    'println': println_c,
+}
+
+
+def emit_c(node, env=compile_env):
+    if isinstance(node, list):
+        first = node[0]
+        rest = node[1:]
+        if isinstance(first, Symbol):
+            if first.name in env:
+                if isinstance(env[first.name], Var) and isinstance(env[first.name].value, Function):
+                    f = env[first.name].value
+                    return f(rest)
+                if callable(env[first.name]):
+                    return env[first.name](rest, env=env)
+                else:
+                    raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
+    if isinstance(node, str):
+        return f'"{node}"'
+    return str(node)
+
+
 def run(source):
     tokens = scan_tokens(source)
     ast = parse(tokens)
@@ -646,15 +674,17 @@ def _compile(source):
     tokens = scan_tokens(source)
     ast = parse(tokens)
 
-    c_code = '''
-#include <stdio.h>
-
+    start = '''#include <stdio.h>
 int main()
 {
-    printf("Hello World");
-
-    return 0;
+'''
+    end = '''
+return 0;
 }'''
+
+    compiled_code = '\n'.join([emit_c(f) for f in ast.forms])
+
+    c_code = '\n'.join([start, compiled_code, end])
 
     return c_code
 
