@@ -642,11 +642,11 @@ def main(file_name):
         _run_prompt()
 
 
-def compile_to_c(file_name):
-    tmp = tempfile.mkdtemp(dir='.', prefix='tmp')
-    c_file = Path(tmp) / Path(f'{file_name.stem}.c')
-    print(f'compiling {file_name} to {c_file}...')
-    text = '''
+def _compile(source):
+    tokens = scan_tokens(source)
+    ast = parse(tokens)
+
+    c_code = '''
 #include <stdio.h>
 
 int main()
@@ -655,8 +655,22 @@ int main()
 
     return 0;
 }'''
+
+    return c_code
+
+
+def compile_to_c(file_name):
+    tmp = tempfile.mkdtemp(dir='.', prefix='tmp')
+    c_file = Path(tmp) / Path(f'{file_name.stem}.c')
+    print(f'compiling {file_name} to {c_file}...')
+
+    with open(file_name, 'rb') as f:
+        source = f.read().decode('utf8')
+
+    c_program = _compile(source)
+
     with open(c_file, mode='wb') as f:
-        f.write(text.encode('utf8'))
+        f.write(c_program.encode('utf8'))
     executable = Path(tmp) / file_name.stem
     print(f'Compile with: gcc -o {executable} {c_file}')
 
