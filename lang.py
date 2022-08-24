@@ -290,6 +290,11 @@ def add(params, env):
     return sum([evaluate(p, env=env) for p in params])
 
 
+def add_c(params, env):
+    params = [emit_c(p, env=env) for p in params]
+    return f'add({params[0]}, {params[1]})'
+
+
 def subtract(params, env):
     return evaluate(params[0], env=env) - sum([evaluate(n, env=env) for n in params[1:]])
 
@@ -482,7 +487,7 @@ def println(params, env):
 
 def println_c(params, env):
     param = emit_c(params[0], env=env)
-    return f'printf({param});'
+    return f'int result = {param};\nprintf("%d", result);'
 
 
 def read_line(params, env):
@@ -617,6 +622,7 @@ def evaluate(node, env=environment):
 
 
 compile_env = {
+    '+': add_c,
     'println': println_c,
 }
 
@@ -634,8 +640,12 @@ def emit_c(node, env=compile_env):
                     return env[first.name](rest, env=env)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
+            else:
+                raise Exception(f'unhandled symbol: {first}')
     if isinstance(node, str):
         return f'"{node}"'
+    if isinstance(node, int):
+        return f'{node}'
     return str(node)
 
 
@@ -675,6 +685,12 @@ def _compile(source):
     ast = parse(tokens)
 
     start = '''#include <stdio.h>
+
+int add(int x, int y)
+{
+    return x + y;
+}
+
 int main()
 {
 '''
