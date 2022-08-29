@@ -408,7 +408,13 @@ def str_func(params, env):
 
 
 def str_split(params, env):
-    return params[0].split()
+    p = evaluate(params[0], env=env)
+    return p.split()
+
+
+def str_trim(params, env):
+    p = evaluate(params[0], env=env)
+    return p.strip()
 
 
 def str_subs(params, env):
@@ -457,6 +463,11 @@ def map_vals(params, env):
     return list(d.values())
 
 
+def map_pairs(params, env):
+    d = evaluate(params[0], env=env)
+    return [list(i) for i in d.items()]
+
+
 def map_contains(params, env):
     d = evaluate(params[0], env=env)
     key = evaluate(params[1], env=env)
@@ -491,8 +502,10 @@ def println_c(params, env):
 
 
 def read_line(params, env):
-    line = input()
-    return line
+    try:
+        return input()
+    except EOFError:
+        return ''
 
 
 class Function:
@@ -558,10 +571,12 @@ environment = {
     'get': map_get,
     'keys': map_keys,
     'vals': map_vals,
+    'pairs': map_pairs,
     'contains?': map_contains,
     'assoc': map_assoc,
     'dissoc': map_dissoc,
     'str/split': str_split,
+    'str/trim': str_trim,
     'print': print_func,
     'println': println,
     'read-line': read_line,

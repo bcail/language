@@ -181,6 +181,7 @@ class EvalTests(unittest.TestCase):
             {'src': '(get {1 2} 1)', 'result': 2},
             {'src': '(keys {1 2 "a" 3})', 'result': [1, 'a']},
             {'src': '(vals {1 2 "a" 3})', 'result': [2, 3]},
+            {'src': '(pairs {1 2 "a" 3})', 'result': [[1, 2], ["a", 3]]},
             {'src': '(contains? {1 2 "a" 3} 1)', 'result': True},
             {'src': '(contains? {1 2 "a" 3} "not-found")', 'result': False},
             {'src': '(assoc {1 2 "a" 3} "new-key" "new-val")', 'result': {1: 2, 'a': 3, 'new-key': 'new-val'}},
@@ -221,6 +222,13 @@ class EvalTests(unittest.TestCase):
 
         input_mock.assert_called_once()
         self.assertEqual(result, 'line1')
+
+        with patch('builtins.input') as input_mock:
+            input_mock.side_effect = EOFError()
+            result = parse(scan_tokens('(read-line)')).evaluate()
+
+        input_mock.assert_called_once()
+        self.assertEqual(result, '')
 
         with patch('builtins.print') as print_mock:
             result = parse(scan_tokens('(do (println "1") 2)')).evaluate()
