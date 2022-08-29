@@ -674,7 +674,6 @@ def _run_prompt():
 
 def main(file_name):
     if file_name:
-        print(f'interpreting {file_name}...')
         _run_file(file_name)
     else:
         _run_prompt()
