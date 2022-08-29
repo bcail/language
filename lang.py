@@ -91,6 +91,9 @@ class Vector:
     def __len__(self):
         return len(self.items)
 
+    def __getitem__(self, item):
+        return self.items[item]
+
     def append(self, item):
         self.items.append(item)
 
@@ -450,6 +453,12 @@ def subvec(params, env):
         return Vector(l[start:])
 
 
+def nth(params, env):
+    collection = evaluate(params[0], env=env)
+    index = evaluate(params[1], env=env)
+    return collection[index]
+
+
 def count(params, env):
     p = evaluate(params[0], env=env)
     if p is None:
@@ -580,6 +589,7 @@ environment = {
     'subs': str_subs,
     'conj': conj,
     'subvec': subvec,
+    'nth': nth,
     'count': count,
     'get': map_get,
     'keys': map_keys,

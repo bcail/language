@@ -178,6 +178,8 @@ class EvalTests(unittest.TestCase):
             {'src': '(conj [1 2] 3)', 'result': Vector([1, 2, 3])},
             {'src': '(subvec [1 2 3] 0)', 'result': Vector([1, 2, 3])},
             {'src': '(subvec [1 2 3] 0 1)', 'result': Vector([1])},
+            {'src': '(nth [1 2 3] 1)', 'result': 2},
+            {'src': '(nth (quote (1 2 3)) 1)', 'result': 2},
             {'src': '(count nil)', 'result': 0},
             {'src': '(count [1 2 3])', 'result': 3},
             {'src': '(count (quote (1 2 3)))', 'result': 3},
