@@ -88,6 +88,9 @@ class Vector:
     def __repr__(self):
         return str(self)
 
+    def __len__(self):
+        return len(self.items)
+
     def append(self, item):
         self.items.append(item)
 
@@ -447,6 +450,13 @@ def subvec(params, env):
         return Vector(l[start:])
 
 
+def count(params, env):
+    p = evaluate(params[0], env=env)
+    if p is None:
+        return 0
+    return len(p)
+
+
 def map_get(params, env):
     d = evaluate(params[0], env=env)
     key = evaluate(params[1], env=env)
@@ -570,6 +580,7 @@ environment = {
     'subs': str_subs,
     'conj': conj,
     'subvec': subvec,
+    'count': count,
     'get': map_get,
     'keys': map_keys,
     'vals': map_vals,
