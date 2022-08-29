@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from unittest.mock import patch
-from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector
+from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector, run
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
@@ -204,6 +204,15 @@ class EvalTests(unittest.TestCase):
         results = parse(scan_tokens('(defn hello [name] (str "Hello, " name)) (hello "Someone")')).evaluate()
         self.assertEqual(results[1], 'Hello, Someone')
 
+        results = parse(scan_tokens('(def name "Someone") (defn hello [name] (str "Hello, " name)) (hello name)')).evaluate()
+        self.assertEqual(results[2], 'Hello, Someone')
+
+        results = parse(scan_tokens('(def name "Someone") (defn hello [name] (str "Hello, " name)) (do (hello name) name)')).evaluate()
+        self.assertEqual(results[2], 'Someone')
+
+        results = parse(scan_tokens('(defn hello [name] (str "Hello, " name)) (loop [name "Someone Else"] (if (= name "Someone") name (do (hello name) (str name name))))')).evaluate()
+        self.assertEqual(results[1], 'Someone ElseSomeone Else')
+
         with patch('builtins.print') as print_mock:
             result = parse(scan_tokens('(print "1")')).evaluate()
 
@@ -246,6 +255,25 @@ class EvalTests(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             parse(scan_tokens('(1 2 3)')).evaluate()
         self.assertIn('not callable', str(cm.exception))
+
+
+class RunTests(unittest.TestCase):
+
+    def test(self):
+        source = '''
+(defn f [l]
+  l)
+
+(loop [line "line1"]
+  (if (= line "")
+    0
+    (do
+      (f line)
+      (recur ""))))'''
+
+        result = run(source)
+
+        self.assertEqual(result[1], 0)
 
 
 if __name__ == '__main__':

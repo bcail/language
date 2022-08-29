@@ -514,8 +514,10 @@ class Function:
         self.params = params
         self.body = body
 
-    def __call__(self, args):
-        local_env = copy.deepcopy(environment)
+    def __call__(self, args, env=None):
+        if not env:
+            env = environment
+        local_env = copy.deepcopy(env)
         bindings = zip(self.params.items, args)
         for binding in bindings:
             local_env[binding[0].name] = evaluate(binding[1], env=local_env)
@@ -600,7 +602,7 @@ def evaluate(node, env=environment):
             if first.name in env:
                 if isinstance(env[first.name], Var) and isinstance(env[first.name].value, Function):
                     f = env[first.name].value
-                    return f(rest)
+                    return f(rest, env=env)
                 if callable(env[first.name]):
                     return env[first.name](rest, env=env)
                 else:
