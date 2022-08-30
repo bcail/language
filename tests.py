@@ -136,6 +136,7 @@ class EvalTests(unittest.TestCase):
             {'src': ':hello', 'result': Keyword(':hello')},
             {'src': '"hello"', 'result': 'hello'},
             {'src': '"hello "', 'result': 'hello '},
+            {'src': '"hello " ;comment', 'result': 'hello '},
             {'src': '(quote (1 2))', 'result': [1, 2]},
             {'src': '[1 2]', 'result': Vector([1, 2])},
             {'src': '[1 (+ 1 1)]', 'result': Vector([1, 2])},
@@ -272,13 +273,13 @@ class RunTests(unittest.TestCase):
 
     def test(self):
         source = '''
-(defn f [l]
+(defn f [l] ;comment
   l)
-
+;comment
 (loop [line "line1"]
   (if (= line "")
     0
-    (do
+    (do ;comment
       (f line)
       (recur ""))))'''
 

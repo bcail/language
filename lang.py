@@ -156,6 +156,7 @@ def scan_tokens(source):
     tokens = []
 
     inside_string = False
+    inside_comment = False
     token_buffer = ''
     index = 0
     while index < len(source):
@@ -168,6 +169,9 @@ def scan_tokens(source):
                 inside_string = False
             else:
                 token_buffer += c
+        elif inside_comment:
+            if c == '\n':
+                inside_comment = False
         elif c == '(':
             tokens.append({'type': TokenType.LEFT_PAREN})
         elif c == ')':
@@ -205,6 +209,8 @@ def scan_tokens(source):
                 token_buffer = ''
         elif c == '"':
             inside_string = True
+        elif c == ';':
+            inside_comment = True
         else:
             print(f'unknown char "{c}"')
 
