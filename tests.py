@@ -173,6 +173,8 @@ class EvalTests(unittest.TestCase):
             {'src': '(str "hello " "world")', 'result': 'hello world'},
             {'src': '(str "hello " 1 " world")', 'result': 'hello 1 world'},
             {'src': '(str/split "hello world")', 'result': ['hello', 'world']},
+            {'src': '(str/trim "\n")', 'result': ''},
+            {'src': '(str/trim " hello ")', 'result': 'hello'},
             {'src': '(subs "world" 0)', 'result': 'world'},
             {'src': '(subs "world" 0 2)', 'result': 'wo'},
             {'src': '(conj [1 2] 3)', 'result': Vector([1, 2, 3])},
@@ -218,6 +220,9 @@ class EvalTests(unittest.TestCase):
 
         results = parse(scan_tokens('(defn hello [name] (str "Hello, " name)) (loop [name "Someone Else"] (if (= name "Someone") name (do (hello name) (str name name))))')).evaluate()
         self.assertEqual(results[1], 'Someone ElseSomeone Else')
+
+        results = parse(scan_tokens('(def v "\n") (str/trim v)')).evaluate()
+        self.assertEqual(results[1], '')
 
         with patch('builtins.print') as print_mock:
             result = parse(scan_tokens('(print "1")')).evaluate()
