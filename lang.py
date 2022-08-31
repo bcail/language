@@ -328,7 +328,8 @@ def divide(params, env):
 def equal(params, env):
     first_param = evaluate(params[0], env=env)
     for param in params[1:]:
-        if evaluate(param, env=env) != first_param:
+        p = evaluate(param, env=env)
+        if p != first_param:
             return False
     return True
 
@@ -360,15 +361,15 @@ def define(params, env):
 
 def if_form(params, env):
     test_val = evaluate(params[0], env=env)
-    true_val = evaluate(params[1], env=env)
-    if len(params) > 2:
-        false_val = evaluate(params[2], env=env)
+
+    if test_val:
+        return evaluate(params[1], env=env)
     else:
-        false_val = None
-    if test_val in [False, None]:
+        if len(params) > 2:
+            false_val = evaluate(params[2], env=env)
+        else:
+            false_val = None
         return false_val
-    else:
-        return true_val
 
 
 def let(params, env):
@@ -530,7 +531,7 @@ def read_line(params, env):
     try:
         return input()
     except EOFError:
-        return ''
+        return None
 
 
 class Function:

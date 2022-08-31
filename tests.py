@@ -249,7 +249,7 @@ class EvalTests(unittest.TestCase):
             result = parse(scan_tokens('(read-line)')).evaluate()
 
         input_mock.assert_called_once()
-        self.assertEqual(result, '')
+        self.assertEqual(result, None)
 
         with patch('builtins.print') as print_mock:
             result = parse(scan_tokens('(do (println "1") 2)')).evaluate()
@@ -287,6 +287,24 @@ class RunTests(unittest.TestCase):
 
         self.assertEqual(result[1], 0)
 
+    def test_if(self):
+        source = '''
+  (if (= 1 2)
+    (println "true")
+    (println "false"))'''
+
+        with patch('builtins.print') as print_mock:
+            parse(scan_tokens(source)).evaluate()
+        print_mock.assert_called_once_with('false')
+
+        source = '''
+  (if (= 1 1)
+    (println "true")
+    (println "false"))'''
+
+        with patch('builtins.print') as print_mock:
+            parse(scan_tokens(source)).evaluate()
+        print_mock.assert_called_once_with('true')
 
 if __name__ == '__main__':
     unittest.main()
