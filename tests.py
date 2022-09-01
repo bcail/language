@@ -195,6 +195,8 @@ class EvalTests(unittest.TestCase):
             {'src': '(contains? {1 2 "a" 3} "not-found")', 'result': False},
             {'src': '(assoc {1 2 "a" 3} "new-key" "new-val")', 'result': {1: 2, 'a': 3, 'new-key': 'new-val'}},
             {'src': '(dissoc {1 2 "a" 3} 1)', 'result': {'a': 3}},
+            {'src': '(def d {}) (assoc d 1 "a") (get d 1)', 'result': [Var(name='d', value={1: 'a'}), {1: 'a'}, 'a']},
+            {'src': '(def d {1 "a"}) (dissoc d 1) d', 'result': [Var(name='d', value={1: 'a'}), {}, {}]},
             {'src': '((fn [n] (loop [cnt n acc 1] (if (= 0 cnt) acc (recur (- cnt 1) (* acc cnt))))) 3)', 'result': 6},
         ]
 

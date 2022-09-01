@@ -442,11 +442,10 @@ def str_subs(params, env):
 
 
 def conj(params, env):
-    l = evaluate(params[0], env=env).items
+    coll = evaluate(params[0], env=env)
     new_element = evaluate(params[1], env=env)
-    new_l = l[:]
-    new_l.append(new_element)
-    return Vector(new_l)
+    coll.append(new_element)
+    return coll
 
 
 def subvec(params, env):
@@ -501,14 +500,14 @@ def map_contains(params, env):
 
 
 def map_assoc(params, env):
-    d = copy.deepcopy(evaluate(params[0], env=env))
+    d = evaluate(params[0], env=env)
     key = evaluate(params[1], env=env)
     d[key] = evaluate(params[2], env=env)
     return d
 
 
 def map_dissoc(params, env):
-    d = copy.deepcopy(evaluate(params[0], env=env))
+    d = evaluate(params[0], env=env)
     key = evaluate(params[1], env=env)
     d.pop(key, None)
     return d
