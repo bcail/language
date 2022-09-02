@@ -1,7 +1,10 @@
+import os
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
-from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector, run
+from lang import (TokenType, scan_tokens, parse, evaluate,
+        Keyword, Symbol, Var, Vector, run, _compile)
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
@@ -329,6 +332,31 @@ counts'''
         result = run(source)
 
         self.assertEqual(result[3], {'the': 0})
+
+
+class CompileTests(unittest.TestCase):
+    def test(self):
+        tests = [
+            {'src': '(println (+ 1 3))', 'result': '4'},
+        ]
+
+        for test in tests:
+            with self.subTest(test=test):
+                print(f'*** c test: {test["src"]}')
+                c_code = _compile(test['src'])
+
+                with tempfile.TemporaryDirectory() as tmp:
+                    c_filename = os.path.join(tmp, 'code.c')
+                    with open(c_filename, 'wb') as f:
+                        f.write(c_code.encode('utf8'))
+
+                    program_filename = os.path.join(tmp, 'program')
+                    compile_cmd = ['gcc', '-o', program_filename, c_filename]
+                    result = subprocess.run(compile_cmd, check=True)
+
+                    program_cmd = [program_filename]
+                    result = subprocess.run(program_cmd, check=True, capture_output=True)
+                    self.assertEqual(result.stdout.decode('utf8'), test['result'])
 
 
 if __name__ == '__main__':
