@@ -305,7 +305,7 @@ def add(params, env):
 
 
 def add_c(params, env):
-    params = [emit_c(p, env=env) for p in params]
+    params = [emit_c(p, env=env)[1] for p in params]
     return f'add({params[0]}, {params[1]})'
 
 
@@ -556,8 +556,11 @@ def println(params, env):
 
 
 def println_c(params, env):
-    param = emit_c(params[0], env=env)
-    return f'int result = {param};\nprintf("%d", result);'
+    type_, param = emit_c(params[0], env=env)
+    if type_ == str:
+        return f'printf({param});'
+    else:
+        return f'int result = {param};\nprintf("%d", result);'
 
 
 def read_line(params, env):
@@ -731,17 +734,17 @@ def emit_c(node, env=compile_env):
             if first.name in env:
                 if isinstance(env[first.name], Var) and isinstance(env[first.name].value, Function):
                     f = env[first.name].value
-                    return f(rest)
+                    return None, f(rest)
                 if callable(env[first.name]):
-                    return env[first.name](rest, env=env)
+                    return None, env[first.name](rest, env=env)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             else:
                 raise Exception(f'unhandled symbol: {first}')
     if isinstance(node, str):
-        return f'"{node}"'
+        return str, f'"{node}"'
     if isinstance(node, int):
-        return f'{node}'
+        return int, f'{node}'
     return str(node)
 
 
@@ -793,7 +796,7 @@ int main()
 return 0;
 }'''
 
-    compiled_code = '\n'.join([emit_c(f) for f in ast.forms])
+    compiled_code = '\n'.join([emit_c(f)[1] for f in ast.forms])
 
     c_code = '\n'.join([start, compiled_code, end])
 

@@ -338,6 +338,7 @@ class CompileTests(unittest.TestCase):
     def test(self):
         tests = [
             {'src': '(println (+ 1 3))', 'result': '4'},
+            {'src': '(println "hello")', 'result': 'hello'},
         ]
 
         for test in tests:
@@ -356,7 +357,11 @@ class CompileTests(unittest.TestCase):
 
                     program_cmd = [program_filename]
                     result = subprocess.run(program_cmd, check=True, capture_output=True)
-                    self.assertEqual(result.stdout.decode('utf8'), test['result'])
+                    try:
+                        self.assertEqual(result.stdout.decode('utf8'), test['result'])
+                    except AssertionError:
+                        print(f'bad c code:\n{c_code}')
+                        raise
 
 
 if __name__ == '__main__':
