@@ -489,7 +489,10 @@ def sort_by(params, env):
     f = lambda l: l[1] #TODO - actually implement this...
     if len(params) == 2:
         collection = evaluate(params[1], env=env)
-        return sorted(collection.items, key=f)
+        if isinstance(collection, Vector):
+            return sorted(collection.items, key=f)
+        else:
+            return sorted(collection, key=f)
     else:
         comparator = evaluate(params[1], env=env)
         collection = evaluate(params[2], env=env)
