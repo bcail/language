@@ -198,6 +198,8 @@ class EvalTests(unittest.TestCase):
             {'src': '(def d {}) (assoc d 1 "a") (get d 1)', 'result': [Var(name='d', value={1: 'a'}), {1: 'a'}, 'a']},
             {'src': '(def d {1 "a"}) (dissoc d 1) d', 'result': [Var(name='d', value={1: 'a'}), {}, {}]},
             {'src': '((fn [n] (loop [cnt n acc 1] (if (= 0 cnt) acc (recur (- cnt 1) (* acc cnt))))) 3)', 'result': 6},
+            {'src': '(def d {}) (loop [i 0 k 1] (if (> i 1) d (do (assoc d k "a") (recur (+ i 1) 2))))', 'result': [Var(name='d', value={}), {1: 'a', 2: 'a'}]},
+            {'src': '(def i 0) ((fn [n] n) i)', 'result': [Var(name='i', value=0), 0]},
         ]
 
         for test in tests:
@@ -307,6 +309,22 @@ class RunTests(unittest.TestCase):
         with patch('builtins.print') as print_mock:
             parse(scan_tokens(source)).evaluate()
         print_mock.assert_called_once_with('true')
+
+    def test_function(self):
+        source = '''
+(def counts {})
+
+(defn countwords [word]
+  (assoc counts word 0))
+
+(countwords "the")
+
+counts'''
+
+        result = run(source)
+
+        self.assertEqual(result[3], {'the': 0})
+
 
 if __name__ == '__main__':
     unittest.main()

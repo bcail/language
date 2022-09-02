@@ -355,7 +355,7 @@ def define(params, env):
     var = Var(name=name)
     if len(params) > 1:
         var.value = evaluate(params[1], env=env)
-    environment[name] = var
+    global_env[name] = var
     return var
 
 
@@ -540,8 +540,7 @@ class Function:
         self.body = body
 
     def __call__(self, args, env=None):
-        if not env:
-            env = environment
+        env = env or {}
         local_env = copy.deepcopy(env)
         bindings = zip(self.params.items, args)
         for binding in bindings:
@@ -557,7 +556,7 @@ def defn(params, env):
     name = params[0].name
     var = Var(name=name)
     var.value = Function(params=params[1], body=params[2])
-    environment[name] = var
+    global_env[name] = var
     return var
 
 
@@ -576,7 +575,7 @@ def file_close(params, env):
     f.close()
 
 
-environment = {
+global_env = {
     '+': add,
     '-': subtract,
     '*': multiply,
@@ -615,7 +614,8 @@ environment = {
 }
 
 
-def evaluate(node, env=environment):
+def evaluate(node, env=None):
+    env = env or {}
     if isinstance(node, list):
         first = node[0]
         rest = node[1:]
@@ -626,14 +626,18 @@ def evaluate(node, env=environment):
             else:
                 raise Exception('first element of list not callable: {results[0]}')
         elif isinstance(first, Symbol):
-            if first.name in env:
-                if isinstance(env[first.name], Var) and isinstance(env[first.name].value, Function):
-                    f = env[first.name].value
-                    return f(rest, env=env)
-                if callable(env[first.name]):
-                    return env[first.name](rest, env=env)
+            if first.name in env or first.name in global_env:
+                if first.name in env:
+                    value = env[first.name]
                 else:
-                    raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
+                    value = global_env[first.name]
+                if isinstance(value, Var) and isinstance(value.value, Function):
+                    f = value.value
+                    return f(rest, env=env)
+                if callable(value):
+                    return value(rest, env=env)
+                else:
+                    raise Exception(f'symbol first in list and not callable: {first.name} -- {value}')
             elif first.name == 'quote':
                 return rest[0]
             elif first.name == 'recur':
@@ -649,10 +653,16 @@ def evaluate(node, env=environment):
         elif isinstance(first, Function):
             return first(rest)
         else:
-            raise Exception(f'first element of list not callable: {first}')
+            raise Exception(f'first element of list not callable: {node}')
     if isinstance(node, Symbol):
-        symbol = env[node.name]
-        return getattr(symbol, 'value', symbol)
+        if node.name in env:
+            symbol = env[node.name]
+            return getattr(symbol, 'value', symbol)
+        elif node.name in global_env:
+            symbol = global_env[node.name]
+            return getattr(symbol, 'value', symbol)
+        else:
+            raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Function):
         return node()
     if isinstance(node, Vector):
