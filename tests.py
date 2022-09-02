@@ -187,6 +187,7 @@ class EvalTests(unittest.TestCase):
             {'src': '(count [1 2 3])', 'result': 3},
             {'src': '(count (quote (1 2 3)))', 'result': 3},
             {'src': '(get {1 2} 1)', 'result': 2},
+            {'src': '(get {1 2} 5 99)', 'result': 99},
             {'src': '(keys {1 2 "a" 3})', 'result': [1, 'a']},
             {'src': '(vals {1 2 "a" 3})', 'result': [2, 3]},
             {'src': '(pairs {1 2 "a" 3})', 'result': [[1, 2], ["a", 3]]},

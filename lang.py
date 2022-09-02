@@ -475,7 +475,13 @@ def count(params, env):
 def map_get(params, env):
     d = evaluate(params[0], env=env)
     key = evaluate(params[1], env=env)
-    return d[key]
+    if key in d:
+        return d[key]
+    else:
+        if len(params) > 2:
+            default = evaluate(params[2], env=env)
+            return default
+    raise KeyError(key)
 
 
 def map_keys(params, env):
