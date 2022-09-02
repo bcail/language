@@ -78,6 +78,8 @@ class Vector:
         self.items = items or []
 
     def __eq__(self, other):
+        if isinstance(other, list):
+            return self.items == other
         if not isinstance(other, Vector):
             raise Exception(f'{other} is not a Vector')
         return self.items == other.items
@@ -472,6 +474,29 @@ def count(params, env):
     return len(p)
 
 
+def sort(params, env):
+    if len(params) == 1:
+        collection = evaluate(params[0], env=env)
+        return sorted(collection.items)
+    else:
+        f = evaluate(params[0], env=env)
+        collection = evaluate(params[1], env=env)
+        if f.__name__ == 'greater':
+            return sorted(collection, reverse=True)
+
+
+def sort_by(params, env):
+    f = lambda l: l[1] #TODO - actually implement this...
+    if len(params) == 2:
+        collection = evaluate(params[1], env=env)
+        return sorted(collection.items, key=f)
+    else:
+        comparator = evaluate(params[1], env=env)
+        collection = evaluate(params[2], env=env)
+        if comparator.__name__ == 'greater':
+            return sorted(collection, key=f, reverse=True)
+
+
 def map_get(params, env):
     d = evaluate(params[0], env=env)
     key = evaluate(params[1], env=env)
@@ -553,6 +578,12 @@ class Function:
             local_env[binding[0].name] = evaluate(binding[1], env=local_env)
         return evaluate(self.body, env=local_env)
 
+    def __str__(self):
+        return f'<Function params={self.params}; body={self.body}'
+
+    def __repr__(self):
+        return str(self)
+
 
 def create_function(params, env):
     return Function(params=params[0], body=params[1])
@@ -602,6 +633,8 @@ global_env = {
     'subvec': subvec,
     'nth': nth,
     'count': count,
+    'sort': sort,
+    'sort-by': sort_by,
     'get': map_get,
     'keys': map_keys,
     'vals': map_vals,
