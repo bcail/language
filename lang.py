@@ -305,8 +305,12 @@ def add(params, env):
 
 
 def add_c(params, env):
-    params = [emit_c(p, env=env)[1] for p in params]
-    return f'add({params[0]}, {params[1]})'
+    c_params = [emit_c(p, env=env)[1] for p in params]
+    type_ = type(params[0])
+    if type_ == float:
+        return type_, f'add_float({c_params[0]}, {c_params[1]})'
+    else:
+        return type_, f'add({c_params[0]}, {c_params[1]})'
 
 
 def subtract(params, env):
@@ -558,9 +562,11 @@ def println(params, env):
 def println_c(params, env):
     type_, param = emit_c(params[0], env=env)
     if type_ == str:
-        return f'printf({param});'
+        return str, f'printf({param});'
+    elif type_ == float:
+        return str, f'float result = {param};\nprintf("%f", result);'
     else:
-        return f'int result = {param};\nprintf("%d", result);'
+        return str, f'int result = {param};\nprintf("%d", result);'
 
 
 def read_line(params, env):
@@ -734,9 +740,9 @@ def emit_c(node, env=compile_env):
             if first.name in env:
                 if isinstance(env[first.name], Var) and isinstance(env[first.name].value, Function):
                     f = env[first.name].value
-                    return None, f(rest)
+                    return f(rest)
                 if callable(env[first.name]):
-                    return None, env[first.name](rest, env=env)
+                    return env[first.name](rest, env=env)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             else:
@@ -745,7 +751,9 @@ def emit_c(node, env=compile_env):
         return str, f'"{node}"'
     if isinstance(node, int):
         return int, f'{node}'
-    return str(node)
+    if isinstance(node, float):
+        return float, f'{node}'
+    return None, str(node)
 
 
 def run(source):
@@ -789,6 +797,11 @@ int add(int x, int y)
     return x + y;
 }
 
+float add_float(float x, float y)
+{
+    return x + y;
+}
+
 int main()
 {
 '''
@@ -796,7 +809,8 @@ int main()
 return 0;
 }'''
 
-    compiled_code = '\n'.join([emit_c(f)[1] for f in ast.forms])
+    compiled_forms = [emit_c(f)[1] for f in ast.forms]
+    compiled_code = '\n'.join(compiled_forms)
 
     c_code = '\n'.join([start, compiled_code, end])
 

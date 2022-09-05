@@ -337,8 +337,9 @@ counts'''
 class CompileTests(unittest.TestCase):
     def test(self):
         tests = [
-            {'src': '(println (+ 1 3))', 'result': '4'},
             {'src': '(println "hello")', 'result': 'hello'},
+            {'src': '(println (+ 1 3))', 'result': '4'},
+            {'src': '(println (+ 1.5 2.3))', 'result': '3.800000'},
         ]
 
         for test in tests:
@@ -353,7 +354,11 @@ class CompileTests(unittest.TestCase):
 
                     program_filename = os.path.join(tmp, 'program')
                     compile_cmd = ['gcc', '-o', program_filename, c_filename]
-                    result = subprocess.run(compile_cmd, check=True)
+                    try:
+                        subprocess.run(compile_cmd, check=True)
+                    except subprocess.CalledProcessError:
+                        print(f'bad c code:\n{c_code}')
+                        raise
 
                     program_cmd = [program_filename]
                     result = subprocess.run(program_cmd, check=True, capture_output=True)
