@@ -371,6 +371,11 @@ def greater(params, env):
     return bool(evaluate(params[0], env=env) > evaluate(params[1], env=env))
 
 
+def greater_c(params, env):
+    c_params = [emit_c(p)[1] for p in params]
+    return str, f'{c_params[0]} > {c_params[1]}'
+
+
 def greater_equal(params, env):
     return bool(evaluate(params[0], env=env) >= evaluate(params[1], env=env))
 
@@ -403,6 +408,16 @@ def if_form(params, env):
         else:
             false_val = None
         return false_val
+
+
+def if_form_c(params, env):
+    test_code = emit_c(params[0], env=env)[1]
+    true_code = emit_c(params[1], env=env)[1]
+
+    code = f'if ({test_code})'
+    code += '{%s}' % true_code
+
+    return str, code
 
 
 def let(params, env):
@@ -771,6 +786,7 @@ compile_env = {
     '-': subtract_c,
     '*': multiply_c,
     '/': divide_c,
+    '>': greater_c,
     'print': print_c,
     'println': println_c,
 }
@@ -791,6 +807,8 @@ def emit_c(node, env=compile_env):
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             else:
                 raise Exception(f'unhandled symbol: {first}')
+        elif first == TokenType.IF:
+            return if_form_c(rest, env=env)
     if isinstance(node, str):
         return str, f'"{node}"'
     if isinstance(node, int):
