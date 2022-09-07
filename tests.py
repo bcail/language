@@ -337,16 +337,16 @@ counts'''
 class CompileTests(unittest.TestCase):
     def test(self):
         tests = [
-            {'src': '(println "hello")', 'result': 'hello\n'},
-            {'src': '(print (+ 1 3))', 'result': '4'},
-            {'src': '(print (+ 1.5 2.3))', 'result': '3.800000'},
-            {'src': '(print (- 3 2))', 'result': '1'},
-            {'src': '(print (- 3.5 2.1))', 'result': '1.400000'},
-            {'src': '(print (* 3 2))', 'result': '6'},
-            {'src': '(print (* 3.6 2.5))', 'result': '9.000000'},
-            {'src': '(print (/ 6 2))', 'result': '3'},
-            {'src': '(print (/ 7.5 2.5))', 'result': '3.000000'},
-            {'src': '(if (> 3 2) (print "true"))', 'result': 'true'},
+            {'src': '(println "hello")', 'output': 'hello\n'},
+            {'src': '(print (+ 1 3))', 'output': '4'},
+            {'src': '(print (+ 1.5 2.3))', 'output': '3.800000'},
+            {'src': '(print (- 3 2))', 'output': '1'},
+            {'src': '(print (- 3.5 2.1))', 'output': '1.400000'},
+            {'src': '(print (* 3 2))', 'output': '6'},
+            {'src': '(print (* 3.6 2.5))', 'output': '9.000000'},
+            {'src': '(print (/ 6 2))', 'output': '3'},
+            {'src': '(print (/ 7.5 2.5))', 'output': '3.000000'},
+            {'src': '(if (> 3 2) (print "true"))', 'output': 'true'},
         ]
 
         for test in tests:
@@ -370,7 +370,7 @@ class CompileTests(unittest.TestCase):
                     program_cmd = [program_filename]
                     result = subprocess.run(program_cmd, check=True, capture_output=True)
                     try:
-                        self.assertEqual(result.stdout.decode('utf8'), test['result'])
+                        self.assertEqual(result.stdout.decode('utf8'), test['output'])
                     except AssertionError:
                         print(f'bad c code:\n{c_code}')
                         raise
