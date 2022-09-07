@@ -333,6 +333,15 @@ def multiply(params, env):
     return result
 
 
+def multiply_c(params, env):
+    c_params = [emit_c(p, env=env)[1] for p in params]
+    type_ = type(params[0])
+    if type_ == float:
+        return type_, f'multiply_float({c_params[0]}, {c_params[1]})'
+    else:
+        return type_, f'multiply({c_params[0]}, {c_params[1]})'
+
+
 def divide(params, env):
     result = evaluate(params[0], env=env)
     for n in params[1:]:
@@ -738,6 +747,7 @@ def evaluate(node, env=None):
 compile_env = {
     '+': add_c,
     '-': subtract_c,
+    '*': multiply_c,
     'println': println_c,
 }
 
@@ -820,6 +830,16 @@ int subtract(int x, int y)
 float subtract_float(float x, float y)
 {
     return x - y;
+}
+
+int multiply(int x, int y)
+{
+    return x * y;
+}
+
+float multiply_float(float x, float y)
+{
+    return x * y;
 }
 
 int main()
