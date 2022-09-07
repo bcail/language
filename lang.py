@@ -625,7 +625,7 @@ def println_c(params, env):
     else:
         c_code = f'int result = {param};\nprintf("%d", result);'
     c_code = f'{c_code}\nprintf("\\n");'
-    return str, c_code
+    return None, c_code
 
 
 def read_line(params, env):
@@ -807,6 +807,19 @@ def _get_function_name(base='f'):
         i += 1
 
 
+def _get_c_return_type_from_hint(hint):
+    if hint == None:
+        return 'void'
+    elif hint == str:
+        return 'const char *'
+    elif hint == int:
+        return 'int'
+    elif hint == 'float':
+        return 'float'
+    else:
+        raise Exception(f'invalid return type hint: {hint}')
+
+
 def emit_c(node, env=compile_env):
     if isinstance(node, list):
         first = node[0]
@@ -822,11 +835,15 @@ def emit_c(node, env=compile_env):
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             elif first.name == 'do':
                 do_exprs = [emit_c(n, env=env) for n in rest]
+                last_expr = do_exprs[-1]
+                if last_expr[0] != None:
+                    do_exprs = do_exprs[:-1] + [(last_expr[0], f'return {last_expr[1]};')]
+                f_return_type = _get_c_return_type_from_hint(last_expr[0])
                 f_code = '\n'.join([d[1] for d in do_exprs])
                 f_name = _get_function_name('do_f')
-                f_code = 'int %s()\n{\n%s\n}' % (f_name, f_code)
+                f_code = '%s %s()\n{\n%s\n}' % (f_return_type, f_name, f_code)
                 c_functions[f_name] = f_code
-                return do_exprs[-1][1], f'{f_name}()'
+                return last_expr[0], f'{f_name}()'
             else:
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:

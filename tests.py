@@ -349,6 +349,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(if (> 3 2) (print "true"))', 'output': 'true'},
             {'src': '(if (> 3 4) (print "true") (print "false")', 'output': 'false'},
             {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
+            {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
         ]
 
         for test in tests:
