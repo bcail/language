@@ -414,8 +414,12 @@ def if_form_c(params, env):
     test_code = emit_c(params[0], env=env)[1]
     true_code = emit_c(params[1], env=env)[1]
 
-    code = f'if ({test_code})'
+    code = f'if ({test_code})\n'
     code += '{%s}' % true_code
+
+    if len(params) > 2:
+        false_code = emit_c(params[2], env=env)[1]
+        code += '\nelse\n{%s}' % false_code
 
     return str, code
 

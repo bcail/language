@@ -347,6 +347,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (/ 6 2))', 'output': '3'},
             {'src': '(print (/ 7.5 2.5))', 'output': '3.000000'},
             {'src': '(if (> 3 2) (print "true"))', 'output': 'true'},
+            {'src': '(if (> 3 4) (print "true") (print "false")', 'output': 'false'},
         ]
 
         for test in tests:
