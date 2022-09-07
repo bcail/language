@@ -796,6 +796,17 @@ compile_env = {
 }
 
 
+def _get_function_name(base='f'):
+    if base not in c_functions:
+        return base
+    i = 1
+    while True:
+        f_name = f'{base}_{i}'
+        if f_name not in c_functions:
+            return f_name
+        i += 1
+
+
 def emit_c(node, env=compile_env):
     if isinstance(node, list):
         first = node[0]
@@ -809,6 +820,13 @@ def emit_c(node, env=compile_env):
                     return env[first.name](rest, env=env)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
+            elif first.name == 'do':
+                do_exprs = [emit_c(n, env=env) for n in rest]
+                f_code = '\n'.join([d[1] for d in do_exprs])
+                f_name = _get_function_name('do_f')
+                f_code = 'int %s()\n{\n%s\n}' % (f_name, f_code)
+                c_functions[f_name] = f_code
+                return do_exprs[-1][1], f'{f_name}()'
             else:
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
@@ -852,63 +870,40 @@ def main(file_name):
         _run_prompt()
 
 
+c_includes = [
+    '<stdio.h>',
+]
+
+
+c_functions = {
+    'add': 'int add(int x, int y) { return x + y; }',
+    'add_float': 'float add_float(float x, float y) { return x + y; }',
+    'subtract': 'int subtract(int x, int y) { return x - y; }',
+    'subtract_float': 'float subtract_float(float x, float y) { return x - y; }',
+    'multiply': 'int multiply(int x, int y) { return x * y; }',
+    'multiply_float': 'float multiply_float(float x, float y) { return x * y; }',
+    'divide': 'int divide(int x, int y) { return x / y; }',
+    'divide_float': 'float divide_float(float x, float y) { return x / y; }',
+}
+
+
 def _compile(source):
     tokens = scan_tokens(source)
     ast = parse(tokens)
 
-    start = '''#include <stdio.h>
+    compiled_forms = []
+    for f in ast.forms:
+        c = emit_c(f)[1]
+        if not c.endswith(';'):
+            c = f'{c};'
+        compiled_forms.append(c)
 
-int add(int x, int y)
-{
-    return x + y;
-}
-
-float add_float(float x, float y)
-{
-    return x + y;
-}
-
-int subtract(int x, int y)
-{
-    return x - y;
-}
-
-float subtract_float(float x, float y)
-{
-    return x - y;
-}
-
-int multiply(int x, int y)
-{
-    return x * y;
-}
-
-float multiply_float(float x, float y)
-{
-    return x * y;
-}
-
-int divide(int x, int y)
-{
-    return x / y;
-}
-
-float divide_float(float x, float y)
-{
-    return x / y;
-}
-
-int main()
-{
-'''
-    end = '''
-return 0;
-}'''
-
-    compiled_forms = [emit_c(f)[1] for f in ast.forms]
-    compiled_code = '\n'.join(compiled_forms)
-
-    c_code = '\n'.join([start, compiled_code, end])
+    c_code = '\n'.join([f'#include {i}' for i in c_includes])
+    c_code += '\n\n'
+    c_code += '\n'.join([f for f in c_functions.values()])
+    c_code += '\n\nint main()\n{\n'
+    c_code += '\n'.join(compiled_forms)
+    c_code += '\nreturn 0;\n}'
 
     return c_code
 
