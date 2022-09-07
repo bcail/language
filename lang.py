@@ -349,6 +349,15 @@ def divide(params, env):
     return result
 
 
+def divide_c(params, env):
+    c_params = [emit_c(p, env=env)[1] for p in params]
+    type_ = type(params[0])
+    if type_ == float:
+        return type_, f'divide_float({c_params[0]}, {c_params[1]})'
+    else:
+        return type_, f'divide({c_params[0]}, {c_params[1]})'
+
+
 def equal(params, env):
     first_param = evaluate(params[0], env=env)
     for param in params[1:]:
@@ -748,6 +757,7 @@ compile_env = {
     '+': add_c,
     '-': subtract_c,
     '*': multiply_c,
+    '/': divide_c,
     'println': println_c,
 }
 
@@ -840,6 +850,16 @@ int multiply(int x, int y)
 float multiply_float(float x, float y)
 {
     return x * y;
+}
+
+int divide(int x, int y)
+{
+    return x / y;
+}
+
+float divide_float(float x, float y)
+{
+    return x / y;
 }
 
 int main()

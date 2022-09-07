@@ -344,6 +344,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(println (- 3.5 2.1))', 'result': '1.400000'},
             {'src': '(println (* 3 2))', 'result': '6'},
             {'src': '(println (* 3.6 2.5))', 'result': '9.000000'},
+            {'src': '(println (/ 6 2))', 'result': '3'},
+            {'src': '(println (/ 7.5 2.5))', 'result': '3.000000'},
         ]
 
         for test in tests:
