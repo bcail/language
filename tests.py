@@ -340,6 +340,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(println "hello")', 'result': 'hello'},
             {'src': '(println (+ 1 3))', 'result': '4'},
             {'src': '(println (+ 1.5 2.3))', 'result': '3.800000'},
+            {'src': '(println (- 3 2))', 'result': '1'},
+            {'src': '(println (- 3.5 2.1))', 'result': '1.400000'},
         ]
 
         for test in tests:
