@@ -586,14 +586,27 @@ def println(params, env):
     print(evaluate(params[0], env=env))
 
 
+def print_c(params, env):
+    type_, param = emit_c(params[0], env=env)
+    if type_ == str:
+        c_code = f'printf({param});'
+    elif type_ == float:
+        c_code = f'float result = {param};\nprintf("%f", result);'
+    else:
+        c_code = f'int result = {param};\nprintf("%d", result);'
+    return str, c_code
+
+
 def println_c(params, env):
     type_, param = emit_c(params[0], env=env)
     if type_ == str:
-        return str, f'printf({param});'
+        c_code = f'printf({param});'
     elif type_ == float:
-        return str, f'float result = {param};\nprintf("%f", result);'
+        c_code = f'float result = {param};\nprintf("%f", result);'
     else:
-        return str, f'int result = {param};\nprintf("%d", result);'
+        c_code = f'int result = {param};\nprintf("%d", result);'
+    c_code = f'{c_code}\nprintf("\\n");'
+    return str, c_code
 
 
 def read_line(params, env):
@@ -758,6 +771,7 @@ compile_env = {
     '-': subtract_c,
     '*': multiply_c,
     '/': divide_c,
+    'print': print_c,
     'println': println_c,
 }
 

@@ -337,15 +337,15 @@ counts'''
 class CompileTests(unittest.TestCase):
     def test(self):
         tests = [
-            {'src': '(println "hello")', 'result': 'hello'},
-            {'src': '(println (+ 1 3))', 'result': '4'},
-            {'src': '(println (+ 1.5 2.3))', 'result': '3.800000'},
-            {'src': '(println (- 3 2))', 'result': '1'},
-            {'src': '(println (- 3.5 2.1))', 'result': '1.400000'},
-            {'src': '(println (* 3 2))', 'result': '6'},
-            {'src': '(println (* 3.6 2.5))', 'result': '9.000000'},
-            {'src': '(println (/ 6 2))', 'result': '3'},
-            {'src': '(println (/ 7.5 2.5))', 'result': '3.000000'},
+            {'src': '(println "hello")', 'result': 'hello\n'},
+            {'src': '(print (+ 1 3))', 'result': '4'},
+            {'src': '(print (+ 1.5 2.3))', 'result': '3.800000'},
+            {'src': '(print (- 3 2))', 'result': '1'},
+            {'src': '(print (- 3.5 2.1))', 'result': '1.400000'},
+            {'src': '(print (* 3 2))', 'result': '6'},
+            {'src': '(print (* 3.6 2.5))', 'result': '9.000000'},
+            {'src': '(print (/ 6 2))', 'result': '3'},
+            {'src': '(print (/ 7.5 2.5))', 'result': '3.000000'},
         ]
 
         for test in tests:
