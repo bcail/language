@@ -125,21 +125,21 @@ class TokenType(Enum):
     SYMBOL = auto()
     STRING = auto()
     NUMBER = auto()
-    FLOAT = auto()
+    DOUBLE = auto()
     TRUE = auto()
     FALSE = auto()
     NIL = auto()
     IF = auto()
 
 
-FLOAT_RE = re.compile('-?\d+\.?\d*')
+DOUBLE_RE = re.compile('-?\d+\.?\d*')
 
 
 def _get_token(token_buffer):
     if token_buffer.isdigit() or (token_buffer.startswith('-') and token_buffer[1:].isdigit()):
         return {'type': TokenType.NUMBER, 'lexeme': token_buffer}
-    elif FLOAT_RE.match(token_buffer):
-        return {'type': TokenType.FLOAT, 'lexeme': token_buffer}
+    elif DOUBLE_RE.match(token_buffer):
+        return {'type': TokenType.DOUBLE, 'lexeme': token_buffer}
     elif token_buffer == 'true':
         return {'type': TokenType.TRUE}
     elif token_buffer == 'false':
@@ -233,7 +233,7 @@ def _get_node(token):
         return False
     elif token['type'] == TokenType.NUMBER:
         return int(token['lexeme'])
-    elif token['type'] == TokenType.FLOAT:
+    elif token['type'] == TokenType.DOUBLE:
         return float(token['lexeme'])
     elif token['type'] == TokenType.STRING:
         return token['lexeme']
@@ -308,7 +308,7 @@ def add_c(params, env):
     c_params = [emit_c(p, env=env)[1] for p in params]
     type_ = type(params[0])
     if type_ == float:
-        return type_, f'add_float({c_params[0]}, {c_params[1]})'
+        return type_, f'add_double({c_params[0]}, {c_params[1]})'
     else:
         return type_, f'add({c_params[0]}, {c_params[1]})'
 
@@ -321,7 +321,7 @@ def subtract_c(params, env):
     c_params = [emit_c(p, env=env)[1] for p in params]
     type_ = type(params[0])
     if type_ == float:
-        return type_, f'subtract_float({c_params[0]}, {c_params[1]})'
+        return type_, f'subtract_double({c_params[0]}, {c_params[1]})'
     else:
         return type_, f'subtract({c_params[0]}, {c_params[1]})'
 
@@ -337,7 +337,7 @@ def multiply_c(params, env):
     c_params = [emit_c(p, env=env)[1] for p in params]
     type_ = type(params[0])
     if type_ == float:
-        return type_, f'multiply_float({c_params[0]}, {c_params[1]})'
+        return type_, f'multiply_double({c_params[0]}, {c_params[1]})'
     else:
         return type_, f'multiply({c_params[0]}, {c_params[1]})'
 
@@ -353,7 +353,7 @@ def divide_c(params, env):
     c_params = [emit_c(p, env=env)[1] for p in params]
     type_ = type(params[0])
     if type_ == float:
-        return type_, f'divide_float({c_params[0]}, {c_params[1]})'
+        return type_, f'divide_double({c_params[0]}, {c_params[1]})'
     else:
         return type_, f'divide({c_params[0]}, {c_params[1]})'
 
@@ -610,7 +610,7 @@ def print_c(params, env):
     if type_ == str:
         c_code = f'printf({param});'
     elif type_ == float:
-        c_code = f'float result = {param};\nprintf("%f", result);'
+        c_code = f'double result = {param};\nprintf("%f", result);'
     else:
         c_code = f'int result = {param};\nprintf("%d", result);'
     return str, c_code
@@ -621,7 +621,7 @@ def println_c(params, env):
     if type_ == str:
         c_code = f'printf({param});'
     elif type_ == float:
-        c_code = f'float result = {param};\nprintf("%f", result);'
+        c_code = f'double result = {param};\nprintf("%f", result);'
     else:
         c_code = f'int result = {param};\nprintf("%d", result);'
     c_code = f'{c_code}\nprintf("\\n");'
@@ -814,8 +814,8 @@ def _get_c_return_type_from_hint(hint):
         return 'const char *'
     elif hint == int:
         return 'int'
-    elif hint == 'float':
-        return 'float'
+    elif hint == float:
+        return 'double'
     else:
         raise Exception(f'invalid return type hint: {hint}')
 
@@ -841,7 +841,7 @@ def emit_c(node, env=compile_env):
                 f_return_type = _get_c_return_type_from_hint(last_expr[0])
                 f_code = '\n'.join([d[1] for d in do_exprs])
                 f_name = _get_function_name('do_f')
-                f_code = '%s %s()\n{\n%s\n}' % (f_return_type, f_name, f_code)
+                f_code = '%s %s(void)\n{\n%s\n}' % (f_return_type, f_name, f_code)
                 c_functions[f_name] = f_code
                 return last_expr[0], f'{f_name}()'
             else:
@@ -894,13 +894,13 @@ c_includes = [
 
 c_functions = {
     'add': 'int add(int x, int y) { return x + y; }',
-    'add_float': 'float add_float(float x, float y) { return x + y; }',
+    'add_double': 'double add_double(double x, double y) { return x + y; }',
     'subtract': 'int subtract(int x, int y) { return x - y; }',
-    'subtract_float': 'float subtract_float(float x, float y) { return x - y; }',
+    'subtract_double': 'double subtract_double(double x, double y) { return x - y; }',
     'multiply': 'int multiply(int x, int y) { return x * y; }',
-    'multiply_float': 'float multiply_float(float x, float y) { return x * y; }',
+    'multiply_double': 'double multiply_double(double x, double y) { return x * y; }',
     'divide': 'int divide(int x, int y) { return x / y; }',
-    'divide_float': 'float divide_float(float x, float y) { return x / y; }',
+    'divide_double': 'double divide_double(double x, double y) { return x / y; }',
 }
 
 
@@ -918,7 +918,7 @@ def _compile(source):
     c_code = '\n'.join([f'#include {i}' for i in c_includes])
     c_code += '\n\n'
     c_code += '\n'.join([f for f in c_functions.values()])
-    c_code += '\n\nint main()\n{\n'
+    c_code += '\n\nint main(void)\n{\n'
     c_code += '\n'.join(compiled_forms)
     c_code += '\nreturn 0;\n}'
 

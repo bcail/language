@@ -334,6 +334,56 @@ counts'''
         self.assertEqual(result[3], {'the': 0})
 
 
+# See https://github.com/airbus-seclab/c-compiler-security
+GCC_CMD = [
+    'gcc',
+    '-O2',
+    '-Werror',
+    '-Wall',
+    '-Wextra',
+    '-std=c99',
+    '-pedantic',
+    '-Wpedantic',
+    '-Wformat=2',
+    '-Wformat-overflow=2',
+    '-Wformat-truncation=2',
+    '-Wformat-security',
+    '-Wnull-dereference',
+    '-Wstack-protector',
+    '-Wtrampolines',
+    '-Walloca',
+    '-Wvla',
+    '-Warray-bounds=2',
+    '-Wimplicit-fallthrough=3',
+    '-Wtraditional-conversion',
+    '-Wshift-overflow=2',
+    '-Wcast-qual',
+    '-Wstringop-overflow=4',
+    '-Wconversion',
+    '-Warith-conversion',
+    '-Wlogical-op',
+    '-Wduplicated-cond',
+    '-Wduplicated-branches',
+    '-Wformat-signedness',
+    '-Wshadow',
+    '-Wstrict-overflow=4',
+    '-Wundef',
+    '-Wstrict-prototypes',
+    '-Wswitch-default',
+    '-Wswitch-enum',
+    '-Wstack-usage=1000000',
+    '-Wcast-align=strict',
+    '-D_FORTIFY_SOURCE=2',
+    '-fstack-protector-strong',
+    '-fstack-clash-protection',
+    '-fPIE',
+    '-Wl,-z,relro',
+    '-Wl,-z,now',
+    '-Wl,-z,noexecstack',
+    '-Wl,-z,separate-code',
+]
+
+
 class CompileTests(unittest.TestCase):
     def test(self):
         tests = [
@@ -363,7 +413,7 @@ class CompileTests(unittest.TestCase):
                         f.write(c_code.encode('utf8'))
 
                     program_filename = os.path.join(tmp, 'program')
-                    compile_cmd = ['gcc', '-o', program_filename, c_filename]
+                    compile_cmd = GCC_CMD + ['-o', program_filename, c_filename]
                     try:
                         subprocess.run(compile_cmd, check=True)
                     except subprocess.CalledProcessError:
