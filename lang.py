@@ -517,6 +517,12 @@ def nth(params, env):
     return collection[index]
 
 
+def nth_c(params, env):
+    lst = emit_c(params[0], env=env)[1]
+    index = emit_c(params[1], env=env)[1]
+    return int, f'list_get({lst}, {index})'
+
+
 def count(params, env):
     p = evaluate(params[0], env=env)
     if p is None:
@@ -793,6 +799,7 @@ compile_env = {
     '>': greater_c,
     'print': print_c,
     'println': println_c,
+    'nth': nth_c,
 }
 
 
@@ -818,6 +825,16 @@ def _get_c_return_type_from_hint(hint):
         return 'double'
     else:
         raise Exception(f'invalid return type hint: {hint}')
+
+
+def new_vector_c(v, env):
+    name = 'lst'
+    c_code = f'List* {name} = NULL;'
+    c_code += f'\nlist_init({name});'
+    c_items = [emit_c(item, env=env) for item in v.items]
+    for c_item in c_items:
+        c_code += f'\nlist_add({name}, {c_item[1]});'
+    return name, f'{c_code}\n'
 
 
 def emit_c(node, env=compile_env):
@@ -848,13 +865,19 @@ def emit_c(node, env=compile_env):
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
             return if_form_c(rest, env=env)
+        else:
+            raise Exception(f'unhandled list: {node}')
+    if isinstance(node, Vector):
+        name, code = new_vector_c(node, env=env)
+        main_code.append(code)
+        return None, name
     if isinstance(node, str):
         return str, f'"{node}"'
     if isinstance(node, int):
         return int, f'{node}'
     if isinstance(node, float):
         return float, f'{node}'
-    return None, str(node)
+    raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
 def run(source):
@@ -889,6 +912,7 @@ def main(file_name):
 
 c_includes = [
     '<stdio.h>',
+    '<stdint.h>',
 ]
 
 
@@ -902,6 +926,31 @@ c_functions = {
     'divide': 'int divide(int x, int y) { return x / y; }',
     'divide_double': 'double divide_double(double x, double y) { return x / y; }',
 }
+
+main_code = []
+
+c_types = '''
+    typedef struct {
+        int count;
+        int capacity;
+        int* nums;
+    } List;
+
+    void list_init(List* list) {
+      list->count = 0;
+      list->capacity = 0;
+      list->nums = NULL;
+    }
+
+    void list_add(List* list, int item) {
+      list->count++;
+      list->nums = &item;
+    }
+
+    int list_get(List* list, int index) {
+      return list->nums[index];
+    }
+    '''
 
 
 def _compile(source):
@@ -917,8 +966,10 @@ def _compile(source):
 
     c_code = '\n'.join([f'#include {i}' for i in c_includes])
     c_code += '\n\n'
+    c_code += c_types
     c_code += '\n'.join([f for f in c_functions.values()])
     c_code += '\n\nint main(void)\n{\n'
+    c_code += '\n'.join(main_code)
     c_code += '\n'.join(compiled_forms)
     c_code += '\nreturn 0;\n}'
 

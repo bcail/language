@@ -414,6 +414,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(if (> 3 4) (print "true") (print "false")', 'output': 'false'},
             {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
             {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
+            {'src': '(print (nth [1 2] 0))', 'output': 1},
         ]
 
         for test in tests:
@@ -435,7 +436,14 @@ class CompileTests(unittest.TestCase):
                         raise
 
                     program_cmd = [program_filename]
-                    result = subprocess.run(program_cmd, check=True, capture_output=True)
+                    try:
+                        result = subprocess.run(program_cmd, check=True, capture_output=True)
+                    except subprocess.CalledProcessError as e:
+                        print(f'bad c code:\n{c_code}')
+                        print(f'err: {e.stderr.decode("utf8")}')
+                        print(f'out: {e.stdout.decode("utf8")}')
+                        raise
+
                     try:
                         self.assertEqual(result.stdout.decode('utf8'), test['output'])
                     except AssertionError:
