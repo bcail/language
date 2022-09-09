@@ -381,7 +381,21 @@ GCC_CMD = [
     '-Wl,-z,now',
     '-Wl,-z,noexecstack',
     '-Wl,-z,separate-code',
+    '-fsanitize=address',
+    '-fsanitize=pointer-compare',
+    '-fsanitize=pointer-subtract',
+    '-fsanitize=leak',
+    '-fno-omit-frame-pointer',
+    '-fsanitize=undefined',
+    '-fsanitize=bounds-strict',
+    '-fsanitize=float-divide-by-zero',
+    '-fsanitize=float-cast-overflow',
 ]
+
+GCC_ENV = {
+    'ASAN_OPTIONS': 'strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_invalid_pointer_pairs=2',
+    'PATH': os.environ.get('PATH', ''),
+}
 
 
 class CompileTests(unittest.TestCase):
@@ -415,7 +429,7 @@ class CompileTests(unittest.TestCase):
                     program_filename = os.path.join(tmp, 'program')
                     compile_cmd = GCC_CMD + ['-o', program_filename, c_filename]
                     try:
-                        subprocess.run(compile_cmd, check=True)
+                        subprocess.run(compile_cmd, check=True, env=GCC_ENV)
                     except subprocess.CalledProcessError:
                         print(f'bad c code:\n{c_code}')
                         raise
