@@ -913,6 +913,7 @@ def main(file_name):
 c_includes = [
     '<stdio.h>',
     '<stdint.h>',
+    '<stdlib.h>',
 ]
 
 
@@ -930,9 +931,25 @@ c_functions = {
 main_code = []
 
 c_types = '''
+    #define GROW_CAPACITY(capacity) \
+                ((capacity) < 8 ? 8 : (capacity) * 2)
+
+    #define GROW_ARRAY(type, pointer, oldCount, newCount) \
+                (type*)reallocate(pointer, sizeof(type) * (newCount))
+
+    void* reallocate(void* pointer, size_t newSize) {
+      if (newSize == 0) {
+        free(pointer);
+        return NULL;
+      }
+
+      void* result = realloc(pointer, newSize);
+      return result;
+    }
+
     typedef struct {
-        int count;
-        int capacity;
+        size_t count;
+        size_t capacity;
         int* nums;
     } List;
 
@@ -943,8 +960,14 @@ c_types = '''
     }
 
     void list_add(List* list, int item) {
+      if (list->capacity < list->count + 1) {
+        size_t oldCapacity = list->capacity;
+        list->capacity = GROW_CAPACITY(oldCapacity);
+        list->nums = GROW_ARRAY(int, list->nums, oldCapacity, list->capacity);
+      }
+
+      list->nums[list->count] = item;
       list->count++;
-      list->nums = &item;
     }
 
     int list_get(List* list, int index) {
