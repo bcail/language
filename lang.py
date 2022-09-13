@@ -520,7 +520,7 @@ def nth(params, env):
 def nth_c(params, env):
     lst = emit_c(params[0], env=env)[1]
     index = emit_c(params[1], env=env)[1]
-    return int, f'list_get({lst}, {index})'
+    return int, f'list_get(&{lst}, {index})'
 
 
 def count(params, env):
@@ -829,11 +829,11 @@ def _get_c_return_type_from_hint(hint):
 
 def new_vector_c(v, env):
     name = 'lst'
-    c_code = f'List* {name} = NULL;'
-    c_code += f'\nlist_init({name});'
+    c_code = 'List %s;' % name
+    c_code += '\nlist_init(&%s);' % name
     c_items = [emit_c(item, env=env) for item in v.items]
     for c_item in c_items:
-        c_code += f'\nlist_add({name}, {c_item[1]});'
+        c_code += f'\nlist_add(&{name}, {c_item[1]});'
     return name, f'{c_code}\n'
 
 
@@ -869,7 +869,8 @@ def emit_c(node, env=compile_env):
             raise Exception(f'unhandled list: {node}')
     if isinstance(node, Vector):
         name, code = new_vector_c(node, env=env)
-        main_code.append(code)
+        main_start.append(code)
+        main_end.append(f'list_free(&{name});')
         return None, name
     if isinstance(node, str):
         return str, f'"{node}"'
@@ -928,7 +929,8 @@ c_functions = {
     'divide_double': 'double divide_double(double x, double y) { return x / y; }',
 }
 
-main_code = []
+main_start = []
+main_end = []
 
 c_types = '''
     #define GROW_CAPACITY(capacity) \
@@ -936,6 +938,9 @@ c_types = '''
 
     #define GROW_ARRAY(type, pointer, oldCount, newCount) \
                 (type*)reallocate(pointer, sizeof(type) * (newCount))
+
+    #define FREE_ARRAY(type, pointer) \
+                reallocate(pointer, 0)
 
     void* reallocate(void* pointer, size_t newSize) {
       if (newSize == 0) {
@@ -957,6 +962,11 @@ c_types = '''
       list->count = 0;
       list->capacity = 0;
       list->nums = NULL;
+    }
+
+    void list_free(List* list) {
+      FREE_ARRAY(int, list->nums);
+      list_init(list);
     }
 
     void list_add(List* list, int item) {
@@ -992,8 +1002,9 @@ def _compile(source):
     c_code += c_types
     c_code += '\n'.join([f for f in c_functions.values()])
     c_code += '\n\nint main(void)\n{\n'
-    c_code += '\n'.join(main_code)
+    c_code += '\n'.join(main_start)
     c_code += '\n'.join(compiled_forms)
+    c_code += '\n'.join(main_end)
     c_code += '\nreturn 0;\n}'
 
     return c_code
