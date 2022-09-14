@@ -940,7 +940,7 @@ c_types = '''
                 (type*)reallocate(pointer, sizeof(type) * (newCount))
 
     #define FREE_ARRAY(type, pointer) \
-                reallocate(pointer, 0)
+                reallocate(pointer, (size_t)0)
 
     void* reallocate(void* pointer, size_t newSize) {
       if (newSize == 0) {

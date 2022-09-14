@@ -338,9 +338,9 @@ counts'''
 GCC_CMD = [
     'gcc',
     '-O2',
-    # '-Werror',
-    # '-Wall',
-    # '-Wextra',
+    '-Werror',
+    '-Wall',
+    '-Wextra',
     '-std=c99',
     '-pedantic',
     '-Wpedantic',
