@@ -305,12 +305,18 @@ def add(params, env):
 
 
 def add_c(params, env):
-    c_params = [emit_c(p, env=env)[1] for p in params]
+    c_params = [compile_form(p, env=env)['code'] for p in params]
     type_ = type(params[0])
     if type_ == float:
-        return type_, f'add_double({c_params[0]}, {c_params[1]})'
+        return {
+            'type': type_,
+            'code': f'add_double({c_params[0]}, {c_params[1]})',
+        }
     else:
-        return type_, f'add({c_params[0]}, {c_params[1]})'
+        return {
+            'type': type_,
+            'code': f'add({c_params[0]}, {c_params[1]})',
+        }
 
 
 def subtract(params, env):
@@ -318,12 +324,18 @@ def subtract(params, env):
 
 
 def subtract_c(params, env):
-    c_params = [emit_c(p, env=env)[1] for p in params]
+    c_params = [compile_form(p, env=env)['code'] for p in params]
     type_ = type(params[0])
     if type_ == float:
-        return type_, f'subtract_double({c_params[0]}, {c_params[1]})'
+        return {
+            'type': type_,
+            'code': f'subtract_double({c_params[0]}, {c_params[1]})',
+        }
     else:
-        return type_, f'subtract({c_params[0]}, {c_params[1]})'
+        return {
+            'type': type_,
+            'code': f'subtract({c_params[0]}, {c_params[1]})',
+        }
 
 
 def multiply(params, env):
@@ -334,12 +346,18 @@ def multiply(params, env):
 
 
 def multiply_c(params, env):
-    c_params = [emit_c(p, env=env)[1] for p in params]
+    c_params = [compile_form(p, env=env)['code'] for p in params]
     type_ = type(params[0])
     if type_ == float:
-        return type_, f'multiply_double({c_params[0]}, {c_params[1]})'
+        return {
+            'type': type_,
+            'code': f'multiply_double({c_params[0]}, {c_params[1]})',
+        }
     else:
-        return type_, f'multiply({c_params[0]}, {c_params[1]})'
+        return {
+            'type': type_,
+            'code': f'multiply({c_params[0]}, {c_params[1]})',
+        }
 
 
 def divide(params, env):
@@ -350,12 +368,18 @@ def divide(params, env):
 
 
 def divide_c(params, env):
-    c_params = [emit_c(p, env=env)[1] for p in params]
+    c_params = [compile_form(p, env=env)['code'] for p in params]
     type_ = type(params[0])
     if type_ == float:
-        return type_, f'divide_double({c_params[0]}, {c_params[1]})'
+        return {
+            'type': type_,
+            'code': f'divide_double({c_params[0]}, {c_params[1]})',
+        }
     else:
-        return type_, f'divide({c_params[0]}, {c_params[1]})'
+        return {
+            'type': type_,
+            'code': f'divide({c_params[0]}, {c_params[1]})',
+        }
 
 
 def equal(params, env):
@@ -372,8 +396,11 @@ def greater(params, env):
 
 
 def greater_c(params, env):
-    c_params = [emit_c(p)[1] for p in params]
-    return str, f'{c_params[0]} > {c_params[1]}'
+    c_params = [compile_form(p)['code'] for p in params]
+    return {
+        'type': str,
+        'code': f'{c_params[0]} > {c_params[1]}',
+    }
 
 
 def greater_equal(params, env):
@@ -411,17 +438,20 @@ def if_form(params, env):
 
 
 def if_form_c(params, env):
-    test_code = emit_c(params[0], env=env)[1]
-    true_code = emit_c(params[1], env=env)[1]
+    test_code = compile_form(params[0], env=env)['code']
+    true_code = compile_form(params[1], env=env)['code']
 
     code = f'if ({test_code})\n'
     code += '{%s}' % true_code
 
     if len(params) > 2:
-        false_code = emit_c(params[2], env=env)[1]
+        false_code = compile_form(params[2], env=env)['code']
         code += '\nelse\n{%s}' % false_code
 
-    return str, code
+    return {
+        'type': str,
+        'code': code
+    }
 
 
 def let(params, env):
@@ -518,9 +548,12 @@ def nth(params, env):
 
 
 def nth_c(params, env):
-    lst = emit_c(params[0], env=env)[1]
-    index = emit_c(params[1], env=env)[1]
-    return int, f'list_get(&{lst}, {index})'
+    lst = compile_form(params[0], env=env)['code']
+    index = compile_form(params[1], env=env)['code']
+    return {
+        'type': int,
+        'code': f'list_get(&{lst}, {index})',
+    }
 
 
 def count(params, env):
@@ -612,18 +645,25 @@ def println(params, env):
 
 
 def print_c(params, env):
-    type_, param = emit_c(params[0], env=env)
+    result = compile_form(params[0], env=env)
+    type_ = result.get('type')
+    param = result['code']
     if type_ == str:
         c_code = f'printf({param});'
     elif type_ == float:
         c_code = f'double result = {param};\nprintf("%f", result);'
     else:
         c_code = f'int result = {param};\nprintf("%d", result);'
-    return str, c_code
+    return {
+        'type': str,
+        'code': c_code,
+    }
 
 
 def println_c(params, env):
-    type_, param = emit_c(params[0], env=env)
+    result = compile_form(params[0], env=env)
+    type_ = result.get('type')
+    param = result['code']
     if type_ == str:
         c_code = f'printf({param});'
     elif type_ == float:
@@ -631,7 +671,7 @@ def println_c(params, env):
     else:
         c_code = f'int result = {param};\nprintf("%d", result);'
     c_code = f'{c_code}\nprintf("\\n");'
-    return None, c_code
+    return {'code': c_code}
 
 
 def read_line(params, env):
@@ -831,13 +871,13 @@ def new_vector_c(v, env):
     name = 'lst'
     c_code = 'List %s;' % name
     c_code += '\nlist_init(&%s);' % name
-    c_items = [emit_c(item, env=env) for item in v.items]
+    c_items = [compile_form(item, env=env)['code'] for item in v.items]
     for c_item in c_items:
-        c_code += f'\nlist_add(&{name}, {c_item[1]});'
+        c_code += f'\nlist_add(&{name}, {c_item});'
     return name, f'{c_code}\n'
 
 
-def emit_c(node, env=compile_env):
+def compile_form(node, env=compile_env):
     if isinstance(node, list):
         first = node[0]
         rest = node[1:]
@@ -851,16 +891,23 @@ def emit_c(node, env=compile_env):
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             elif first.name == 'do':
-                do_exprs = [emit_c(n, env=env) for n in rest]
+                do_exprs = [compile_form(n, env=env) for n in rest]
                 last_expr = do_exprs[-1]
-                if last_expr[0] != None:
-                    do_exprs = do_exprs[:-1] + [(last_expr[0], f'return {last_expr[1]};')]
-                f_return_type = _get_c_return_type_from_hint(last_expr[0])
-                f_code = '\n'.join([d[1] for d in do_exprs])
+                if last_expr.get('type') != None:
+                    fixed_last_expr = {
+                        'type': last_expr['type'],
+                        'code': f'return {last_expr["code"]};',
+                    }
+                    do_exprs = do_exprs[:-1] + [fixed_last_expr]
+                f_return_type = _get_c_return_type_from_hint(last_expr.get('type'))
+                f_code = '\n'.join([d['code'] for d in do_exprs])
                 f_name = _get_function_name('do_f')
                 f_code = '%s %s(void)\n{\n%s\n}' % (f_return_type, f_name, f_code)
                 c_functions[f_name] = f_code
-                return last_expr[0], f'{f_name}()'
+                return {
+                    'type': last_expr.get('type'),
+                    'code': f'{f_name}()',
+                }
             else:
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
@@ -871,13 +918,22 @@ def emit_c(node, env=compile_env):
         name, code = new_vector_c(node, env=env)
         main_start.append(code)
         main_end.append(f'list_free(&{name});')
-        return None, name
+        return {'code': name}
     if isinstance(node, str):
-        return str, f'"{node}"'
+        return {
+            'type': str,
+            'code': f'"{node}"',
+        }
     if isinstance(node, int):
-        return int, f'{node}'
+        return {
+            'type': int,
+            'code': f'{node}',
+        }
     if isinstance(node, float):
-        return float, f'{node}'
+        return {
+            'type': float,
+            'code': f'{node}',
+        }
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
@@ -992,7 +1048,8 @@ def _compile(source):
 
     compiled_forms = []
     for f in ast.forms:
-        c = emit_c(f)[1]
+        result = compile_form(f)
+        c = result['code']
         if not c.endswith(';'):
             c = f'{c};'
         compiled_forms.append(c)
