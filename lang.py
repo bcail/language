@@ -548,11 +548,13 @@ def nth(params, env):
 
 
 def nth_c(params, env):
-    lst = compile_form(params[0], env=env)['code']
+    lst = compile_form(params[0], env=env)
     index = compile_form(params[1], env=env)['code']
     return {
+        'pre': lst.get('pre'),
         'type': int,
-        'code': f'list_get(&{lst}, {index})',
+        'code': f'list_get(&{lst["code"]}, {index})',
+        'post': lst.get('post'),
     }
 
 
@@ -655,8 +657,9 @@ def print_c(params, env):
     else:
         c_code = f'int result = {param};\nprintf("%d", result);'
     return {
-        'type': str,
+        'pre': result.get('pre'),
         'code': c_code,
+        'post': result.get('post'),
     }
 
 
@@ -671,7 +674,11 @@ def println_c(params, env):
     else:
         c_code = f'int result = {param};\nprintf("%d", result);'
     c_code = f'{c_code}\nprintf("\\n");'
-    return {'code': c_code}
+    return {
+        'pre': result.get('pre'),
+        'code': c_code,
+        'post': result.get('post'),
+    }
 
 
 def read_line(params, env):
@@ -915,10 +922,12 @@ def compile_form(node, env=compile_env):
         else:
             raise Exception(f'unhandled list: {node}')
     if isinstance(node, Vector):
-        name, code = new_vector_c(node, env=env)
-        main_start.append(code)
-        main_end.append(f'list_free(&{name});')
-        return {'code': name}
+        name, pre_code = new_vector_c(node, env=env)
+        return {
+            'pre': pre_code,
+            'code': name,
+            'post': f'list_free(&{name});',
+        }
     if isinstance(node, str):
         return {
             'type': str,
@@ -985,8 +994,6 @@ c_functions = {
     'divide_double': 'double divide_double(double x, double y) { return x / y; }',
 }
 
-main_start = []
-main_end = []
 
 c_types = '''
     #define GROW_CAPACITY(capacity) \
@@ -1046,6 +1053,9 @@ def _compile(source):
     tokens = scan_tokens(source)
     ast = parse(tokens)
 
+    pre_code = []
+    post_code = []
+
     compiled_forms = []
     for f in ast.forms:
         result = compile_form(f)
@@ -1053,15 +1063,19 @@ def _compile(source):
         if not c.endswith(';'):
             c = f'{c};'
         compiled_forms.append(c)
+        if result.get('pre'):
+            pre_code.append(result['pre'])
+        if result.get('post'):
+            post_code.append(result['post'])
 
     c_code = '\n'.join([f'#include {i}' for i in c_includes])
     c_code += '\n\n'
     c_code += c_types
     c_code += '\n'.join([f for f in c_functions.values()])
     c_code += '\n\nint main(void)\n{\n'
-    c_code += '\n'.join(main_start)
+    c_code += '\n'.join(pre_code)
     c_code += '\n'.join(compiled_forms)
-    c_code += '\n'.join(main_end)
+    c_code += '\n'.join(post_code)
     c_code += '\nreturn 0;\n}'
 
     return c_code

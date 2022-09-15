@@ -415,6 +415,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
             {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
             {'src': '(print (nth [1 2] 0))', 'output': '1'},
+            {'src': '(print (nth [1 (+ 1 1)] 1))', 'output': '2'},
         ]
 
         for test in tests:
