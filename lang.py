@@ -839,7 +839,7 @@ def evaluate(node, env=None):
     return node
 
 
-compile_env = {
+global_compile_env = {
     '+': add_c,
     '-': subtract_c,
     '*': multiply_c,
@@ -885,7 +885,7 @@ def new_vector_c(v, env):
     return name, f'{c_code}\n'
 
 
-def compile_form(node, env=compile_env):
+def compile_form(node, env=global_compile_env):
     if isinstance(node, list):
         first = node[0]
         rest = node[1:]
@@ -1060,7 +1060,7 @@ def _compile(source):
 
     pre_code = []
     post_code = []
-    new_functions = []
+    generated_functions = {} # compiler-generated
 
     compiled_forms = []
     for f in ast.forms:
@@ -1075,20 +1075,20 @@ def _compile(source):
             post_code.append(result['post'])
         if result.get('function'):
             function = result['function']
-            new_functions.append(
-                '%s %s(%s)\n{%s}' % (
-                    function['return_type'],
-                    function['name'],
-                    ', '.join(function['params']),
-                    function['body']
-                )
+            f_name = function['name']
+            f_code = '%s %s(%s)\n{%s}' % (
+                function['return_type'],
+                f_name,
+                ', '.join(function['params']),
+                function['body']
             )
+            generated_functions[f_name] = f_code
 
     c_code = '\n'.join([f'#include {i}' for i in c_includes])
     c_code += '\n\n'
     c_code += c_types
     c_code += '\n'.join([f for f in c_functions.values()])
-    c_code += '\n' + '\n'.join([f for f in new_functions])
+    c_code += '\n' + '\n'.join([f for f in generated_functions.values()])
     c_code += '\n\nint main(void)\n{\n'
     c_code += '\n'.join(pre_code)
     c_code += '\n'.join(compiled_forms)
