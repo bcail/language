@@ -840,14 +840,14 @@ global_compile_env = {
 }
 
 
-def _get_function_name(base, functions):
-    if base not in functions:
+def _get_generated_name(base, env):
+    if base not in env['functions'] and base not in env['temps']:
         return base
     i = 1
     while True:
-        f_name = f'{base}_{i}'
-        if f_name not in functions:
-            return f_name
+        name = f'{base}_{i}'
+        if name not in env['functions'] and name not in env['temps']:
+            return name
         i += 1
 
 
@@ -865,13 +865,16 @@ def _get_c_return_type_from_hint(hint):
 
 
 def new_vector_c(v, env):
-    name = 'lst'
-    c_code = 'List %s;' % name
-    c_code += '\nlist_init(&%s);' % name
+    name = _get_generated_name('lst', env=env)
+    env['temps'][name] = 'List %s;' % name
+    c_code = 'list_init(&%s);' % name
     c_items = [compile_form(item, env=env)['code'] for item in v.items]
     for c_item in c_items:
         c_code += f'\nlist_add(&{name}, {c_item});'
-    return name, f'{c_code}\n'
+
+    env['main_pre'].append(f'{c_code}\n')
+    env['main_post'].append(f'list_free(&{name});')
+    return name
 
 
 def compile_form(node, env):
@@ -898,7 +901,7 @@ def compile_form(node, env):
                     do_exprs = do_exprs[:-1] + [fixed_last_expr]
                 f_return_type = _get_c_return_type_from_hint(last_expr.get('type'))
                 f_code = '\n'.join([d['code'] for d in do_exprs])
-                f_name = _get_function_name('do_f', env['functions'])
+                f_name = _get_generated_name('do_f', env)
                 env['functions'][f_name] = '%s %s(void) {\n%s\n}' % (
                     f_return_type, f_name, f_code
                 )
@@ -913,9 +916,7 @@ def compile_form(node, env):
         else:
             raise Exception(f'unhandled list: {node}')
     if isinstance(node, Vector):
-        name, pre_code = new_vector_c(node, env=env)
-        env['main_pre'].append(pre_code)
-        env['main_post'].append(f'list_free(&{name});')
+        name = new_vector_c(node, env=env)
         return {'code': name}
     if isinstance(node, str):
         return {
@@ -1045,9 +1046,10 @@ def _compile(source):
     compiled_forms = []
     env = {
         'global': copy.deepcopy(global_compile_env),
+        'functions': {},
+        'temps': {},
         'main_pre': [],
         'main_post': [],
-        'functions': {},
     }
     for f in ast.forms:
         result = compile_form(f, env=env)
@@ -1061,6 +1063,7 @@ def _compile(source):
     c_code += c_types
     c_code += '\n'.join([f for f in c_functions.values()])
     c_code += '\n' + '\n'.join([f for f in env['functions'].values()])
+    c_code += '\n' + '\n'.join([f for f in env['temps'].values()])
     c_code += '\n\nint main(void)\n{\n'
     c_code += '\n'.join(env['main_pre'])
     c_code += '\n'.join(compiled_forms)

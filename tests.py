@@ -416,6 +416,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
             {'src': '(print (nth [1 2] 0))', 'output': '1'},
             {'src': '(print (nth [1 (+ 1 1)] 1))', 'output': '2'},
+            {'src': '(print (nth [1 (nth [2 3] 0)] 1))', 'output': '2'},
         ]
 
         for test in tests:
