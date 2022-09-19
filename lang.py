@@ -396,7 +396,7 @@ def greater(params, env):
 
 
 def greater_c(params, env):
-    c_params = [compile_form(p)['code'] for p in params]
+    c_params = [compile_form(p, env=env)['code'] for p in params]
     return {
         'type': str,
         'code': f'{c_params[0]} > {c_params[1]}',
@@ -885,17 +885,17 @@ def new_vector_c(v, env):
     return name, f'{c_code}\n'
 
 
-def compile_form(node, env=global_compile_env):
+def compile_form(node, env):
     if isinstance(node, list):
         first = node[0]
         rest = node[1:]
         if isinstance(first, Symbol):
-            if first.name in env:
-                if isinstance(env[first.name], Var) and isinstance(env[first.name].value, Function):
-                    f = env[first.name].value
+            if first.name in env['global']:
+                if isinstance(env['global'][first.name], Var) and isinstance(env['global'][first.name].value, Function):
+                    f = env['global'][first.name].value
                     return f(rest)
-                if callable(env[first.name]):
-                    return env[first.name](rest, env=env)
+                if callable(env['global'][first.name]):
+                    return env['global'][first.name](rest, env=env)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             elif first.name == 'do':
@@ -1063,8 +1063,11 @@ def _compile(source):
     generated_functions = {} # compiler-generated
 
     compiled_forms = []
+    env = {
+        'global': copy.deepcopy(global_compile_env),
+    }
     for f in ast.forms:
-        result = compile_form(f)
+        result = compile_form(f, env=env)
         c = result['code']
         if not c.endswith(';'):
             c = f'{c};'
