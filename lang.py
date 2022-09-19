@@ -551,10 +551,8 @@ def nth_c(params, env):
     lst = compile_form(params[0], env=env)
     index = compile_form(params[1], env=env)['code']
     return {
-        'pre': lst.get('pre'),
         'type': int,
         'code': f'list_get(&{lst["code"]}, {index})',
-        'post': lst.get('post'),
     }
 
 
@@ -656,12 +654,7 @@ def print_c(params, env):
         c_code = f'double result = {param};\nprintf("%f", result);'
     else:
         c_code = f'int result = {param};\nprintf("%d", result);'
-    return {
-        'pre': result.get('pre'),
-        'code': c_code,
-        'post': result.get('post'),
-        'function': result.get('function'),
-    }
+    return {'code': c_code}
 
 
 def println_c(params, env):
@@ -675,11 +668,7 @@ def println_c(params, env):
     else:
         c_code = f'int result = {param};\nprintf("%d", result);'
     c_code = f'{c_code}\nprintf("\\n");'
-    return {
-        'pre': result.get('pre'),
-        'code': c_code,
-        'post': result.get('post'),
-    }
+    return {'code': c_code}
 
 
 def read_line(params, env):
@@ -910,15 +899,12 @@ def compile_form(node, env):
                 f_return_type = _get_c_return_type_from_hint(last_expr.get('type'))
                 f_code = '\n'.join([d['code'] for d in do_exprs])
                 f_name = 'do_f'
+                env['functions'][f_name] = '%s %s(void) {\n%s\n}' % (
+                    f_return_type, f_name, f_code
+                )
                 return {
                     'type': last_expr.get('type'),
                     'code': f'{f_name}()',
-                    'function': {
-                        'name': f_name,
-                        'return_type': f_return_type,
-                        'params': ['void'],
-                        'body': f_code
-                    }
                 }
             else:
                 raise Exception(f'unhandled symbol: {first}')
@@ -928,11 +914,9 @@ def compile_form(node, env):
             raise Exception(f'unhandled list: {node}')
     if isinstance(node, Vector):
         name, pre_code = new_vector_c(node, env=env)
-        return {
-            'pre': pre_code,
-            'code': name,
-            'post': f'list_free(&{name});',
-        }
+        env['main_pre'].append(pre_code)
+        env['main_post'].append(f'list_free(&{name});')
+        return {'code': name}
     if isinstance(node, str):
         return {
             'type': str,
@@ -1058,13 +1042,12 @@ def _compile(source):
     tokens = scan_tokens(source)
     ast = parse(tokens)
 
-    pre_code = []
-    post_code = []
-    generated_functions = {} # compiler-generated
-
     compiled_forms = []
     env = {
         'global': copy.deepcopy(global_compile_env),
+        'main_pre': [],
+        'main_post': [],
+        'functions': {},
     }
     for f in ast.forms:
         result = compile_form(f, env=env)
@@ -1072,30 +1055,16 @@ def _compile(source):
         if not c.endswith(';'):
             c = f'{c};'
         compiled_forms.append(c)
-        if result.get('pre'):
-            pre_code.append(result['pre'])
-        if result.get('post'):
-            post_code.append(result['post'])
-        if result.get('function'):
-            function = result['function']
-            f_name = function['name']
-            f_code = '%s %s(%s)\n{%s}' % (
-                function['return_type'],
-                f_name,
-                ', '.join(function['params']),
-                function['body']
-            )
-            generated_functions[f_name] = f_code
 
     c_code = '\n'.join([f'#include {i}' for i in c_includes])
     c_code += '\n\n'
     c_code += c_types
     c_code += '\n'.join([f for f in c_functions.values()])
-    c_code += '\n' + '\n'.join([f for f in generated_functions.values()])
+    c_code += '\n' + '\n'.join([f for f in env['functions'].values()])
     c_code += '\n\nint main(void)\n{\n'
-    c_code += '\n'.join(pre_code)
+    c_code += '\n'.join(env['main_pre'])
     c_code += '\n'.join(compiled_forms)
-    c_code += '\n'.join(post_code)
+    c_code += '\n'.join(env['main_post'])
     c_code += '\nreturn 0;\n}'
 
     return c_code
