@@ -840,13 +840,13 @@ global_compile_env = {
 }
 
 
-def _get_function_name(base='f'):
-    if base not in c_functions:
+def _get_function_name(base, functions):
+    if base not in functions:
         return base
     i = 1
     while True:
         f_name = f'{base}_{i}'
-        if f_name not in c_functions:
+        if f_name not in functions:
             return f_name
         i += 1
 
@@ -898,7 +898,7 @@ def compile_form(node, env):
                     do_exprs = do_exprs[:-1] + [fixed_last_expr]
                 f_return_type = _get_c_return_type_from_hint(last_expr.get('type'))
                 f_code = '\n'.join([d['code'] for d in do_exprs])
-                f_name = 'do_f'
+                f_name = _get_function_name('do_f', env['functions'])
                 env['functions'][f_name] = '%s %s(void) {\n%s\n}' % (
                     f_return_type, f_name, f_code
                 )
