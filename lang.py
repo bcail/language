@@ -502,6 +502,21 @@ def str_func(params, env):
         return ''.join([str(evaluate(p, env=env)) for p in params])
 
 
+def str_c(params, env):
+    if not params:
+        return {'code': ''}
+    if len(params) == 1:
+        return {
+            'type': str,
+            'code': '"%s"' % str(compile_form(params[0], env=env)['code'])
+        }
+    else:
+        return {
+            'type': str,
+            'code': 'strcat(%s, %s)' % (compile_form(params[0], env=env)['code'], compile_form(params[1], env=env)['code'])
+        }
+
+
 def str_split(params, env):
     p = evaluate(params[0], env=env)
     return p.split()
@@ -837,6 +852,7 @@ global_compile_env = {
     'print': print_c,
     'println': println_c,
     'nth': nth_c,
+    'str': str_c,
 }
 
 
@@ -970,6 +986,7 @@ c_includes = [
     '<stdio.h>',
     '<stdint.h>',
     '<stdlib.h>',
+    '<string.h>',
 ]
 
 
