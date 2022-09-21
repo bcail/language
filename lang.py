@@ -676,7 +676,7 @@ def print_c(params, env):
     elif type_ == float:
         c_code = f'double result = {param};\nprintf("%f", result);'
     else:
-        c_code = f'int result = (int){param};\nprintf("%d", result);'
+        c_code = f'int result = {param};\nprintf("%d", result);'
     return {'code': c_code}
 
 
@@ -1063,8 +1063,8 @@ c_types = '''
       return list->nums[index];
     }
 
-    size_t list_count(List* list) {
-      return list->count;
+    int list_count(List* list) {
+      return (int) list->count;
     }
 
     const char* str(void) {
