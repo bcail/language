@@ -578,6 +578,14 @@ def count(params, env):
     return len(p)
 
 
+def count_c(params, env):
+    lst = compile_form(params[0], env=env)
+    return {
+        'type': int,
+        'code': f'list_count(&{lst["code"]});',
+    }
+
+
 def sort(params, env):
     if len(params) == 1:
         collection = evaluate(params[0], env=env)
@@ -668,7 +676,7 @@ def print_c(params, env):
     elif type_ == float:
         c_code = f'double result = {param};\nprintf("%f", result);'
     else:
-        c_code = f'int result = {param};\nprintf("%d", result);'
+        c_code = f'int result = (int){param};\nprintf("%d", result);'
     return {'code': c_code}
 
 
@@ -851,6 +859,7 @@ global_compile_env = {
     '>': greater_c,
     'print': print_c,
     'println': println_c,
+    'count': count_c,
     'nth': nth_c,
     'str': str_c,
 }
@@ -1053,6 +1062,14 @@ c_types = '''
     int list_get(List* list, int index) {
       return list->nums[index];
     }
+
+    size_t list_count(List* list) {
+      return list->count;
+    }
+
+    const char* str(void) {
+      return "asdf";
+    }
     '''
 
 
@@ -1080,11 +1097,11 @@ def _compile(source):
     c_code += c_types
     c_code += '\n'.join([f for f in c_functions.values()])
     c_code += '\n' + '\n'.join([f for f in env['functions'].values()])
+    c_code += '\n\nint main(void)\n{'
     c_code += '\n' + '\n'.join([f for f in env['temps'].values()])
-    c_code += '\n\nint main(void)\n{\n'
-    c_code += '\n'.join(env['main_pre'])
-    c_code += '\n'.join(compiled_forms)
-    c_code += '\n'.join(env['main_post'])
+    c_code += '\n' + '\n'.join(env['main_pre'])
+    c_code += '\n' + '\n'.join(compiled_forms)
+    c_code += '\n' + '\n'.join(env['main_post'])
     c_code += '\nreturn 0;\n}'
 
     return c_code
