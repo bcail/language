@@ -897,6 +897,12 @@ def compile_form(node, env):
             'type': str,
             'code': f'STRING_OBJ("{node}")',
         }
+    if isinstance(node, bool):
+        if node:
+            val = 'true'
+        else:
+            val = 'false'
+        return {'code': f'BOOL_OBJ({val})'}
     if isinstance(node, int):
         return {
             'type': int,
@@ -908,7 +914,7 @@ def compile_form(node, env):
             'code': f'NUMBER_OBJ({node})',
         }
     if node is None:
-        return {'code': f'NIL_OBJ'}
+        return {'code': 'NIL_OBJ'}
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
@@ -971,11 +977,14 @@ c_types = '''
                 reallocate(pointer, (size_t)0)
 
     #define NIL_OBJ ((Obj){NIL, {.number = 0}})
+    #define BOOL_OBJ(value) ((Obj){BOOL, {.boolean = value}})
     #define NUMBER_OBJ(value) ((Obj){NUMBER, {.number = value}})
     #define STRING_OBJ(value) ((Obj){STRING, {.string = value}})
+    #define AS_BOOL(value)  ((value).data.boolean)
     #define AS_NUMBER(value)  ((value).data.number)
     #define AS_STRING(value)  ((value).data.string)
     #define IS_NIL(value)  ((value).type == NIL)
+    #define IS_BOOL(value)  ((value).type == BOOL)
     #define IS_NUMBER(value)  ((value).type == NUMBER)
     #define IS_STRING(value)  ((value).type == STRING)
 
@@ -991,6 +1000,7 @@ c_types = '''
 
     typedef enum {
       NIL,
+      BOOL,
       NUMBER,
       STRING,
     } ObjType;
@@ -998,6 +1008,7 @@ c_types = '''
     typedef struct {
       ObjType type;
       union {
+        bool boolean;
         double number;
         char* string;
       } data;
@@ -1006,6 +1017,14 @@ c_types = '''
     void print(Obj obj) {
       if IS_NIL(obj) {
         printf("nil");
+      }
+      else if IS_BOOL(obj) {
+        if AS_BOOL(obj) {
+          printf("true");
+        }
+        else {
+          printf("false");
+        }
       }
       else if IS_NUMBER(obj) {
         printf("%f", AS_NUMBER(obj));

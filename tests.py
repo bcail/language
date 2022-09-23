@@ -402,6 +402,8 @@ class CompileTests(unittest.TestCase):
     def test(self):
         tests = [
             {'src': '(print nil)', 'output': 'nil'},
+            {'src': '(print true)', 'output': 'true'},
+            {'src': '(print false)', 'output': 'false'},
             {'src': '(print (+ 1 3))', 'output': '4.000000'},
             {'src': '(print (+ 1.5 2.3))', 'output': '3.800000'},
             {'src': '(print (- 3 2))', 'output': '1.000000'},
