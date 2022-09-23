@@ -307,16 +307,10 @@ def add(params, env):
 def add_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
     type_ = type(params[0])
-    if type_ == float:
-        return {
-            'type': type_,
-            'code': f'add_double({c_params[0]}, {c_params[1]})',
-        }
-    else:
-        return {
-            'type': type_,
-            'code': f'add({c_params[0]}, {c_params[1]})',
-        }
+    return {
+        'type': type_,
+        'code': f'add({c_params[0]}, {c_params[1]})',
+    }
 
 
 def subtract(params, env):
@@ -326,16 +320,10 @@ def subtract(params, env):
 def subtract_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
     type_ = type(params[0])
-    if type_ == float:
-        return {
-            'type': type_,
-            'code': f'subtract_double({c_params[0]}, {c_params[1]})',
-        }
-    else:
-        return {
-            'type': type_,
-            'code': f'subtract({c_params[0]}, {c_params[1]})',
-        }
+    return {
+        'type': type_,
+        'code': f'subtract({c_params[0]}, {c_params[1]})',
+    }
 
 
 def multiply(params, env):
@@ -348,16 +336,10 @@ def multiply(params, env):
 def multiply_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
     type_ = type(params[0])
-    if type_ == float:
-        return {
-            'type': type_,
-            'code': f'multiply_double({c_params[0]}, {c_params[1]})',
-        }
-    else:
-        return {
-            'type': type_,
-            'code': f'multiply({c_params[0]}, {c_params[1]})',
-        }
+    return {
+        'type': type_,
+        'code': f'multiply({c_params[0]}, {c_params[1]})',
+    }
 
 
 def divide(params, env):
@@ -370,16 +352,10 @@ def divide(params, env):
 def divide_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
     type_ = type(params[0])
-    if type_ == float:
-        return {
-            'type': type_,
-            'code': f'divide_double({c_params[0]}, {c_params[1]})',
-        }
-    else:
-        return {
-            'type': type_,
-            'code': f'divide({c_params[0]}, {c_params[1]})',
-        }
+    return {
+        'type': type_,
+        'code': f'divide({c_params[0]}, {c_params[1]})',
+    }
 
 
 def equal(params, env):
@@ -669,14 +645,8 @@ def println(params, env):
 
 def print_c(params, env):
     result = compile_form(params[0], env=env)
-    type_ = result.get('type')
     param = result['code']
-    if type_ == str:
-        c_code = f'printf({param});'
-    elif type_ == float:
-        c_code = f'double result = {param};\nprintf("%f", result);'
-    else:
-        c_code = f'int result = {param};\nprintf("%d", result);'
+    c_code = f'print({param});'
     return {'code': c_code}
 
 
@@ -951,12 +921,12 @@ def compile_form(node, env):
     if isinstance(node, int):
         return {
             'type': int,
-            'code': f'{node}',
+            'code': f'NUMBER_OBJ({node})',
         }
     if isinstance(node, float):
         return {
             'type': float,
-            'code': f'{node}',
+            'code': f'NUMBER_OBJ({node})',
         }
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
@@ -1000,14 +970,10 @@ c_includes = [
 
 
 c_functions = {
-    'add': 'int add(int x, int y) { return x + y; }',
-    'add_double': 'double add_double(double x, double y) { return x + y; }',
-    'subtract': 'int subtract(int x, int y) { return x - y; }',
-    'subtract_double': 'double subtract_double(double x, double y) { return x - y; }',
-    'multiply': 'int multiply(int x, int y) { return x * y; }',
-    'multiply_double': 'double multiply_double(double x, double y) { return x * y; }',
-    'divide': 'int divide(int x, int y) { return x / y; }',
-    'divide_double': 'double divide_double(double x, double y) { return x / y; }',
+    'add': 'Obj add(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) + AS_NUMBER(y)); }',
+    'subtract': 'Obj subtract(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) - AS_NUMBER(y)); }',
+    'multiply': 'Obj multiply(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) * AS_NUMBER(y)); }',
+    'divide': 'Obj divide(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) / AS_NUMBER(y)); }',
 }
 
 
@@ -1021,6 +987,10 @@ c_types = '''
     #define FREE_ARRAY(type, pointer) \
                 reallocate(pointer, (size_t)0)
 
+    #define NUMBER_OBJ(value) ((Obj){NUMBER, {.number = value}})
+    #define AS_NUMBER(value)  ((value).data.number)
+    #define IS_NUMBER(value)  ((value).type == NUMBER)
+
     void* reallocate(void* pointer, size_t newSize) {
       if (newSize == 0) {
         free(pointer);
@@ -1031,45 +1001,62 @@ c_types = '''
       return result;
     }
 
+    typedef enum {
+      NUMBER,
+    } ObjType;
+
+    typedef struct {
+      ObjType type;
+      union {
+        double number;
+      } data;
+    } Obj;
+
+    void print(Obj obj) {
+      if IS_NUMBER(obj) {
+        printf("%f", AS_NUMBER(obj));
+      }
+    }
+
     typedef struct {
         size_t count;
         size_t capacity;
-        int* nums;
+        Obj* objs;
     } List;
 
     void list_init(List* list) {
       list->count = 0;
       list->capacity = 0;
-      list->nums = NULL;
+      list->objs = NULL;
     }
 
     void list_free(List* list) {
-      FREE_ARRAY(int, list->nums);
+      FREE_ARRAY(int, list->objs);
       list_init(list);
     }
 
-    void list_add(List* list, int item) {
+    /* void list_add(List* list, Obj* item) {
       if (list->capacity < list->count + 1) {
         size_t oldCapacity = list->capacity;
         list->capacity = GROW_CAPACITY(oldCapacity);
-        list->nums = GROW_ARRAY(int, list->nums, oldCapacity, list->capacity);
+        list->objs = GROW_ARRAY(Obj, list->objs, oldCapacity, list->capacity);
       }
 
-      list->nums[list->count] = item;
+      list->objs[list->count] = item;
       list->count++;
-    }
+    } */
 
-    int list_get(List* list, int index) {
-      return list->nums[index];
-    }
+    /* Obj* list_get(List* list, int index) {
+      return list->objs[index];
+    } */
 
     int list_count(List* list) {
       return (int) list->count;
     }
 
-    const char* str(void) {
+    /* const char* str(void) {
       return "asdf";
-    }
+    } */
     '''
 
 
