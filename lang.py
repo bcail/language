@@ -1027,7 +1027,7 @@ c_types = '''
       list_init(list);
     }
 
-    /* void list_add(List* list, Obj* item) {
+    void list_add(List* list, Obj item) {
       if (list->capacity < list->count + 1) {
         size_t oldCapacity = list->capacity;
         list->capacity = GROW_CAPACITY(oldCapacity);
@@ -1036,11 +1036,11 @@ c_types = '''
 
       list->objs[list->count] = item;
       list->count++;
-    } */
+    }
 
-    /* Obj* list_get(List* list, int index) {
-      return list->objs[index];
-    } */
+    Obj list_get(List* list, Obj index) {
+      return list->objs[(int)AS_NUMBER(index)];
+    }
 
     int list_count(List* list) {
       return (int) list->count;
