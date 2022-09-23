@@ -839,19 +839,6 @@ def _get_generated_name(base, env):
         i += 1
 
 
-def _get_c_return_type_from_hint(hint):
-    if hint == None:
-        return 'void'
-    elif hint == str:
-        return 'const char *'
-    elif hint == int:
-        return 'int'
-    elif hint == float:
-        return 'double'
-    else:
-        raise Exception(f'invalid return type hint: {hint}')
-
-
 def new_vector_c(v, env):
     name = _get_generated_name('lst', env=env)
     env['temps'][name] = 'List %s;' % name
@@ -887,12 +874,11 @@ def compile_form(node, env):
                         'code': f'return {last_expr["code"]};',
                     }
                     do_exprs = do_exprs[:-1] + [fixed_last_expr]
-                f_return_type = _get_c_return_type_from_hint(last_expr.get('type'))
-                f_code = '\n'.join([d['code'] for d in do_exprs])
                 f_name = _get_generated_name('do_f', env)
-                env['functions'][f_name] = '%s %s(void) {\n%s\n}' % (
-                    f_return_type, f_name, f_code
-                )
+                f_code = '\n'.join([d['code'] for d in do_exprs])
+                if not last_expr.get('type'):
+                    f_code = f'{f_code}\nreturn NIL_OBJ;'
+                env['functions'][f_name] = 'Obj %s(void) {\n%s\n}' % (f_name, f_code)
                 return {
                     'type': last_expr.get('type'),
                     'code': f'{f_name}()',
@@ -982,10 +968,12 @@ c_types = '''
     #define FREE_ARRAY(type, pointer) \
                 reallocate(pointer, (size_t)0)
 
+    #define NIL_OBJ ((Obj){NIL, {.number = 0}})
     #define NUMBER_OBJ(value) ((Obj){NUMBER, {.number = value}})
     #define STRING_OBJ(value) ((Obj){STRING, {.string = value}})
     #define AS_NUMBER(value)  ((value).data.number)
     #define AS_STRING(value)  ((value).data.string)
+    #define IS_NIL(value)  ((value).type == NIL)
     #define IS_NUMBER(value)  ((value).type == NUMBER)
     #define IS_STRING(value)  ((value).type == STRING)
 
@@ -1000,6 +988,7 @@ c_types = '''
     }
 
     typedef enum {
+      NIL,
       NUMBER,
       STRING,
     } ObjType;
