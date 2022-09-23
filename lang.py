@@ -375,7 +375,7 @@ def greater_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
     return {
         'type': str,
-        'code': f'{c_params[0]} > {c_params[1]}',
+        'code': f'greater({c_params[0]}, {c_params[1]})',
     }
 
 
@@ -916,7 +916,7 @@ def compile_form(node, env):
     if isinstance(node, str):
         return {
             'type': str,
-            'code': f'"{node}"',
+            'code': f'STRING_OBJ("{node}")',
         }
     if isinstance(node, int):
         return {
@@ -965,6 +965,7 @@ c_includes = [
     '<stdio.h>',
     '<stdint.h>',
     '<stdlib.h>',
+    '<stdbool.h>',
     '<string.h>',
 ]
 
@@ -974,6 +975,7 @@ c_functions = {
     'subtract': 'Obj subtract(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) - AS_NUMBER(y)); }',
     'multiply': 'Obj multiply(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) * AS_NUMBER(y)); }',
     'divide': 'Obj divide(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) / AS_NUMBER(y)); }',
+    'greater': 'bool greater(Obj x, Obj y) { return AS_NUMBER(x) > AS_NUMBER(y); }',
 }
 
 
@@ -988,8 +990,11 @@ c_types = '''
                 reallocate(pointer, (size_t)0)
 
     #define NUMBER_OBJ(value) ((Obj){NUMBER, {.number = value}})
+    #define STRING_OBJ(value) ((Obj){STRING, {.string = value}})
     #define AS_NUMBER(value)  ((value).data.number)
+    #define AS_STRING(value)  ((value).data.string)
     #define IS_NUMBER(value)  ((value).type == NUMBER)
+    #define IS_STRING(value)  ((value).type == STRING)
 
     void* reallocate(void* pointer, size_t newSize) {
       if (newSize == 0) {
@@ -1003,18 +1008,23 @@ c_types = '''
 
     typedef enum {
       NUMBER,
+      STRING,
     } ObjType;
 
     typedef struct {
       ObjType type;
       union {
         double number;
+        char* string;
       } data;
     } Obj;
 
     void print(Obj obj) {
       if IS_NUMBER(obj) {
         printf("%f", AS_NUMBER(obj));
+      }
+      else {
+        printf("%s", AS_STRING(obj));
       }
     }
 
