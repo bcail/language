@@ -652,15 +652,8 @@ def print_c(params, env):
 
 def println_c(params, env):
     result = compile_form(params[0], env=env)
-    type_ = result.get('type')
     param = result['code']
-    if type_ == str:
-        c_code = f'printf({param});'
-    elif type_ == float:
-        c_code = f'double result = {param};\nprintf("%f", result);'
-    else:
-        c_code = f'int result = {param};\nprintf("%d", result);'
-    c_code = f'{c_code}\nprintf("\\n");'
+    c_code = f'print({param});\nprintf("\\n");'
     return {'code': c_code}
 
 

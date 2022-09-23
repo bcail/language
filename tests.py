@@ -401,7 +401,6 @@ GCC_ENV = {
 class CompileTests(unittest.TestCase):
     def test(self):
         tests = [
-            {'src': '(print "hello")', 'output': 'hello'},
             {'src': '(print (+ 1 3))', 'output': '4.000000'},
             {'src': '(print (+ 1.5 2.3))', 'output': '3.800000'},
             {'src': '(print (- 3 2))', 'output': '1.000000'},
@@ -410,6 +409,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (* 3.6 2.5))', 'output': '9.000000'},
             {'src': '(print (/ 6 2))', 'output': '3.000000'},
             {'src': '(print (/ 7.5 2.5))', 'output': '3.000000'},
+            {'src': '(print "hello")', 'output': 'hello'},
+            {'src': '(println "hello")', 'output': 'hello\n'},
             {'src': '(if (> 3 2) (print "true"))', 'output': 'true'},
             {'src': '(if (> 3 4) (print "true") (print "false")', 'output': 'false'},
             # {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
