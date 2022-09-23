@@ -907,6 +907,8 @@ def compile_form(node, env):
             'type': float,
             'code': f'NUMBER_OBJ({node})',
         }
+    if node is None:
+        return {'code': f'NIL_OBJ'}
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
@@ -1002,7 +1004,10 @@ c_types = '''
     } Obj;
 
     void print(Obj obj) {
-      if IS_NUMBER(obj) {
+      if IS_NIL(obj) {
+        printf("nil");
+      }
+      else if IS_NUMBER(obj) {
         printf("%f", AS_NUMBER(obj));
       }
       else {
