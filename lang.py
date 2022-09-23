@@ -645,14 +645,14 @@ def println(params, env):
 
 def print_c(params, env):
     result = compile_form(params[0], env=env)
-    param = result['code']
+    param = result['code'].rstrip(';')
     c_code = f'print({param});'
     return {'code': c_code}
 
 
 def println_c(params, env):
     result = compile_form(params[0], env=env)
-    param = result['code']
+    param = result['code'].rstrip(';')
     c_code = f'print({param});\nprintf("\\n");'
     return {'code': c_code}
 
@@ -1042,8 +1042,8 @@ c_types = '''
       return list->objs[(int)AS_NUMBER(index)];
     }
 
-    int list_count(List* list) {
-      return (int) list->count;
+    Obj list_count(List* list) {
+      return NUMBER_OBJ((int) list->count);
     }
 
     /* const char* str(void) {

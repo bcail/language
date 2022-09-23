@@ -418,7 +418,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (nth [1 2] 0))', 'output': '1.000000'},
             {'src': '(print (nth [1 (+ 1 1)] 1))', 'output': '2.000000'},
             {'src': '(print (nth [1 (nth [2 3] 0)] 1))', 'output': '2.000000'},
-            # {'src': '(print (count [1 2 3]))', 'output': '3'},
+            {'src': '(print (count [1 2 3]))', 'output': '3.000000'},
             # {'src': '(str)', 'output': ''},
             # {'src': '(print (str 1))', 'output': '1'},
         ]
