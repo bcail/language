@@ -379,6 +379,30 @@ def greater_c(params, env):
     }
 
 
+def greater_equal_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    return {
+        'type': str,
+        'code': f'greater_equal({c_params[0]}, {c_params[1]})',
+    }
+
+
+def less_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    return {
+        'type': str,
+        'code': f'less({c_params[0]}, {c_params[1]})',
+    }
+
+
+def less_equal_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    return {
+        'type': str,
+        'code': f'less_equal({c_params[0]}, {c_params[1]})',
+    }
+
+
 def greater_equal(params, env):
     return bool(evaluate(params[0], env=env) >= evaluate(params[1], env=env))
 
@@ -829,6 +853,9 @@ global_compile_env = {
     '*': multiply_c,
     '/': divide_c,
     '>': greater_c,
+    '>=': greater_equal_c,
+    '<': less_c,
+    '<=': less_equal_c,
     'print': print_c,
     'println': println_c,
     'count': count_c,
@@ -978,6 +1005,9 @@ c_functions = {
     'multiply': 'Obj multiply(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) * AS_NUMBER(y)); }',
     'divide': 'Obj divide(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) / AS_NUMBER(y)); }',
     'greater': 'bool greater(Obj x, Obj y) { return AS_NUMBER(x) > AS_NUMBER(y); }',
+    'greater_equal': 'bool greater_equal(Obj x, Obj y) { return AS_NUMBER(x) >= AS_NUMBER(y); }',
+    'less': 'bool less(Obj x, Obj y) { return AS_NUMBER(x) < AS_NUMBER(y); }',
+    'less_equal': 'bool less_equal(Obj x, Obj y) { return AS_NUMBER(x) <= AS_NUMBER(y); }',
 }
 
 
