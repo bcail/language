@@ -400,6 +400,15 @@ def define(params, env):
     return var
 
 
+def def_c(params, env):
+    name = params[0].name
+    c_name = _get_generated_name(base=f'u_{name}', env=env)
+    value = compile_form(params[1], env=env)['code']
+    code = f'Obj {c_name} = {value};'
+    env['user_globals'][name] = {'c_name': c_name, 'code': code}
+    return {'code': ''}
+
+
 def if_form(params, env):
     test_val = evaluate(params[0], env=env)
 
@@ -824,17 +833,18 @@ global_compile_env = {
     'println': println_c,
     'count': count_c,
     'nth': nth_c,
+    'def': def_c,
     'str': str_c,
 }
 
 
 def _get_generated_name(base, env):
-    if base not in env['functions'] and base not in env['temps']:
+    if base not in env['functions'] and base not in env['temps'] and base not in env['user_globals']:
         return base
     i = 1
     while True:
         name = f'{base}_{i}'
-        if name not in env['functions'] and name not in env['temps']:
+        if name not in env['functions'] and name not in env['temps'] and base not in env['user_globals']:
             return name
         i += 1
 
@@ -889,6 +899,11 @@ def compile_form(node, env):
             return if_form_c(rest, env=env)
         else:
             raise Exception(f'unhandled list: {node}')
+    if isinstance(node, Symbol):
+        if node.name in env['user_globals']:
+            return {'code': env['user_globals'][node.name]['c_name']}
+        else:
+            raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
         name = new_vector_c(node, env=env)
         return {'code': name}
@@ -1084,6 +1099,7 @@ def _compile(source):
     env = {
         'global': copy.deepcopy(global_compile_env),
         'functions': {},
+        'user_globals': {},
         'temps': {},
         'main_pre': [],
         'main_post': [],
@@ -1101,6 +1117,7 @@ def _compile(source):
     c_code += '\n'.join([f for f in c_functions.values()])
     c_code += '\n' + '\n'.join([f for f in env['functions'].values()])
     c_code += '\n\nint main(void)\n{'
+    c_code += '\n' + '\n'.join([g['code'] for g in env['user_globals'].values()])
     c_code += '\n' + '\n'.join([f for f in env['temps'].values()])
     c_code += '\n' + '\n'.join(env['main_pre'])
     c_code += '\n' + '\n'.join(compiled_forms)

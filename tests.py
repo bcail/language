@@ -423,6 +423,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (nth [1 (nth [2 3] 0)] 1))', 'output': '2.000000'},
             {'src': '(print (nth [1 nil 2] 1))', 'output': 'nil'},
             {'src': '(print (count [1 2 3]))', 'output': '3.000000'},
+            {'src': '(def a 1) (print a)', 'output': '1.000000'},
             # {'src': '(str)', 'output': ''},
             # {'src': '(print (str 1))', 'output': '1'},
         ]
