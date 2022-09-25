@@ -515,6 +515,34 @@ def loop(params, env):
             return result
 
 
+def let_c(params, env):
+    bindings = params[0]
+    body = params[1:]
+
+    paired_bindings = []
+    for i in range(0, len(bindings.items), 2):
+        paired_bindings.append(bindings.items[i:i+2])
+
+    f_name = _get_generated_name(base='let', env=env)
+    f_code = ''
+
+    env['local'] = {}
+    for binding in paired_bindings:
+        result = compile_form(binding[1], env=env)
+        env['local'][binding[0].name] = result
+        f_code += f'Obj {binding[0].name} = {result["code"]};\n'
+
+    result = compile_form(*body, env=env)
+
+    f_code += f'return {result["code"]};'
+
+    env['functions'][f_name] = 'Obj %s(void) {\n  %s\n}' % (f_name, f_code)
+
+    del env['local']
+
+    return {'code': f'{f_name}();'}
+
+
 def loop_c(params, env):
     bindings = params[0]
     body = params[1:]
@@ -908,6 +936,7 @@ global_compile_env = {
     'count': count_c,
     'nth': nth_c,
     'def': def_c,
+    'let': let_c,
     'loop': loop_c,
     'str': str_c,
 }
