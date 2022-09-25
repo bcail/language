@@ -371,6 +371,11 @@ def greater(params, env):
     return bool(evaluate(params[0], env=env) > evaluate(params[1], env=env))
 
 
+def equal_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    return {'code': f'equal({c_params[0]}, {c_params[1]})'}
+
+
 def greater_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
     return {
@@ -450,12 +455,21 @@ def if_form_c(params, env):
     test_code = compile_form(params[0], env=env)['code']
     true_code = compile_form(params[1], env=env)['code']
 
-    code = f'if ({test_code})\n'
-    code += '{%s}' % true_code
+    if not true_code.endswith(';'):
+        true_code = f'return {true_code};'
+
+    code = 'if (AS_BOOL(%s)) {\n' % test_code
+    code += '%s\n}' % true_code
 
     if len(params) > 2:
-        false_code = compile_form(params[2], env=env)['code']
-        code += '\nelse\n{%s}' % false_code
+        false_result = compile_form(params[2], env=env)
+        if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
+            code += '\nelse {'
+            for r in false_result[1:]:
+                code += f'\n{r["code"]};'
+            code += '\n}'
+        else:
+            code += '\nelse\n{\n%s\n}' % false_result['code']
 
     return {
         'type': str,
@@ -490,7 +504,6 @@ def loop(params, env):
     for index, loop_param in enumerate(loop_params):
         local_env[loop_param.name] = evaluate(initial_args[index], env=local_env)
 
-
     while True:
         result = evaluate(*body, env=local_env)
 
@@ -500,6 +513,39 @@ def loop(params, env):
                 local_env[loop_param.name] = evaluate(new_args[index], env=local_env)
         else:
             return result
+
+
+def loop_c(params, env):
+    bindings = params[0]
+    body = params[1:]
+
+    loop_params = bindings.items[::2]
+    initial_args = bindings.items[1::2]
+
+    f_name = _get_generated_name(base='loop', env=env)
+    c_loop_params = ', '.join([f'Obj {p.name}' for p in loop_params])
+    env['local'] = {}
+
+    for index, loop_param in enumerate(loop_params):
+        env['local'][loop_param.name] = compile_form(initial_args[index], env=env)['code']
+
+    f_code = 'do {\n'
+    for form in body:
+        compiled = compile_form(form, env=env)
+        if isinstance(compiled, tuple) and isinstance(compiled[0], Symbol) and compiled[0].name == 'recur':
+            for c in compiled[1:]:
+                f_code += f'\n{c["code"]}'
+        else:
+            f_code += f'\n{compiled["code"]}'
+    f_code += '} while (true);'
+
+    env['functions'][f_name] = 'Obj %s(%s) {\n%s\n}' % (f_name, c_loop_params, f_code)
+
+    c_initial_args = ','.join([compile_form(arg, env=env)['code'] for arg in initial_args])
+
+    del env['local']
+
+    return {'code': f'{f_name}({c_initial_args});'}
 
 
 def str_func(params, env):
@@ -852,6 +898,7 @@ global_compile_env = {
     '-': subtract_c,
     '*': multiply_c,
     '/': divide_c,
+    '=': equal_c,
     '>': greater_c,
     '>=': greater_equal_c,
     '<': less_c,
@@ -861,6 +908,7 @@ global_compile_env = {
     'count': count_c,
     'nth': nth_c,
     'def': def_c,
+    'loop': loop_c,
     'str': str_c,
 }
 
@@ -920,6 +968,11 @@ def compile_form(node, env):
                     'type': last_expr.get('type'),
                     'code': f'{f_name}()',
                 }
+            elif first.name == 'recur':
+                params = [compile_form(r, env) for r in rest]
+                for index, p in enumerate(env['local'].keys()):
+                    params[index]['code'] = f'{p} = {params[index]["code"]}'
+                return (first, *params)
             else:
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
@@ -929,6 +982,8 @@ def compile_form(node, env):
     if isinstance(node, Symbol):
         if node.name in env['user_globals']:
             return {'code': env['user_globals'][node.name]['c_name']}
+        elif node.name in env['local']:
+            return {'code': node.name}
         else:
             raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
@@ -1004,10 +1059,11 @@ c_functions = {
     'subtract': 'Obj subtract(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) - AS_NUMBER(y)); }',
     'multiply': 'Obj multiply(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) * AS_NUMBER(y)); }',
     'divide': 'Obj divide(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) / AS_NUMBER(y)); }',
-    'greater': 'bool greater(Obj x, Obj y) { return AS_NUMBER(x) > AS_NUMBER(y); }',
-    'greater_equal': 'bool greater_equal(Obj x, Obj y) { return AS_NUMBER(x) >= AS_NUMBER(y); }',
-    'less': 'bool less(Obj x, Obj y) { return AS_NUMBER(x) < AS_NUMBER(y); }',
-    'less_equal': 'bool less_equal(Obj x, Obj y) { return AS_NUMBER(x) <= AS_NUMBER(y); }',
+    'equal': 'Obj equal(Obj x, Obj y) { return BOOL_OBJ(AS_NUMBER(x) == AS_NUMBER(y)); }',
+    'greater': 'Obj greater(Obj x, Obj y) { return BOOL_OBJ(AS_NUMBER(x) > AS_NUMBER(y)); }',
+    'greater_equal': 'Obj greater_equal(Obj x, Obj y) { return BOOL_OBJ(AS_NUMBER(x) >= AS_NUMBER(y)); }',
+    'less': 'Obj less(Obj x, Obj y) { return BOOL_OBJ(AS_NUMBER(x) < AS_NUMBER(y)); }',
+    'less_equal': 'Obj less_equal(Obj x, Obj y) { return BOOL_OBJ(AS_NUMBER(x) <= AS_NUMBER(y)); }',
 }
 
 

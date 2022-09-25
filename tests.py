@@ -404,6 +404,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print nil)', 'output': 'nil'},
             {'src': '(print true)', 'output': 'true'},
             {'src': '(print false)', 'output': 'false'},
+            {'src': '(print (= 1 1))', 'output': 'true'},
             {'src': '(print (+ 1 3))', 'output': '4.000000'},
             {'src': '(print (+ 1.5 2.3))', 'output': '3.800000'},
             {'src': '(print (- 3 2))', 'output': '1.000000'},
@@ -430,6 +431,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (nth [1 nil 2] 1))', 'output': 'nil'},
             {'src': '(print (count [1 2 3]))', 'output': '3.000000'},
             {'src': '(def a 1) (print a)', 'output': '1.000000'},
+            {'src': '(print (loop [cnt 3 acc 0] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc 1)))))', 'output': '3.000000'},
             # {'src': '(str)', 'output': ''},
             # {'src': '(print (str 1))', 'output': '1'},
         ]
