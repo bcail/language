@@ -1193,6 +1193,7 @@ c_types = '''
     }
 
     Obj list_get(List* list, Obj index) {
+      /* size_t is the unsigned integer type returned by the sizeof operator */
       size_t num_index = (size_t) AS_NUMBER(index);
       if (num_index < list->count) {
         return list->objs[num_index];
