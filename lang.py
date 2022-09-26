@@ -1193,7 +1193,13 @@ c_types = '''
     }
 
     Obj list_get(List* list, Obj index) {
-      return list->objs[(int)AS_NUMBER(index)];
+      size_t num_index = (size_t) AS_NUMBER(index);
+      if (num_index < list->count) {
+        return list->objs[num_index];
+      }
+      else {
+        return NIL_OBJ;
+      }
     }
 
     Obj list_count(List* list) {
