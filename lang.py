@@ -1000,7 +1000,9 @@ def compile_form(node, env):
             elif first.name == 'recur':
                 params = [compile_form(r, env) for r in rest]
                 for index, p in enumerate(env['local'].keys()):
-                    params[index]['code'] = f'{p} = {params[index]["code"]}'
+                    params[index]['code'] = f'Obj tmp_{p} = {params[index]["code"]};'
+                for var in env['local'].keys():
+                    params[-1]['code'] += f'\n{var} = tmp_{var};'
                 return (first, *params)
             else:
                 raise Exception(f'unhandled symbol: {first}')

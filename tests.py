@@ -435,6 +435,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(def a 1) (print a)', 'output': '1.000000'},
             {'src': '(print (let [x 1] x))', 'output': '1.000000'},
             {'src': '(print (loop [cnt 3 acc 0] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc 1)))))', 'output': '3.000000'},
+            {'src': '(print (loop [cnt 3 acc 0] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc cnt)))))', 'output': '6.000000'},
             # {'src': '(str)', 'output': ''},
             # {'src': '(print (str 1))', 'output': '1'},
         ]
