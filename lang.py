@@ -3,6 +3,7 @@ from enum import Enum, auto
 import os
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 
 
@@ -452,28 +453,35 @@ def if_form(params, env):
 
 
 def if_form_c(params, env):
+    f_name = _get_generated_name(base='if_form', env=env)
+
     test_code = compile_form(params[0], env=env)['code']
-    true_code = compile_form(params[1], env=env)['code']
+    true_result = compile_form(params[1], env=env)
+    if isinstance(true_result, tuple) and isinstance(true_result[0], Symbol) and true_result[0].name == 'recur':
+        true_code = '\n'.join([r['code'] for r in true_result[1:]])
+    else:
+        true_code = true_result['code']
 
-    if not true_code.endswith(';'):
-        true_code = f'return {true_code};'
-
-    code = 'if (AS_BOOL(%s)) {\n' % test_code
-    code += '%s\n}' % true_code
+    f_code = '  if (AS_BOOL(%s)) {\n' % test_code
+    f_code += '    return %s;\n  }' % true_code
 
     if len(params) > 2:
         false_result = compile_form(params[2], env=env)
         if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
-            code += '\nelse {'
+            f_code += '\n  else {'
             for r in false_result[1:]:
-                code += f'\n{r["code"]};'
-            code += '\n}'
+                f_code += f'\n{r["code"]};'
+            f_code += '\n}'
         else:
-            code += '\nelse\n{\n%s\n}' % false_result['code']
+            f_code += '\n  else\n{\n    return %s;\n}' % false_result['code']
+    else:
+        f_code += '\n  else {\n    return NIL_OBJ;\n  }'
+
+    env['functions'][f_name] = 'Obj %s(void) {\n%s\n}' % (f_name, f_code)
 
     return {
         'type': str,
-        'code': code
+        'code': f'{f_name}();'
     }
 
 
@@ -1146,7 +1154,7 @@ c_types = '''
       } data;
     } Obj;
 
-    void print(Obj obj) {
+    Obj print(Obj obj) {
       if IS_NIL(obj) {
         printf("nil");
       }
@@ -1164,6 +1172,7 @@ c_types = '''
       else {
         printf("%s", AS_STRING(obj));
       }
+      return NIL_OBJ;
     }
 
     typedef struct {
@@ -1251,20 +1260,29 @@ def _compile(source):
     return c_code
 
 
-def compile_to_c(file_name):
-    tmp = tempfile.mkdtemp(dir='.', prefix='tmp')
-    c_file = Path(tmp) / Path(f'{file_name.stem}.c')
-    print(f'compiling {file_name} to {c_file}...')
-
+def compile_to_c(file_name, run=False):
     with open(file_name, 'rb') as f:
         source = f.read().decode('utf8')
 
     c_program = _compile(source)
 
-    with open(c_file, mode='wb') as f:
-        f.write(c_program.encode('utf8'))
-    executable = Path(tmp) / file_name.stem
-    print(f'Compile with: gcc -o {executable} {c_file}')
+    if run:
+        with tempfile.TemporaryDirectory() as tmp:
+            c_filename = os.path.join(tmp, 'code.c')
+            with open(c_filename, 'wb') as f:
+                f.write(c_program.encode('utf8'))
+            compile_cmd = ['gcc', '-o', str(file_name.stem), c_filename]
+            subprocess.run(compile_cmd, check=True)
+            subprocess.run([f'./{str(file_name.stem)}'], check=True)
+    else:
+        tmp = tempfile.mkdtemp(dir='.', prefix='tmp')
+        c_file = Path(tmp) / Path(f'{file_name.stem}.c')
+
+        with open(c_file, mode='wb') as f:
+            f.write(c_program.encode('utf8'))
+
+        executable = Path(tmp) / file_name.stem
+        print(f'Compile with: gcc -o {executable} {c_file}')
 
 
 if __name__ == '__main__':
@@ -1272,13 +1290,19 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Random language')
     parser.add_argument('-c', action='store_true', dest='compile', help='compile the file to C')
-    parser.add_argument('file', type=str, nargs='?', help='file to compile')
+    parser.add_argument('-r', action='store_true', dest='run', help='compile to C & run')
+    parser.add_argument('file', type=str, nargs='?', help='file to interpret')
 
     args = parser.parse_args()
 
     if args.compile:
         if args.file:
             compile_to_c(Path(args.file))
+        else:
+            print('no file to compile')
+    elif args.run:
+        if args.file:
+            compile_to_c(Path(args.file), run=True)
         else:
             print('no file to compile')
     else:
