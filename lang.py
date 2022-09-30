@@ -305,26 +305,8 @@ def add(params, env):
     return sum([evaluate(p, env=env) for p in params])
 
 
-def add_c(params, env):
-    c_params = [compile_form(p, env=env)['code'] for p in params]
-    type_ = type(params[0])
-    return {
-        'type': type_,
-        'code': f'add({c_params[0]}, {c_params[1]})',
-    }
-
-
 def subtract(params, env):
     return evaluate(params[0], env=env) - sum([evaluate(n, env=env) for n in params[1:]])
-
-
-def subtract_c(params, env):
-    c_params = [compile_form(p, env=env)['code'] for p in params]
-    type_ = type(params[0])
-    return {
-        'type': type_,
-        'code': f'subtract({c_params[0]}, {c_params[1]})',
-    }
 
 
 def multiply(params, env):
@@ -334,29 +316,11 @@ def multiply(params, env):
     return result
 
 
-def multiply_c(params, env):
-    c_params = [compile_form(p, env=env)['code'] for p in params]
-    type_ = type(params[0])
-    return {
-        'type': type_,
-        'code': f'multiply({c_params[0]}, {c_params[1]})',
-    }
-
-
 def divide(params, env):
     result = evaluate(params[0], env=env)
     for n in params[1:]:
         result = result / evaluate(n, env=env)
     return result
-
-
-def divide_c(params, env):
-    c_params = [compile_form(p, env=env)['code'] for p in params]
-    type_ = type(params[0])
-    return {
-        'type': type_,
-        'code': f'divide({c_params[0]}, {c_params[1]})',
-    }
 
 
 def equal(params, env):
@@ -370,43 +334,6 @@ def equal(params, env):
 
 def greater(params, env):
     return bool(evaluate(params[0], env=env) > evaluate(params[1], env=env))
-
-
-def equal_c(params, env):
-    c_params = [compile_form(p, env=env)['code'] for p in params]
-    return {'code': f'equal({c_params[0]}, {c_params[1]})'}
-
-
-def greater_c(params, env):
-    c_params = [compile_form(p, env=env)['code'] for p in params]
-    return {
-        'type': str,
-        'code': f'greater({c_params[0]}, {c_params[1]})',
-    }
-
-
-def greater_equal_c(params, env):
-    c_params = [compile_form(p, env=env)['code'] for p in params]
-    return {
-        'type': str,
-        'code': f'greater_equal({c_params[0]}, {c_params[1]})',
-    }
-
-
-def less_c(params, env):
-    c_params = [compile_form(p, env=env)['code'] for p in params]
-    return {
-        'type': str,
-        'code': f'less({c_params[0]}, {c_params[1]})',
-    }
-
-
-def less_equal_c(params, env):
-    c_params = [compile_form(p, env=env)['code'] for p in params]
-    return {
-        'type': str,
-        'code': f'less_equal({c_params[0]}, {c_params[1]})',
-    }
 
 
 def greater_equal(params, env):
@@ -430,15 +357,6 @@ def define(params, env):
     return var
 
 
-def def_c(params, env):
-    name = params[0].name
-    c_name = _get_generated_name(base=f'u_{name}', env=env)
-    value = compile_form(params[1], env=env)['code']
-    code = f'Obj {c_name} = {value};'
-    env['user_globals'][name] = {'c_name': c_name, 'code': code}
-    return {'code': ''}
-
-
 def if_form(params, env):
     test_val = evaluate(params[0], env=env)
 
@@ -450,50 +368,6 @@ def if_form(params, env):
         else:
             false_val = None
         return false_val
-
-
-def if_form_c(params, env):
-    f_name = _get_generated_name(base='if_form', env=env)
-
-    test_code = compile_form(params[0], env=env)['code']
-    true_result = compile_form(params[1], env=env)
-    if isinstance(true_result, tuple) and isinstance(true_result[0], Symbol) and true_result[0].name == 'recur':
-        true_code = '\n'.join([r['code'] for r in true_result[1:]])
-    else:
-        true_code = true_result['code']
-
-    f_code = '  if (AS_BOOL(%s)) {\n' % test_code
-    f_code += '    return %s;\n  }' % true_code
-
-    if len(params) > 2:
-        false_result = compile_form(params[2], env=env)
-        if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
-            f_code += '\n  else {'
-            for r in false_result[1:]:
-                f_code += f'\n    {r["code"]};'
-            f_code += '\n  }'
-        else:
-            f_code += '\n  else {\n    return %s;\n  }' % false_result['code']
-    else:
-        f_code += '\n  else {\n    return NIL_OBJ;\n  }'
-
-    f_params = 'void'
-    f_args = ''
-    local = env.get('local', {})
-    if local:
-        keys = list(local.keys())
-        f_params = f'Obj {keys[0]}'
-        f_args = keys[0]
-        for key in keys[1:]:
-            f_params += f', Obj {key}'
-            f_args += f', {key}'
-
-    env['functions'][f_name] = 'Obj %s(%s) {\n%s\n}' % (f_name, f_params, f_code)
-
-    return {
-        'type': str,
-        'code': f'{f_name}({f_args})'
-    }
 
 
 def let(params, env):
@@ -534,67 +408,6 @@ def loop(params, env):
             return result
 
 
-def let_c(params, env):
-    bindings = params[0]
-    body = params[1:]
-
-    paired_bindings = []
-    for i in range(0, len(bindings.items), 2):
-        paired_bindings.append(bindings.items[i:i+2])
-
-    f_name = _get_generated_name(base='let', env=env)
-    f_code = ''
-
-    env['local'] = {}
-    for binding in paired_bindings:
-        result = compile_form(binding[1], env=env)
-        env['local'][binding[0].name] = result
-        f_code += f'Obj {binding[0].name} = {result["code"]};\n'
-
-    result = compile_form(*body, env=env)
-
-    f_code += f'  return {result["code"]};'
-
-    env['functions'][f_name] = 'Obj %s(void) {\n  %s\n}' % (f_name, f_code)
-
-    del env['local']
-
-    return {'code': f'{f_name}();'}
-
-
-def loop_c(params, env):
-    bindings = params[0]
-    body = params[1:]
-
-    loop_params = bindings.items[::2]
-    initial_args = bindings.items[1::2]
-
-    f_name = _get_generated_name(base='loop', env=env)
-    c_loop_params = ', '.join([f'Obj {p.name}' for p in loop_params])
-    env['local'] = {}
-
-    for index, loop_param in enumerate(loop_params):
-        env['local'][loop_param.name] = compile_form(initial_args[index], env=env)['code']
-
-    f_code = 'do {\n'
-    for form in body:
-        compiled = compile_form(form, env=env)
-        if isinstance(compiled, tuple) and isinstance(compiled[0], Symbol) and compiled[0].name == 'recur':
-            for c in compiled[1:]:
-                f_code += f'\n{c["code"]}'
-        else:
-            f_code += f'\n{compiled["code"]}'
-    f_code += '} while (true);'
-
-    env['functions'][f_name] = 'Obj %s(%s) {\n%s\n}' % (f_name, c_loop_params, f_code)
-
-    c_initial_args = ','.join([compile_form(arg, env=env)['code'] for arg in initial_args])
-
-    del env['local']
-
-    return {'code': f'{f_name}({c_initial_args});'}
-
-
 def str_func(params, env):
     if not params:
         return ''
@@ -602,21 +415,6 @@ def str_func(params, env):
         return str(evaluate(params[0], env=env))
     else:
         return ''.join([str(evaluate(p, env=env)) for p in params])
-
-
-def str_c(params, env):
-    if not params:
-        return {'code': ''}
-    if len(params) == 1:
-        return {
-            'type': str,
-            'code': '"%s"' % str(compile_form(params[0], env=env)['code'])
-        }
-    else:
-        return {
-            'type': str,
-            'code': 'strcat(%s, %s)' % (compile_form(params[0], env=env)['code'], compile_form(params[1], env=env)['code'])
-        }
 
 
 def str_split(params, env):
@@ -664,28 +462,11 @@ def nth(params, env):
     return collection[index]
 
 
-def nth_c(params, env):
-    lst = compile_form(params[0], env=env)
-    index = compile_form(params[1], env=env)['code']
-    return {
-        'type': int,
-        'code': f'list_get(&{lst["code"]}, {index})',
-    }
-
-
 def count(params, env):
     p = evaluate(params[0], env=env)
     if p is None:
         return 0
     return len(p)
-
-
-def count_c(params, env):
-    lst = compile_form(params[0], env=env)
-    return {
-        'type': int,
-        'code': f'list_count(&{lst["code"]});',
-    }
 
 
 def sort(params, env):
@@ -767,20 +548,6 @@ def print_func(params, env):
 
 def println(params, env):
     print(evaluate(params[0], env=env))
-
-
-def print_c(params, env):
-    result = compile_form(params[0], env=env)
-    param = result['code'].rstrip(';')
-    c_code = f'print({param})'
-    return {'code': c_code}
-
-
-def println_c(params, env):
-    result = compile_form(params[0], env=env)
-    param = result['code'].rstrip(';')
-    c_code = f'print({param});\nprintf("\\n")'
-    return {'code': c_code}
 
 
 def read_line(params, env):
@@ -938,6 +705,239 @@ def evaluate(node, env=None):
         d = dict(zip(keys, values))
         return d
     return node
+
+
+def add_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    type_ = type(params[0])
+    return {
+        'type': type_,
+        'code': f'add({c_params[0]}, {c_params[1]})',
+    }
+
+
+def subtract_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    type_ = type(params[0])
+    return {
+        'type': type_,
+        'code': f'subtract({c_params[0]}, {c_params[1]})',
+    }
+
+
+def multiply_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    type_ = type(params[0])
+    return {
+        'type': type_,
+        'code': f'multiply({c_params[0]}, {c_params[1]})',
+    }
+
+
+def divide_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    type_ = type(params[0])
+    return {
+        'type': type_,
+        'code': f'divide({c_params[0]}, {c_params[1]})',
+    }
+
+
+def equal_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    return {'code': f'equal({c_params[0]}, {c_params[1]})'}
+
+
+def greater_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    return {
+        'type': str,
+        'code': f'greater({c_params[0]}, {c_params[1]})',
+    }
+
+
+def greater_equal_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    return {
+        'type': str,
+        'code': f'greater_equal({c_params[0]}, {c_params[1]})',
+    }
+
+
+def less_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    return {
+        'type': str,
+        'code': f'less({c_params[0]}, {c_params[1]})',
+    }
+
+
+def less_equal_c(params, env):
+    c_params = [compile_form(p, env=env)['code'] for p in params]
+    return {
+        'type': str,
+        'code': f'less_equal({c_params[0]}, {c_params[1]})',
+    }
+
+
+def def_c(params, env):
+    name = params[0].name
+    c_name = _get_generated_name(base=f'u_{name}', env=env)
+    value = compile_form(params[1], env=env)['code']
+    code = f'Obj {c_name} = {value};'
+    env['user_globals'][name] = {'c_name': c_name, 'code': code}
+    return {'code': ''}
+
+
+def if_form_c(params, env):
+    f_name = _get_generated_name(base='if_form', env=env)
+
+    test_code = compile_form(params[0], env=env)['code']
+    true_result = compile_form(params[1], env=env)
+    if isinstance(true_result, tuple) and isinstance(true_result[0], Symbol) and true_result[0].name == 'recur':
+        true_code = '\n'.join([r['code'] for r in true_result[1:]])
+    else:
+        true_code = true_result['code']
+
+    f_code = '  if (AS_BOOL(%s)) {\n' % test_code
+    f_code += '    return %s;\n  }' % true_code
+
+    if len(params) > 2:
+        false_result = compile_form(params[2], env=env)
+        if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
+            f_code += '\n  else {'
+            for r in false_result[1:]:
+                f_code += f'\n    {r["code"]};'
+            f_code += '\n  }'
+        else:
+            f_code += '\n  else {\n    return %s;\n  }' % false_result['code']
+    else:
+        f_code += '\n  else {\n    return NIL_OBJ;\n  }'
+
+    f_params = 'void'
+    f_args = ''
+    local = env.get('local', {})
+    if local:
+        keys = list(local.keys())
+        f_params = f'Obj {keys[0]}'
+        f_args = keys[0]
+        for key in keys[1:]:
+            f_params += f', Obj {key}'
+            f_args += f', {key}'
+
+    env['functions'][f_name] = 'Obj %s(%s) {\n%s\n}' % (f_name, f_params, f_code)
+
+    return {
+        'type': str,
+        'code': f'{f_name}({f_args})'
+    }
+
+
+def let_c(params, env):
+    bindings = params[0]
+    body = params[1:]
+
+    paired_bindings = []
+    for i in range(0, len(bindings.items), 2):
+        paired_bindings.append(bindings.items[i:i+2])
+
+    f_name = _get_generated_name(base='let', env=env)
+    f_code = ''
+
+    env['local'] = {}
+    for binding in paired_bindings:
+        result = compile_form(binding[1], env=env)
+        env['local'][binding[0].name] = result
+        f_code += f'Obj {binding[0].name} = {result["code"]};\n'
+
+    result = compile_form(*body, env=env)
+
+    f_code += f'  return {result["code"]};'
+
+    env['functions'][f_name] = 'Obj %s(void) {\n  %s\n}' % (f_name, f_code)
+
+    del env['local']
+
+    return {'code': f'{f_name}();'}
+
+
+def loop_c(params, env):
+    bindings = params[0]
+    body = params[1:]
+
+    loop_params = bindings.items[::2]
+    initial_args = bindings.items[1::2]
+
+    f_name = _get_generated_name(base='loop', env=env)
+    c_loop_params = ', '.join([f'Obj {p.name}' for p in loop_params])
+    env['local'] = {}
+
+    for index, loop_param in enumerate(loop_params):
+        env['local'][loop_param.name] = compile_form(initial_args[index], env=env)['code']
+
+    f_code = 'do {\n'
+    for form in body:
+        compiled = compile_form(form, env=env)
+        if isinstance(compiled, tuple) and isinstance(compiled[0], Symbol) and compiled[0].name == 'recur':
+            for c in compiled[1:]:
+                f_code += f'\n{c["code"]}'
+        else:
+            f_code += f'\n{compiled["code"]}'
+    f_code += '} while (true);'
+
+    env['functions'][f_name] = 'Obj %s(%s) {\n%s\n}' % (f_name, c_loop_params, f_code)
+
+    c_initial_args = ','.join([compile_form(arg, env=env)['code'] for arg in initial_args])
+
+    del env['local']
+
+    return {'code': f'{f_name}({c_initial_args});'}
+
+
+def str_c(params, env):
+    if not params:
+        return {'code': ''}
+    if len(params) == 1:
+        return {
+            'type': str,
+            'code': '"%s"' % str(compile_form(params[0], env=env)['code'])
+        }
+    else:
+        return {
+            'type': str,
+            'code': 'strcat(%s, %s)' % (compile_form(params[0], env=env)['code'], compile_form(params[1], env=env)['code'])
+        }
+
+
+def nth_c(params, env):
+    lst = compile_form(params[0], env=env)
+    index = compile_form(params[1], env=env)['code']
+    return {
+        'type': int,
+        'code': f'list_get(&{lst["code"]}, {index})',
+    }
+
+
+def count_c(params, env):
+    lst = compile_form(params[0], env=env)
+    return {
+        'type': int,
+        'code': f'list_count(&{lst["code"]});',
+    }
+
+
+def print_c(params, env):
+    result = compile_form(params[0], env=env)
+    param = result['code'].rstrip(';')
+    c_code = f'print({param})'
+    return {'code': c_code}
+
+
+def println_c(params, env):
+    result = compile_form(params[0], env=env)
+    param = result['code'].rstrip(';')
+    c_code = f'print({param});\nprintf("\\n")'
+    return {'code': c_code}
 
 
 global_compile_env = {
