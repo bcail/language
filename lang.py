@@ -470,18 +470,29 @@ def if_form_c(params, env):
         if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
             f_code += '\n  else {'
             for r in false_result[1:]:
-                f_code += f'\n{r["code"]};'
-            f_code += '\n}'
+                f_code += f'\n    {r["code"]};'
+            f_code += '\n  }'
         else:
-            f_code += '\n  else\n{\n    return %s;\n}' % false_result['code']
+            f_code += '\n  else {\n    return %s;\n  }' % false_result['code']
     else:
         f_code += '\n  else {\n    return NIL_OBJ;\n  }'
 
-    env['functions'][f_name] = 'Obj %s(void) {\n%s\n}' % (f_name, f_code)
+    f_params = 'void'
+    f_args = ''
+    local = env.get('local', {})
+    if local:
+        keys = list(local.keys())
+        f_params = f'Obj {keys[0]}'
+        f_args = keys[0]
+        for key in keys[1:]:
+            f_params += f', Obj {key}'
+            f_args += f', {key}'
+
+    env['functions'][f_name] = 'Obj %s(%s) {\n%s\n}' % (f_name, f_params, f_code)
 
     return {
         'type': str,
-        'code': f'{f_name}();'
+        'code': f'{f_name}({f_args})'
     }
 
 
@@ -542,7 +553,7 @@ def let_c(params, env):
 
     result = compile_form(*body, env=env)
 
-    f_code += f'return {result["code"]};'
+    f_code += f'  return {result["code"]};'
 
     env['functions'][f_name] = 'Obj %s(void) {\n  %s\n}' % (f_name, f_code)
 
@@ -761,14 +772,14 @@ def println(params, env):
 def print_c(params, env):
     result = compile_form(params[0], env=env)
     param = result['code'].rstrip(';')
-    c_code = f'print({param});'
+    c_code = f'print({param})'
     return {'code': c_code}
 
 
 def println_c(params, env):
     result = compile_form(params[0], env=env)
     param = result['code'].rstrip(';')
-    c_code = f'print({param});\nprintf("\\n");'
+    c_code = f'print({param});\nprintf("\\n")'
     return {'code': c_code}
 
 
@@ -997,10 +1008,14 @@ def compile_form(node, env):
                     }
                     do_exprs = do_exprs[:-1] + [fixed_last_expr]
                 f_name = _get_generated_name('do_f', env)
-                f_code = '\n'.join([d['code'] for d in do_exprs])
+
+                f_code = ''
+                for d in do_exprs:
+                    f_code += f'  {d["code"]};\n'
                 if not last_expr.get('type'):
-                    f_code = f'{f_code}\nreturn NIL_OBJ;'
-                env['functions'][f_name] = 'Obj %s(void) {\n%s\n}' % (f_name, f_code)
+                    f_code = f'{f_code}  return NIL_OBJ;\n'
+
+                env['functions'][f_name] = 'Obj %s(void) {\n%s}' % (f_name, f_code)
                 return {
                     'type': last_expr.get('type'),
                     'code': f'{f_name}()',
