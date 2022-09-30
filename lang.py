@@ -1122,120 +1122,116 @@ c_functions = {
 
 
 c_types = '''
-    #define GROW_CAPACITY(capacity) \
-                ((capacity) < 8 ? 8 : (capacity) * 2)
+#define GROW_CAPACITY(capacity) \
+            ((capacity) < 8 ? 8 : (capacity) * 2)
 
-    #define GROW_ARRAY(type, pointer, oldCount, newCount) \
-                (type*)reallocate(pointer, sizeof(type) * (newCount))
+#define GROW_ARRAY(type, pointer, oldCount, newCount) \
+            (type*)reallocate(pointer, sizeof(type) * (newCount))
 
-    #define FREE_ARRAY(type, pointer) \
-                reallocate(pointer, (size_t)0)
+#define FREE_ARRAY(type, pointer) \
+            reallocate(pointer, (size_t)0)
 
-    #define NIL_OBJ ((Obj){NIL, {.number = 0}})
-    #define BOOL_OBJ(value) ((Obj){BOOL, {.boolean = value}})
-    #define NUMBER_OBJ(value) ((Obj){NUMBER, {.number = value}})
-    #define STRING_OBJ(value) ((Obj){STRING, {.string = value}})
-    #define AS_BOOL(value)  ((value).data.boolean)
-    #define AS_NUMBER(value)  ((value).data.number)
-    #define AS_STRING(value)  ((value).data.string)
-    #define IS_NIL(value)  ((value).type == NIL)
-    #define IS_BOOL(value)  ((value).type == BOOL)
-    #define IS_NUMBER(value)  ((value).type == NUMBER)
-    #define IS_STRING(value)  ((value).type == STRING)
+#define NIL_OBJ ((Obj){NIL, {.number = 0}})
+#define BOOL_OBJ(value) ((Obj){BOOL, {.boolean = value}})
+#define NUMBER_OBJ(value) ((Obj){NUMBER, {.number = value}})
+#define STRING_OBJ(value) ((Obj){STRING, {.string = value}})
+#define AS_BOOL(value)  ((value).data.boolean)
+#define AS_NUMBER(value)  ((value).data.number)
+#define AS_STRING(value)  ((value).data.string)
+#define IS_NIL(value)  ((value).type == NIL)
+#define IS_BOOL(value)  ((value).type == BOOL)
+#define IS_NUMBER(value)  ((value).type == NUMBER)
+#define IS_STRING(value)  ((value).type == STRING)
 
-    void* reallocate(void* pointer, size_t newSize) {
-      if (newSize == 0) {
-        free(pointer);
-        return NULL;
-      }
+void* reallocate(void* pointer, size_t newSize) {
+  if (newSize == 0) {
+    free(pointer);
+    return NULL;
+  }
 
-      void* result = realloc(pointer, newSize);
-      return result;
+  void* result = realloc(pointer, newSize);
+  return result;
+}
+
+typedef enum {
+  NIL,
+  BOOL,
+  NUMBER,
+  STRING,
+} ObjType;
+
+typedef struct {
+  ObjType type;
+  union {
+    bool boolean;
+    double number;
+    char* string;
+  } data;
+} Obj;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    Obj* objs;
+} List;
+
+void list_init(List* list) {
+  list->count = 0;
+  list->capacity = 0;
+  list->objs = NULL;
+}
+
+void list_free(List* list) {
+  FREE_ARRAY(int, list->objs);
+  list_init(list);
+}
+
+void list_add(List* list, Obj item) {
+  if (list->capacity < list->count + 1) {
+    size_t oldCapacity = list->capacity;
+    list->capacity = GROW_CAPACITY(oldCapacity);
+    list->objs = GROW_ARRAY(Obj, list->objs, oldCapacity, list->capacity);
+  }
+
+  list->objs[list->count] = item;
+  list->count++;
+}
+
+Obj list_get(List* list, Obj index) {
+  /* size_t is the unsigned integer type returned by the sizeof operator */
+  size_t num_index = (size_t) AS_NUMBER(index);
+  if (num_index < list->count) {
+    return list->objs[num_index];
+  }
+  else {
+    return NIL_OBJ;
+  }
+}
+
+Obj list_count(List* list) {
+  return NUMBER_OBJ((int) list->count);
+}
+
+Obj print(Obj obj) {
+  if IS_NIL(obj) {
+    printf("nil");
+  }
+  else if IS_BOOL(obj) {
+    if AS_BOOL(obj) {
+      printf("true");
     }
-
-    typedef enum {
-      NIL,
-      BOOL,
-      NUMBER,
-      STRING,
-    } ObjType;
-
-    typedef struct {
-      ObjType type;
-      union {
-        bool boolean;
-        double number;
-        char* string;
-      } data;
-    } Obj;
-
-    Obj print(Obj obj) {
-      if IS_NIL(obj) {
-        printf("nil");
-      }
-      else if IS_BOOL(obj) {
-        if AS_BOOL(obj) {
-          printf("true");
-        }
-        else {
-          printf("false");
-        }
-      }
-      else if IS_NUMBER(obj) {
-        printf("%f", AS_NUMBER(obj));
-      }
-      else {
-        printf("%s", AS_STRING(obj));
-      }
-      return NIL_OBJ;
+    else {
+      printf("false");
     }
-
-    typedef struct {
-        size_t count;
-        size_t capacity;
-        Obj* objs;
-    } List;
-
-    void list_init(List* list) {
-      list->count = 0;
-      list->capacity = 0;
-      list->objs = NULL;
-    }
-
-    void list_free(List* list) {
-      FREE_ARRAY(int, list->objs);
-      list_init(list);
-    }
-
-    void list_add(List* list, Obj item) {
-      if (list->capacity < list->count + 1) {
-        size_t oldCapacity = list->capacity;
-        list->capacity = GROW_CAPACITY(oldCapacity);
-        list->objs = GROW_ARRAY(Obj, list->objs, oldCapacity, list->capacity);
-      }
-
-      list->objs[list->count] = item;
-      list->count++;
-    }
-
-    Obj list_get(List* list, Obj index) {
-      /* size_t is the unsigned integer type returned by the sizeof operator */
-      size_t num_index = (size_t) AS_NUMBER(index);
-      if (num_index < list->count) {
-        return list->objs[num_index];
-      }
-      else {
-        return NIL_OBJ;
-      }
-    }
-
-    Obj list_count(List* list) {
-      return NUMBER_OBJ((int) list->count);
-    }
-
-    /* const char* str(void) {
-      return "asdf";
-    } */
+  }
+  else if IS_NUMBER(obj) {
+    printf("%f", AS_NUMBER(obj));
+  }
+  else {
+    printf("%s", AS_STRING(obj));
+  }
+  return NIL_OBJ;
+}
     '''
 
 
