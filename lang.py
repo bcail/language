@@ -1225,7 +1225,7 @@ Obj print(Obj obj) {
     }
   }
   else if IS_NUMBER(obj) {
-    printf("%f", AS_NUMBER(obj));
+    printf("%g", AS_NUMBER(obj));
   }
   else {
     printf("%s", AS_STRING(obj));
