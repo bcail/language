@@ -1131,17 +1131,21 @@ c_types = '''
 #define FREE_ARRAY(type, pointer) \
             reallocate(pointer, (size_t)0)
 
-#define NIL_VAL ((Value){NIL, {.number = 0}})
-#define BOOL_VAL(value) ((Value){BOOL, {.boolean = value}})
-#define NUMBER_VAL(value) ((Value){NUMBER, {.number = value}})
-#define STRING_VAL(value) ((Value){STRING, {.string = value}})
+#define NIL_VAL  ((Value){NIL, {.number = 0}})
+#define BOOL_VAL(value)  ((Value){BOOL, {.boolean = value}})
+#define NUMBER_VAL(value)  ((Value){NUMBER, {.number = value}})
+#define STRING_VAL(value)  ((Value){STRING, {.string = value}})
+#define OBJ_VAL(object)   ((Value){OBJ, {.obj = (Obj*)object}})
 #define AS_BOOL(value)  ((value).data.boolean)
 #define AS_NUMBER(value)  ((value).data.number)
 #define AS_STRING(value)  ((value).data.string)
+#define AS_OBJ(value)  ((value).data.obj)
 #define IS_NIL(value)  ((value).type == NIL)
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
 #define IS_STRING(value)  ((value).type == STRING)
+#define IS_OBJ(value)  ((value).type == OBJ)
+#define OBJ_TYPE(value)  (AS_OBJ(value)->type)
 
 void* reallocate(void* pointer, size_t newSize) {
   if (newSize == 0) {
@@ -1154,10 +1158,19 @@ void* reallocate(void* pointer, size_t newSize) {
 }
 
 typedef enum {
+  OBJ_STRING,
+} ObjType;
+
+typedef struct {
+  ObjType type;
+} Obj;
+
+typedef enum {
   NIL,
   BOOL,
   NUMBER,
   STRING,
+  OBJ,
 } ValueType;
 
 typedef struct {
@@ -1166,6 +1179,7 @@ typedef struct {
     bool boolean;
     double number;
     char* string;
+    Obj* obj;
   } data;
 } Value;
 
