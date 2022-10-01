@@ -784,7 +784,7 @@ def def_c(params, env):
     name = params[0].name
     c_name = _get_generated_name(base=f'u_{name}', env=env)
     value = compile_form(params[1], env=env)['code']
-    code = f'Obj {c_name} = {value};'
+    code = f'Value {c_name} = {value};'
     env['user_globals'][name] = {'c_name': c_name, 'code': code}
     return {'code': ''}
 
@@ -812,20 +812,20 @@ def if_form_c(params, env):
         else:
             f_code += '\n  else {\n    return %s;\n  }' % false_result['code']
     else:
-        f_code += '\n  else {\n    return NIL_OBJ;\n  }'
+        f_code += '\n  else {\n    return NIL_VAL;\n  }'
 
     f_params = 'void'
     f_args = ''
     local = env.get('local', {})
     if local:
         keys = list(local.keys())
-        f_params = f'Obj {keys[0]}'
+        f_params = f'Value {keys[0]}'
         f_args = keys[0]
         for key in keys[1:]:
-            f_params += f', Obj {key}'
+            f_params += f', Value {key}'
             f_args += f', {key}'
 
-    env['functions'][f_name] = 'Obj %s(%s) {\n%s\n}' % (f_name, f_params, f_code)
+    env['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, f_params, f_code)
 
     return {
         'type': str,
@@ -848,13 +848,13 @@ def let_c(params, env):
     for binding in paired_bindings:
         result = compile_form(binding[1], env=env)
         env['local'][binding[0].name] = result
-        f_code += f'Obj {binding[0].name} = {result["code"]};\n'
+        f_code += f'Value {binding[0].name} = {result["code"]};\n'
 
     result = compile_form(*body, env=env)
 
     f_code += f'  return {result["code"]};'
 
-    env['functions'][f_name] = 'Obj %s(void) {\n  %s\n}' % (f_name, f_code)
+    env['functions'][f_name] = 'Value %s(void) {\n  %s\n}' % (f_name, f_code)
 
     del env['local']
 
@@ -869,7 +869,7 @@ def loop_c(params, env):
     initial_args = bindings.items[1::2]
 
     f_name = _get_generated_name(base='loop', env=env)
-    c_loop_params = ', '.join([f'Obj {p.name}' for p in loop_params])
+    c_loop_params = ', '.join([f'Value {p.name}' for p in loop_params])
     env['local'] = {}
 
     for index, loop_param in enumerate(loop_params):
@@ -885,7 +885,7 @@ def loop_c(params, env):
             f_code += f'\n{compiled["code"]}'
     f_code += '} while (true);'
 
-    env['functions'][f_name] = 'Obj %s(%s) {\n%s\n}' % (f_name, c_loop_params, f_code)
+    env['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, c_loop_params, f_code)
 
     c_initial_args = ','.join([compile_form(arg, env=env)['code'] for arg in initial_args])
 
@@ -1013,9 +1013,9 @@ def compile_form(node, env):
                 for d in do_exprs:
                     f_code += f'  {d["code"]};\n'
                 if not last_expr.get('type'):
-                    f_code = f'{f_code}  return NIL_OBJ;\n'
+                    f_code = f'{f_code}  return NIL_VAL;\n'
 
-                env['functions'][f_name] = 'Obj %s(void) {\n%s}' % (f_name, f_code)
+                env['functions'][f_name] = 'Value %s(void) {\n%s}' % (f_name, f_code)
                 return {
                     'type': last_expr.get('type'),
                     'code': f'{f_name}()',
@@ -1023,7 +1023,7 @@ def compile_form(node, env):
             elif first.name == 'recur':
                 params = [compile_form(r, env) for r in rest]
                 for index, p in enumerate(env['local'].keys()):
-                    params[index]['code'] = f'Obj tmp_{p} = {params[index]["code"]};'
+                    params[index]['code'] = f'Value tmp_{p} = {params[index]["code"]};'
                 for var in env['local'].keys():
                     params[-1]['code'] += f'\n{var} = tmp_{var};'
                 return (first, *params)
@@ -1046,26 +1046,26 @@ def compile_form(node, env):
     if isinstance(node, str):
         return {
             'type': str,
-            'code': f'STRING_OBJ("{node}")',
+            'code': f'STRING_VAL("{node}")',
         }
     if isinstance(node, bool):
         if node:
             val = 'true'
         else:
             val = 'false'
-        return {'code': f'BOOL_OBJ({val})'}
+        return {'code': f'BOOL_VAL({val})'}
     if isinstance(node, int):
         return {
             'type': int,
-            'code': f'NUMBER_OBJ({node})',
+            'code': f'NUMBER_VAL({node})',
         }
     if isinstance(node, float):
         return {
             'type': float,
-            'code': f'NUMBER_OBJ({node})',
+            'code': f'NUMBER_VAL({node})',
         }
     if node is None:
-        return {'code': 'NIL_OBJ'}
+        return {'code': 'NIL_VAL'}
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
@@ -1109,15 +1109,15 @@ c_includes = [
 
 
 c_functions = {
-    'add': 'Obj add(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) + AS_NUMBER(y)); }',
-    'subtract': 'Obj subtract(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) - AS_NUMBER(y)); }',
-    'multiply': 'Obj multiply(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) * AS_NUMBER(y)); }',
-    'divide': 'Obj divide(Obj x, Obj y) { return NUMBER_OBJ(AS_NUMBER(x) / AS_NUMBER(y)); }',
-    'equal': 'Obj equal(Obj x, Obj y) { return BOOL_OBJ(AS_NUMBER(x) == AS_NUMBER(y)); }',
-    'greater': 'Obj greater(Obj x, Obj y) { return BOOL_OBJ(AS_NUMBER(x) > AS_NUMBER(y)); }',
-    'greater_equal': 'Obj greater_equal(Obj x, Obj y) { return BOOL_OBJ(AS_NUMBER(x) >= AS_NUMBER(y)); }',
-    'less': 'Obj less(Obj x, Obj y) { return BOOL_OBJ(AS_NUMBER(x) < AS_NUMBER(y)); }',
-    'less_equal': 'Obj less_equal(Obj x, Obj y) { return BOOL_OBJ(AS_NUMBER(x) <= AS_NUMBER(y)); }',
+    'add': 'Value add(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y)); }',
+    'subtract': 'Value subtract(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y)); }',
+    'multiply': 'Value multiply(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y)); }',
+    'divide': 'Value divide(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y)); }',
+    'equal': 'Value equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) == AS_NUMBER(y)); }',
+    'greater': 'Value greater(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) > AS_NUMBER(y)); }',
+    'greater_equal': 'Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBER(y)); }',
+    'less': 'Value less(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y)); }',
+    'less_equal': 'Value less_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) <= AS_NUMBER(y)); }',
 }
 
 
@@ -1131,10 +1131,10 @@ c_types = '''
 #define FREE_ARRAY(type, pointer) \
             reallocate(pointer, (size_t)0)
 
-#define NIL_OBJ ((Obj){NIL, {.number = 0}})
-#define BOOL_OBJ(value) ((Obj){BOOL, {.boolean = value}})
-#define NUMBER_OBJ(value) ((Obj){NUMBER, {.number = value}})
-#define STRING_OBJ(value) ((Obj){STRING, {.string = value}})
+#define NIL_VAL ((Value){NIL, {.number = 0}})
+#define BOOL_VAL(value) ((Value){BOOL, {.boolean = value}})
+#define NUMBER_VAL(value) ((Value){NUMBER, {.number = value}})
+#define STRING_VAL(value) ((Value){STRING, {.string = value}})
 #define AS_BOOL(value)  ((value).data.boolean)
 #define AS_NUMBER(value)  ((value).data.number)
 #define AS_STRING(value)  ((value).data.string)
@@ -1158,79 +1158,79 @@ typedef enum {
   BOOL,
   NUMBER,
   STRING,
-} ObjType;
+} ValueType;
 
 typedef struct {
-  ObjType type;
+  ValueType type;
   union {
     bool boolean;
     double number;
     char* string;
   } data;
-} Obj;
+} Value;
 
 typedef struct {
     size_t count;
     size_t capacity;
-    Obj* objs;
+    Value* values;
 } List;
 
 void list_init(List* list) {
   list->count = 0;
   list->capacity = 0;
-  list->objs = NULL;
+  list->values = NULL;
 }
 
 void list_free(List* list) {
-  FREE_ARRAY(int, list->objs);
+  FREE_ARRAY(int, list->values);
   list_init(list);
 }
 
-void list_add(List* list, Obj item) {
+void list_add(List* list, Value item) {
   if (list->capacity < list->count + 1) {
     size_t oldCapacity = list->capacity;
     list->capacity = GROW_CAPACITY(oldCapacity);
-    list->objs = GROW_ARRAY(Obj, list->objs, oldCapacity, list->capacity);
+    list->values = GROW_ARRAY(Value, list->values, oldCapacity, list->capacity);
   }
 
-  list->objs[list->count] = item;
+  list->values[list->count] = item;
   list->count++;
 }
 
-Obj list_get(List* list, Obj index) {
+Value list_get(List* list, Value index) {
   /* size_t is the unsigned integer type returned by the sizeof operator */
   size_t num_index = (size_t) AS_NUMBER(index);
   if (num_index < list->count) {
-    return list->objs[num_index];
+    return list->values[num_index];
   }
   else {
-    return NIL_OBJ;
+    return NIL_VAL;
   }
 }
 
-Obj list_count(List* list) {
-  return NUMBER_OBJ((int) list->count);
+Value list_count(List* list) {
+  return NUMBER_VAL((int) list->count);
 }
 
-Obj print(Obj obj) {
-  if IS_NIL(obj) {
+Value print(Value value) {
+  if IS_NIL(value) {
     printf("nil");
   }
-  else if IS_BOOL(obj) {
-    if AS_BOOL(obj) {
+  else if IS_BOOL(value) {
+    if AS_BOOL(value) {
       printf("true");
     }
     else {
       printf("false");
     }
   }
-  else if IS_NUMBER(obj) {
-    printf("%g", AS_NUMBER(obj));
+  else if IS_NUMBER(value) {
+    printf("%g", AS_NUMBER(value));
   }
   else {
-    printf("%s", AS_STRING(obj));
+    printf("%s", AS_STRING(value));
   }
-  return NIL_OBJ;
+  return NIL_VAL;
 }
     '''
 
