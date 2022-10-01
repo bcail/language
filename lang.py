@@ -914,7 +914,7 @@ def nth_c(params, env):
     index = compile_form(params[1], env=env)['code']
     return {
         'type': int,
-        'code': f'list_get(&{lst["code"]}, {index})',
+        'code': f'list_get({lst["code"]}, {index})',
     }
 
 
@@ -922,7 +922,7 @@ def count_c(params, env):
     lst = compile_form(params[0], env=env)
     return {
         'type': int,
-        'code': f'list_count(&{lst["code"]});',
+        'code': f'list_count({lst["code"]});',
     }
 
 
@@ -974,7 +974,7 @@ def _get_generated_name(base, env):
 
 def new_vector_c(v, env):
     name = _get_generated_name('lst', env=env)
-    env['temps'][name] = 'List %s;' % name
+    env['temps'][name] = 'ObjList %s;' % name
     c_code = 'list_init(&%s);' % name
     c_items = [compile_form(item, env=env)['code'] for item in v.items]
     for c_item in c_items:
@@ -1042,7 +1042,7 @@ def compile_form(node, env):
             raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
         name = new_vector_c(node, env=env)
-        return {'code': name}
+        return {'code': f'OBJ_VAL(&{name})'}
     if isinstance(node, str):
         return {
             'type': str,
@@ -1140,11 +1140,13 @@ c_types = '''
 #define AS_NUMBER(value)  ((value).data.number)
 #define AS_STRING(value)  ((value).data.string)
 #define AS_OBJ(value)  ((value).data.obj)
+#define AS_LIST(value)       ((ObjList*)AS_OBJ(value))
 #define IS_NIL(value)  ((value).type == NIL)
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
 #define IS_STRING(value)  ((value).type == STRING)
 #define IS_OBJ(value)  ((value).type == OBJ)
+#define IS_LIST(value)  isObjType(value, OBJ_LIST)
 #define OBJ_TYPE(value)  (AS_OBJ(value)->type)
 
 void* reallocate(void* pointer, size_t newSize) {
@@ -1158,7 +1160,7 @@ void* reallocate(void* pointer, size_t newSize) {
 }
 
 typedef enum {
-  OBJ_STRING,
+  OBJ_LIST,
 } ObjType;
 
 typedef struct {
@@ -1183,24 +1185,29 @@ typedef struct {
   } data;
 } Value;
 
-typedef struct {
-    size_t count;
-    size_t capacity;
-    Value* values;
-} List;
+static inline bool isObjType(Value value, ObjType type) {
+  return IS_OBJ(value) && AS_OBJ(value)->type == type;
+}
 
-void list_init(List* list) {
+typedef struct {
+  Obj obj;
+  size_t count;
+  size_t capacity;
+  Value* values;
+} ObjList;
+
+void list_init(ObjList* list) {
   list->count = 0;
   list->capacity = 0;
   list->values = NULL;
 }
 
-void list_free(List* list) {
+void list_free(ObjList* list) {
   FREE_ARRAY(int, list->values);
   list_init(list);
 }
 
-void list_add(List* list, Value item) {
+void list_add(ObjList* list, Value item) {
   if (list->capacity < list->count + 1) {
     size_t oldCapacity = list->capacity;
     list->capacity = GROW_CAPACITY(oldCapacity);
@@ -1211,19 +1218,19 @@ void list_add(List* list, Value item) {
   list->count++;
 }
 
-Value list_get(List* list, Value index) {
+Value list_get(Value list, Value index) {
   /* size_t is the unsigned integer type returned by the sizeof operator */
   size_t num_index = (size_t) AS_NUMBER(index);
-  if (num_index < list->count) {
-    return list->values[num_index];
+  if (num_index < AS_LIST(list)->count) {
+    return AS_LIST(list)->values[num_index];
   }
   else {
     return NIL_VAL;
   }
 }
 
-Value list_count(List* list) {
-  return NUMBER_VAL((int) list->count);
+Value list_count(Value list) {
+  return NUMBER_VAL((int) AS_LIST(list)->count);
 }
 
 Value print(Value value) {
@@ -1240,6 +1247,9 @@ Value print(Value value) {
   }
   else if IS_NUMBER(value) {
     printf("%g", AS_NUMBER(value));
+  }
+  else if (IS_OBJ(value)) {
+    printf("[]");
   }
   else {
     printf("%s", AS_STRING(value));

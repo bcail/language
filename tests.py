@@ -425,6 +425,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(if (<= 2 1) (print true) (print false))', 'output': 'false'},
             {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
             {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
+            {'src': '(print [1 2])', 'output': '[1 2]'},
             {'src': '(print (nth [1 2] 0))', 'output': '1'},
             {'src': '(print (nth [1 (+ 1 1)] 1))', 'output': '2'},
             {'src': '(print (nth [1 (nth [2 3] 0)] 1))', 'output': '2'},
@@ -454,7 +455,8 @@ class CompileTests(unittest.TestCase):
                         f.write(c_code.encode('utf8'))
 
                     program_filename = os.path.join(tmp, 'program')
-                    compile_cmd = GCC_CMD + ['-o', program_filename, c_filename]
+                    # compile_cmd = GCC_CMD + ['-o', program_filename, c_filename]
+                    compile_cmd = ['gcc', '-o', program_filename, c_filename]
                     try:
                         subprocess.run(compile_cmd, check=True, env=GCC_ENV)
                     except subprocess.CalledProcessError:
