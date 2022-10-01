@@ -372,7 +372,7 @@ GCC_CMD = [
     '-Wswitch-default',
     '-Wswitch-enum',
     '-Wstack-usage=1000000',
-    '-Wcast-align=strict',
+    # '-Wcast-align=strict',
     '-D_FORTIFY_SOURCE=2',
     '-fstack-protector-strong',
     '-fstack-clash-protection',
@@ -455,8 +455,7 @@ class CompileTests(unittest.TestCase):
                         f.write(c_code.encode('utf8'))
 
                     program_filename = os.path.join(tmp, 'program')
-                    # compile_cmd = GCC_CMD + ['-o', program_filename, c_filename]
-                    compile_cmd = ['gcc', '-o', program_filename, c_filename]
+                    compile_cmd = GCC_CMD + ['-o', program_filename, c_filename]
                     try:
                         subprocess.run(compile_cmd, check=True, env=GCC_ENV)
                     except subprocess.CalledProcessError:
