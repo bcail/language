@@ -425,7 +425,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(if (<= 2 1) (print true) (print false))', 'output': 'false'},
             {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
             {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
-            {'src': '(print [1 2])', 'output': '[1 2]'},
+            {'src': '(print [1 nil "hello" 2.34 true])', 'output': '[1 nil hello 2.34 true]'},
             {'src': '(print (nth [1 2] 0))', 'output': '1'},
             {'src': '(print (nth [1 (+ 1 1)] 1))', 'output': '2'},
             {'src': '(print (nth [1 (nth [2 3] 0)] 1))', 'output': '2'},

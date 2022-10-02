@@ -1233,16 +1233,6 @@ Value list_count(Value list) {
   return NUMBER_VAL((int) AS_LIST(list)->count);
 }
 
-void list_print(Value list) {
-  Value num_items = list_count(list);
-  printf("[");
-  printf("%g", AS_NUMBER(list_get(list, NUMBER_VAL(0))));
-  for(int i = 1; i < AS_NUMBER(num_items); i++) {
-    printf(" %g", AS_NUMBER(list_get(list, NUMBER_VAL(i))));
-  }
-  printf("]");
-}
-
 Value print(Value value) {
   if IS_NIL(value) {
     printf("nil");
@@ -1259,7 +1249,14 @@ Value print(Value value) {
     printf("%g", AS_NUMBER(value));
   }
   else if (IS_LIST(value)) {
-    list_print(value);
+    Value num_items = list_count(value);
+    printf("[");
+    print(list_get(value, NUMBER_VAL(0)));
+    for(int i = 1; i < AS_NUMBER(num_items); i++) {
+      printf(" ");
+      print(list_get(value, NUMBER_VAL(i)));
+    }
+    printf("]");
   }
   else {
     printf("%s", AS_STRING(value));
