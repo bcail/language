@@ -985,6 +985,22 @@ def new_vector_c(v, env):
     return name
 
 
+def new_map_c(node, env):
+    name = _get_generated_name('map', env=env)
+    env['temps'][name] = f'ObjMap {name};'
+    c_code = f'map_init(&{name});'
+    keys = [compile_form(k, env=env)['code'] for k in node.items[::2]]
+    values = [compile_form(v, env=env)['code'] for v in node.items[1::2]]
+    c_items = zip(keys, values)
+
+    for key, value in c_items:
+        c_code += f'\nmap_add(&{name}, {key}, {value});'
+
+    env['main_pre'].append(f'{c_code}\n')
+    env['main_post'].append(f'map_free(&{name});')
+    return name
+
+
 def compile_form(node, env):
     if isinstance(node, list):
         first = node[0]
@@ -1066,6 +1082,9 @@ def compile_form(node, env):
         }
     if node is None:
         return {'code': 'NIL_VAL'}
+    if isinstance(node, DictBuilder):
+        name = new_map_c(node, env=env)
+        return {'code': f'OBJ_VAL(&{name})'}
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
@@ -1141,12 +1160,14 @@ c_types = '''
 #define AS_STRING(value)  ((value).data.string)
 #define AS_OBJ(value)  ((value).data.obj)
 #define AS_LIST(value)       ((ObjList*)AS_OBJ(value))
+#define AS_MAP(value)       ((ObjMap*)AS_OBJ(value))
 #define IS_NIL(value)  ((value).type == NIL)
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
 #define IS_STRING(value)  ((value).type == STRING)
 #define IS_OBJ(value)  ((value).type == OBJ)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
+#define IS_MAP(value)  isObjType(value, OBJ_MAP)
 #define OBJ_TYPE(value)  (AS_OBJ(value)->type)
 
 void* reallocate(void* pointer, size_t newSize) {
@@ -1161,6 +1182,7 @@ void* reallocate(void* pointer, size_t newSize) {
 
 typedef enum {
   OBJ_LIST,
+  OBJ_MAP,
 } ObjType;
 
 typedef struct {
@@ -1196,14 +1218,27 @@ typedef struct {
   Value* values;
 } ObjList;
 
+typedef struct {
+  Value key;
+  Value value;
+} MapEntry;
+
+typedef struct {
+  Obj obj;
+  size_t count;
+  size_t capacity;
+  MapEntry* entries;
+} ObjMap;
+
 void list_init(ObjList* list) {
+  list->obj = (Obj){.type = OBJ_LIST};
   list->count = 0;
   list->capacity = 0;
   list->values = NULL;
 }
 
 void list_free(ObjList* list) {
-  FREE_ARRAY(int, list->values);
+  FREE_ARRAY(Value, list->values);
   list_init(list);
 }
 
@@ -1233,6 +1268,34 @@ Value list_count(Value list) {
   return NUMBER_VAL((int) AS_LIST(list)->count);
 }
 
+void map_init(ObjMap* map) {
+  map->obj = (Obj){.type = OBJ_MAP};
+  map->count = 0;
+  map->capacity = 0;
+  map->entries = NULL;
+}
+
+void map_free(ObjMap* map) {
+  FREE_ARRAY(MapEntry, map->entries);
+  map_init(map);
+}
+
+void map_add(ObjMap* map, Value key, Value value) {
+  if (map->capacity < map->count + 1) {
+    size_t oldCapacity = map->capacity;
+    map->capacity = GROW_CAPACITY(oldCapacity);
+    map->entries = GROW_ARRAY(MapEntry, map->entries, oldCapacity, map->capacity);
+  }
+
+  MapEntry entry = {.key = key, .value = value};
+  map->entries[map->count] = entry;
+  map->count++;
+}
+
+Value map_count(Value map) {
+  return NUMBER_VAL((int) AS_MAP(map)->count);
+}
+
 Value print(Value value) {
   if IS_NIL(value) {
     printf("nil");
@@ -1252,11 +1315,27 @@ Value print(Value value) {
     Value num_items = list_count(value);
     printf("[");
     print(list_get(value, NUMBER_VAL(0)));
-    for(int i = 1; i < AS_NUMBER(num_items); i++) {
+    for (int i = 1; i < AS_NUMBER(num_items); i++) {
       printf(" ");
       print(list_get(value, NUMBER_VAL(i)));
     }
     printf("]");
+  }
+  else if (IS_MAP(value)) {
+    Value num_entries = map_count(value);
+    printf("{");
+    if (AS_NUMBER(num_entries) > 0) {
+      print(AS_MAP(value)->entries[(size_t)0].key);
+      printf(" ");
+      print(AS_MAP(value)->entries[(size_t)0].value);
+      for (int i = 1; i < AS_NUMBER(num_entries); i++) {
+        printf(", ");
+        print(AS_MAP(value)->entries[(size_t)i].key);
+        printf(" ");
+        print(AS_MAP(value)->entries[(size_t)i].value);
+      }
+    }
+    printf("}");
   }
   else {
     printf("%s", AS_STRING(value));
