@@ -1132,7 +1132,6 @@ c_functions = {
     'subtract': 'Value subtract(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y)); }',
     'multiply': 'Value multiply(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y)); }',
     'divide': 'Value divide(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y)); }',
-    'equal': 'Value equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) == AS_NUMBER(y)); }',
     'greater': 'Value greater(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) > AS_NUMBER(y)); }',
     'greater_equal': 'Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBER(y)); }',
     'less': 'Value less(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y)); }',
@@ -1294,6 +1293,13 @@ void map_add(ObjMap* map, Value key, Value value) {
 
 Value map_count(Value map) {
   return NUMBER_VAL((int) AS_MAP(map)->count);
+}
+
+Value equal(Value x, Value y) {
+  if (x.type != y.type) {
+    return BOOL_VAL(false);
+  }
+  return BOOL_VAL(AS_NUMBER(x) == AS_NUMBER(y));
 }
 
 Value print(Value value) {

@@ -404,6 +404,12 @@ class CompileTests(unittest.TestCase):
             {'src': '(print nil)', 'output': 'nil'},
             {'src': '(print true)', 'output': 'true'},
             {'src': '(print false)', 'output': 'false'},
+            {'src': '(print (= nil nil))', 'output': 'true'},
+            {'src': '(print (= true true))', 'output': 'true'},
+            {'src': '(print (= false false))', 'output': 'true'},
+            {'src': '(print (= nil false))', 'output': 'false'},
+            {'src': '(print (= nil true))', 'output': 'false'},
+            {'src': '(print (= false true))', 'output': 'false'},
             {'src': '(print (= 1 1))', 'output': 'true'},
             {'src': '(print (= 1 "1"))', 'output': 'false'},
             {'src': '(print (= 1 1.0))', 'output': 'true'}, #different from clojure
