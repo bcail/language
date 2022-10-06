@@ -405,6 +405,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(print true)', 'output': 'true'},
             {'src': '(print false)', 'output': 'false'},
             {'src': '(print (= 1 1))', 'output': 'true'},
+            {'src': '(print (= 1 "1"))', 'output': 'false'},
+            {'src': '(print (= 1 1.0))', 'output': 'true'}, #different from clojure
             {'src': '(print (+ 1 3))', 'output': '4'},
             {'src': '(print (+ 1.5 2.3))', 'output': '3.8'},
             {'src': '(print (- 3 2))', 'output': '1'},
