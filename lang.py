@@ -972,6 +972,17 @@ def _get_generated_name(base, env):
         i += 1
 
 
+def new_string_c(s, env):
+    name = _get_generated_name('str', env=env)
+    env['temps'][name] = 'ObjString %s;' % name
+    c_code = f'string_init(&{name});'
+    c_code += f'\nstring_set(&{name}, "{s}", (size_t) {len(s)});'
+
+    env['main_pre'].append(f'{c_code}\n')
+    env['main_post'].append(f'string_free(&{name});')
+    return name
+
+
 def new_vector_c(v, env):
     name = _get_generated_name('lst', env=env)
     env['temps'][name] = 'ObjList %s;' % name
@@ -1060,10 +1071,8 @@ def compile_form(node, env):
         name = new_vector_c(node, env=env)
         return {'code': f'OBJ_VAL(&{name})'}
     if isinstance(node, str):
-        return {
-            'type': str,
-            'code': f'STRING_VAL("{node}")',
-        }
+        name = new_string_c(node, env=env)
+        return {'code': f'OBJ_VAL(&{name})'}
     if isinstance(node, bool):
         if node:
             val = 'true'
@@ -1140,6 +1149,9 @@ c_functions = {
 
 
 c_types = '''
+#define ALLOCATE(type, count) \
+    (type*)reallocate(NULL, sizeof(type) * (count))
+
 #define GROW_CAPACITY(capacity) \
             ((capacity) < 8 ? 8 : (capacity) * 2)
 
@@ -1152,22 +1164,21 @@ c_types = '''
 #define NIL_VAL  ((Value){NIL, {.number = 0}})
 #define BOOL_VAL(value)  ((Value){BOOL, {.boolean = value}})
 #define NUMBER_VAL(value)  ((Value){NUMBER, {.number = value}})
-#define STRING_VAL(value)  ((Value){STRING, {.string = value}})
 #define OBJ_VAL(object)   ((Value){OBJ, {.obj = (Obj*)object}})
 #define AS_BOOL(value)  ((value).data.boolean)
 #define AS_NUMBER(value)  ((value).data.number)
-#define AS_STRING(value)  ((value).data.string)
 #define AS_OBJ(value)  ((value).data.obj)
+#define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
+#define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
 #define AS_LIST(value)       ((ObjList*)AS_OBJ(value))
 #define AS_MAP(value)       ((ObjMap*)AS_OBJ(value))
 #define IS_NIL(value)  ((value).type == NIL)
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
-#define IS_STRING(value)  ((value).type == STRING)
 #define IS_OBJ(value)  ((value).type == OBJ)
+#define IS_STRING(value)  isObjType(value, OBJ_STRING)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
 #define IS_MAP(value)  isObjType(value, OBJ_MAP)
-#define OBJ_TYPE(value)  (AS_OBJ(value)->type)
 
 void* reallocate(void* pointer, size_t newSize) {
   if (newSize == 0) {
@@ -1180,6 +1191,7 @@ void* reallocate(void* pointer, size_t newSize) {
 }
 
 typedef enum {
+  OBJ_STRING,
   OBJ_LIST,
   OBJ_MAP,
 } ObjType;
@@ -1192,7 +1204,6 @@ typedef enum {
   NIL,
   BOOL,
   NUMBER,
-  STRING,
   OBJ,
 } ValueType;
 
@@ -1212,6 +1223,12 @@ static inline bool isObjType(Value value, ObjType type) {
 
 typedef struct {
   Obj obj;
+  size_t length;
+  char* chars;
+} ObjString;
+
+typedef struct {
+  Obj obj;
   size_t count;
   size_t capacity;
   Value* values;
@@ -1228,6 +1245,25 @@ typedef struct {
   size_t capacity;
   MapEntry* entries;
 } ObjMap;
+
+void string_init(ObjString* string) {
+  string->obj = (Obj){.type = OBJ_STRING};
+  string->length = 0;
+  string->chars = NULL;
+}
+
+void string_set(ObjString* string, const char* chars, size_t length) {
+  char* heapChars = ALLOCATE(char, length + 1);
+  memcpy(heapChars, chars, length);
+  heapChars[length] = 0; /* terminate it w/ NULL, so we can pass c-string to functions that need it */
+  string->length = length;
+  string->chars = heapChars;
+}
+
+void string_free(ObjString* string) {
+  FREE_ARRAY(char, string->chars);
+  string_init(string);
+}
 
 void list_init(ObjList* list) {
   list->obj = (Obj){.type = OBJ_LIST};
@@ -1299,7 +1335,27 @@ Value equal(Value x, Value y) {
   if (x.type != y.type) {
     return BOOL_VAL(false);
   }
-  return BOOL_VAL(AS_NUMBER(x) == AS_NUMBER(y));
+  else if (IS_NIL(x)) {
+    return BOOL_VAL(true);
+  }
+  else if (IS_BOOL(x)) {
+    return BOOL_VAL(AS_BOOL(x) == AS_BOOL(y));
+  }
+  else if (IS_NUMBER(x)) {
+    return BOOL_VAL(AS_NUMBER(x) == AS_NUMBER(y));
+  }
+  else if (IS_STRING(x)) {
+    ObjString* xString = AS_STRING(x);
+    ObjString* yString = AS_STRING(y);
+    if ((xString->length == yString->length) &&
+        (memcmp(xString->chars, yString->chars, xString->length) == 0)) {
+      return BOOL_VAL(true);
+    }
+    return BOOL_VAL(false);
+  }
+  else {
+    return BOOL_VAL(false);
+  }
 }
 
 Value print(Value value) {
@@ -1344,7 +1400,7 @@ Value print(Value value) {
     printf("}");
   }
   else {
-    printf("%s", AS_STRING(value));
+    printf("%s", AS_CSTRING(value));
   }
   return NIL_VAL;
 }
