@@ -1353,6 +1353,22 @@ Value equal(Value x, Value y) {
     }
     return BOOL_VAL(false);
   }
+  else if (IS_LIST(x)) {
+    ObjList* xList = AS_LIST(x);
+    ObjList* yList = AS_LIST(y);
+    if (xList->count == yList->count) {
+      Value num_items = list_count(x);
+      for (int i = 0; i < AS_NUMBER(num_items); i++) {
+        Value xItem = list_get(x, NUMBER_VAL(i));
+        Value yItem = list_get(y, NUMBER_VAL(i));
+        if (!AS_BOOL(equal(xItem, yItem))) {
+          return BOOL_VAL(false);
+        }
+      }
+      return BOOL_VAL(true);
+    }
+    return BOOL_VAL(false);
+  }
   else {
     return BOOL_VAL(false);
   }
