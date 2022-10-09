@@ -1179,6 +1179,7 @@ c_types = '''
 #define IS_STRING(value)  isObjType(value, OBJ_STRING)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
 #define IS_MAP(value)  isObjType(value, OBJ_MAP)
+#define MAP_MAX_LOAD 0.75
 
 void* reallocate(void* pointer, size_t newSize) {
   if (newSize == 0) {
@@ -1224,6 +1225,7 @@ static inline bool isObjType(Value value, ObjType type) {
 typedef struct {
   Obj obj;
   size_t length;
+  uint32_t hash;
   char* chars;
 } ObjString;
 
@@ -1249,7 +1251,17 @@ typedef struct {
 void string_init(ObjString* string) {
   string->obj = (Obj){.type = OBJ_STRING};
   string->length = 0;
+  string->hash = 0;
   string->chars = NULL;
+}
+
+static uint32_t hashString(const char* key, size_t length) {
+  uint32_t hash = 2166136261u;
+  for (size_t i = 0; i < length; i++) {
+    hash ^= (uint8_t)key[i];
+    hash *= 16777619;
+  }
+  return hash;
 }
 
 void string_set(ObjString* string, const char* chars, size_t length) {
@@ -1257,6 +1269,7 @@ void string_set(ObjString* string, const char* chars, size_t length) {
   memcpy(heapChars, chars, length);
   heapChars[length] = 0; /* terminate it w/ NULL, so we can pass c-string to functions that need it */
   string->length = length;
+  string->hash = hashString(chars, length);
   string->chars = heapChars;
 }
 
@@ -1315,18 +1328,6 @@ void map_free(ObjMap* map) {
   map_init(map);
 }
 
-void map_add(ObjMap* map, Value key, Value value) {
-  if (map->capacity < map->count + 1) {
-    size_t oldCapacity = map->capacity;
-    map->capacity = GROW_CAPACITY(oldCapacity);
-    map->entries = GROW_ARRAY(MapEntry, map->entries, oldCapacity, map->capacity);
-  }
-
-  MapEntry entry = {.key = key, .value = value};
-  map->entries[map->count] = entry;
-  map->count++;
-}
-
 Value map_count(Value map) {
   return NUMBER_VAL((int) AS_MAP(map)->count);
 }
@@ -1374,6 +1375,45 @@ Value equal(Value x, Value y) {
   }
 }
 
+static MapEntry* findEntry(MapEntry* entries, size_t capacity, Value key) {
+  ObjString* keyString = AS_STRING(key);
+  uint32_t index = keyString->hash % (uint32_t) capacity;
+  for (;;) {
+    MapEntry* entry = &entries[index];
+    if (AS_BOOL(equal(entry->key, key)) || AS_BOOL(equal(entry->key, NIL_VAL))) {
+      return entry;
+    }
+
+    index = (index + 1) % (uint32_t)capacity;
+  }
+}
+
+static void adjustCapacity(ObjMap* map, size_t capacity) {
+  MapEntry* entries = ALLOCATE(MapEntry, capacity);
+  for (size_t i = 0; i < capacity; i++) {
+    entries[i].key = NIL_VAL;
+    entries[i].value = NIL_VAL;
+  }
+
+  map->entries = entries;
+  map->capacity = capacity;
+}
+
+bool map_add(ObjMap* map, Value key, Value value) {
+  if ((double)map->count + 1 > (double)map->capacity * MAP_MAX_LOAD) {
+    size_t capacity = GROW_CAPACITY(map->capacity);
+    adjustCapacity(map, capacity);
+  }
+
+  MapEntry* entry = findEntry(map->entries, map->capacity, key);
+  bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL));
+  if (isNewKey) map->count++;
+
+  entry->key = key;
+  entry->value = value;
+  return isNewKey;
+}
+
 Value print(Value value) {
   if IS_NIL(value) {
     printf("nil");
@@ -1400,17 +1440,18 @@ Value print(Value value) {
     printf("]");
   }
   else if (IS_MAP(value)) {
-    Value num_entries = map_count(value);
+    size_t num_entries = AS_MAP(value)->capacity;
     printf("{");
-    if (AS_NUMBER(num_entries) > 0) {
-      print(AS_MAP(value)->entries[(size_t)0].key);
-      printf(" ");
-      print(AS_MAP(value)->entries[(size_t)0].value);
-      for (int i = 1; i < AS_NUMBER(num_entries); i++) {
-        printf(", ");
-        print(AS_MAP(value)->entries[(size_t)i].key);
+    bool first_entry = true;
+    for (size_t i = 0; i < num_entries; i++) {
+      if (!AS_BOOL(equal(AS_MAP(value)->entries[i].key, NIL_VAL))) {
+        if (!first_entry) {
+          printf(", ");
+        }
+        print(AS_MAP(value)->entries[i].key);
         printf(" ");
-        print(AS_MAP(value)->entries[(size_t)i].value);
+        print(AS_MAP(value)->entries[i].value);
+        first_entry = false;
       }
     }
     printf("}");
