@@ -926,6 +926,15 @@ def count_c(params, env):
     }
 
 
+def map_get_c(params, env):
+    m = compile_form(params[0], env=env)['code']
+    key = compile_form(params[1], env=env)['code']
+    if len(params) > 2:
+        default = compile_form(params[2], env=env)['code']
+        return {'code': f'map_get({m}, {key}, {default})'}
+    return {'code': f'map_get({m}, {key}, NIL_VAL)'}
+
+
 def print_c(params, env):
     result = compile_form(params[0], env=env)
     param = result['code'].rstrip(';')
@@ -954,6 +963,7 @@ global_compile_env = {
     'println': println_c,
     'count': count_c,
     'nth': nth_c,
+    'get': map_get_c,
     'def': def_c,
     'let': let_c,
     'loop': loop_c,
@@ -1412,6 +1422,18 @@ bool map_add(ObjMap* map, Value key, Value value) {
   entry->key = key;
   entry->value = value;
   return isNewKey;
+}
+
+Value map_get(Value map, Value key, Value defaultVal) {
+  ObjMap* objMap = AS_MAP(map);
+  MapEntry* entry = findEntry(objMap->entries, objMap->capacity, key);
+  bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL));
+  if (isNewKey) {
+    return defaultVal;
+  }
+  else {
+    return entry->value;
+  }
 }
 
 Value print(Value value) {
