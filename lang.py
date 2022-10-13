@@ -935,6 +935,13 @@ def map_get_c(params, env):
     return {'code': f'map_get({m}, {key}, NIL_VAL)'}
 
 
+def map_assoc_c(params, env):
+    m = compile_form(params[0], env=env)['code']
+    key = compile_form(params[1], env=env)['code']
+    value = compile_form(params[2], env=env)['code']
+    return {'code': f'map_set(AS_MAP({m}), {key}, {value})'}
+
+
 def print_c(params, env):
     result = compile_form(params[0], env=env)
     param = result['code'].rstrip(';')
@@ -964,6 +971,7 @@ global_compile_env = {
     'count': count_c,
     'nth': nth_c,
     'get': map_get_c,
+    'assoc': map_assoc_c,
     'def': def_c,
     'let': let_c,
     'loop': loop_c,
@@ -1015,7 +1023,7 @@ def new_map_c(node, env):
     c_items = zip(keys, values)
 
     for key, value in c_items:
-        c_code += f'\nmap_add(&{name}, {key}, {value});'
+        c_code += f'\nmap_set(&{name}, {key}, {value});'
 
     env['main_pre'].append(f'{c_code}\n')
     env['main_post'].append(f'map_free(&{name});')
@@ -1409,7 +1417,7 @@ static void adjustCapacity(ObjMap* map, size_t capacity) {
   map->capacity = capacity;
 }
 
-bool map_add(ObjMap* map, Value key, Value value) {
+Value map_set(ObjMap* map, Value key, Value value) {
   if ((double)map->count + 1 > (double)map->capacity * MAP_MAX_LOAD) {
     size_t capacity = GROW_CAPACITY(map->capacity);
     adjustCapacity(map, capacity);
@@ -1421,7 +1429,7 @@ bool map_add(ObjMap* map, Value key, Value value) {
 
   entry->key = key;
   entry->value = value;
-  return isNewKey;
+  return OBJ_VAL(map);
 }
 
 Value map_get(Value map, Value key, Value defaultVal) {

@@ -441,6 +441,7 @@ class CompileTests(unittest.TestCase):
             ## {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
             {'src': '(print [1 nil "hello" 2.34 true])', 'output': '[1 nil hello 2.34 true]'},
             {'src': '(print {"a" 1 "b" 2})', 'output': '{a 1, b 2}'},
+            {'src': '(print (assoc {"1" 2 "a" 3} "new-key" "new-val"))', 'output': '{new-key new-val, 1 2, a 3}'},
             {'src': '(print (get {"a" 1} "a"))', 'output': '1'},
             {'src': '(print (get {"a" 1} "b"))', 'output': 'nil'},
             {'src': '(print (get {"a" 1} "b" 99))', 'output': '99'},
