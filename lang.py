@@ -1388,6 +1388,27 @@ Value equal(Value x, Value y) {
     }
     return BOOL_VAL(false);
   }
+  else if (IS_MAP(x)) {
+    ObjMap* xMap = AS_MAP(x);
+    ObjMap* yMap = AS_MAP(y);
+    size_t x_num_items = xMap->count;
+    size_t y_num_items = yMap->count;
+    if (x_num_items != y_num_items) {
+      return BOOL_VAL(false);
+    }
+    size_t x_num_entries = xMap->capacity;
+    for (size_t i = 0; i < x_num_entries; i++) {
+      MapEntry x_entry = xMap->entries[i];
+      MapEntry y_entry = yMap->entries[i];
+      if (!AS_BOOL(equal(x_entry.key, y_entry.key))) {
+        return BOOL_VAL(false);
+      }
+      if (!AS_BOOL(equal(x_entry.value, y_entry.value))) {
+        return BOOL_VAL(false);
+      }
+    }
+    return BOOL_VAL(true);
+  }
   else {
     return BOOL_VAL(false);
   }
