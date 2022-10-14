@@ -827,7 +827,7 @@ def let_c(params, env):
 
     del env['local']
 
-    return {'code': f'{f_name}();'}
+    return {'code': f'{f_name}()'}
 
 
 def loop_c(params, env):
@@ -884,7 +884,7 @@ def nth_c(params, env):
 
 def count_c(params, env):
     lst = compile_form(params[0], env=env)
-    return {'code': f'list_count({lst["code"]});'}
+    return {'code': f'list_count({lst["code"]})'}
 
 
 def map_get_c(params, env):
@@ -905,14 +905,14 @@ def map_assoc_c(params, env):
 
 def print_c(params, env):
     result = compile_form(params[0], env=env)
-    param = result['code'].rstrip(';')
+    param = result['code']
     c_code = f'print({param})'
     return {'code': c_code}
 
 
 def println_c(params, env):
     result = compile_form(params[0], env=env)
-    param = result['code'].rstrip(';')
+    param = result['code']
     c_code = f'println({param})'
     return {'code': c_code}
 
