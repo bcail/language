@@ -913,7 +913,7 @@ def print_c(params, env):
 def println_c(params, env):
     result = compile_form(params[0], env=env)
     param = result['code'].rstrip(';')
-    c_code = f'print({param});\nprintf("\\n")'
+    c_code = f'println({param})'
     return {'code': c_code}
 
 
@@ -941,24 +941,29 @@ global_compile_env = {
 
 
 def _get_generated_name(base, env):
-    if base not in env['functions'] and base not in env['temps'] and base not in env['user_globals']:
+    if base not in env['functions'] and base not in env['temps'] and base not in env['user_globals'] and base not in env.get('local', {}).get('temps', {}):
         return base
     i = 1
     while True:
         name = f'{base}_{i}'
-        if name not in env['functions'] and name not in env['temps'] and base not in env['user_globals']:
+        if name not in env['functions'] and name not in env['temps'] and base not in env['user_globals'] and name not in env.get('local', {}).get('temps', {}):
             return name
         i += 1
 
 
 def new_string_c(s, env):
     name = _get_generated_name('str', env=env)
-    env['temps'][name] = 'ObjString %s;' % name
     c_code = f'string_init(&{name});'
     c_code += f'\nstring_set(&{name}, "{s}", (size_t) {len(s)});'
 
-    env['main_pre'].append(f'{c_code}\n')
-    env['main_post'].append(f'string_free(&{name});')
+    if 'local' in env:
+        env['local']['temps'][name] = f'ObjString {name};'
+        env['local']['pre'].append(f'{c_code}\n')
+        env['local']['post'].append(f'string_free(&{name});')
+    else:
+        env['temps'][name] = f'ObjString {name};'
+        env['main_pre'].append(f'{c_code}\n')
+        env['main_post'].append(f'string_free(&{name});')
     return name
 
 
@@ -1005,27 +1010,23 @@ def compile_form(node, env):
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             elif first.name == 'do':
+                env['local'] = {'temps': {}, 'pre': [], 'post': []}
                 do_exprs = [compile_form(n, env=env) for n in rest]
-                last_expr = do_exprs[-1]
-                # if last_expr.get('type') != None:
-                #     fixed_last_expr = {
-                #         'type': last_expr['type'],
-                #         'code': f'return {last_expr["code"]};',
-                #     }
-                #     do_exprs = do_exprs[:-1] + [fixed_last_expr]
+
                 f_name = _get_generated_name('do_f', env)
 
                 f_code = ''
-                for d in do_exprs:
+                f_code += '\n'.join([f for f in env['local']['temps'].values()])
+                f_code += '\n' + '\n'.join(env['local']['pre'])
+                for d in do_exprs[:-1]:
                     f_code += f'  {d["code"]};\n'
-                # if not last_expr.get('type'):
-                #     f_code = f'{f_code}  return NIL_VAL;\n'
+                f_code += f'  Value result = {do_exprs[-1]["code"]};'
+                f_code += '\n' + '\n'.join(env['local']['post'])
+                f_code += '\n  return result;'
 
-                env['functions'][f_name] = 'Value %s(void) {\n%s}' % (f_name, f_code)
-                return {
-                    # 'type': last_expr.get('type'),
-                    'code': f'{f_name}()',
-                }
+                env['functions'][f_name] = 'Value %s(void) {\n%s\n}' % (f_name, f_code)
+                del env['local']
+                return {'code': f'{f_name}()'}
             elif first.name == 'recur':
                 params = [compile_form(r, env) for r in rest]
                 for index, p in enumerate(env['local'].keys()):
@@ -1465,6 +1466,12 @@ Value print(Value value) {
   else {
     printf("%s", AS_CSTRING(value));
   }
+  return NIL_VAL;
+}
+
+Value println(Value value) {
+  print(value);
+  printf("\\n");
   return NIL_VAL;
 }
     '''
