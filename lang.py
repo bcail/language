@@ -844,15 +844,17 @@ def loop_c(params, env):
     for index, loop_param in enumerate(loop_params):
         env['local'][loop_param.name] = compile_form(initial_args[index], env=env)['code']
 
-    f_code = 'do {\n'
+    f_code = '  bool continue = false;'
+    f_code += '\n  do {\n'
     for form in body:
         compiled = compile_form(form, env=env)
-        if isinstance(compiled, tuple) and isinstance(compiled[0], Symbol) and compiled[0].name == 'recur':
-            for c in compiled[1:]:
-                f_code += f'\n{c["code"]}'
-        else:
-            f_code += f'\n{compiled["code"]}'
-    f_code += '} while (true);'
+        f_code += f'\n  Value result = {compiled["code"]};'
+        # if isinstance(compiled, tuple) and isinstance(compiled[0], Symbol) and compiled[0].name == 'recur':
+        #     for c in compiled[1:]:
+        #         f_code += f'\n{c["code"]}'
+        # else:
+        #     f_code += f'\n{compiled["code"]}'
+    f_code += '\n  } while (continue);'
 
     env['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, c_loop_params, f_code)
 
@@ -860,7 +862,7 @@ def loop_c(params, env):
 
     del env['local']
 
-    return {'code': f'{f_name}({c_initial_args});'}
+    return {'code': f'{f_name}({c_initial_args})'}
 
 
 def str_c(params, env):
@@ -1142,6 +1144,7 @@ c_types = '''
 #define AS_BOOL(value)  ((value).data.boolean)
 #define AS_NUMBER(value)  ((value).data.number)
 #define AS_OBJ(value)  ((value).data.obj)
+#define AS_RECUR(value)       ((ObjRecur*)AS_OBJ(value))
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
 #define AS_LIST(value)       ((ObjList*)AS_OBJ(value))
@@ -1150,6 +1153,7 @@ c_types = '''
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
 #define IS_OBJ(value)  ((value).type == OBJ)
+#define IS_RECUR(value)  isObjType(value, OBJ_RECUR)
 #define IS_STRING(value)  isObjType(value, OBJ_STRING)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
 #define IS_MAP(value)  isObjType(value, OBJ_MAP)
@@ -1166,6 +1170,7 @@ void* reallocate(void* pointer, size_t newSize) {
 }
 
 typedef enum {
+  OBJ_RECUR,
   OBJ_STRING,
   OBJ_LIST,
   OBJ_MAP,
@@ -1202,6 +1207,13 @@ typedef struct {
   uint32_t hash;
   char* chars;
 } ObjString;
+
+typedef struct {
+  Obj obj;
+  size_t count;
+  size_t capacity;
+  Value* values;
+} ObjRecur;
 
 typedef struct {
   Obj obj;
@@ -1288,6 +1300,44 @@ Value list_get(Value list, Value index) {
 
 Value list_count(Value list) {
   return NUMBER_VAL((int) AS_LIST(list)->count);
+}
+
+void recur_init(ObjRecur* recur) {
+  recur->obj = (Obj){.type = OBJ_RECUR};
+  recur->count = 0;
+  recur->capacity = 0;
+  recur->values = NULL;
+}
+
+void recur_free(ObjRecur* recur) {
+  FREE_ARRAY(Value, recur->values);
+  recur_init(recur);
+}
+
+void recur_add(ObjRecur* recur, Value item) {
+  if (recur->capacity < recur->count + 1) {
+    size_t oldCapacity = recur->capacity;
+    recur->capacity = GROW_CAPACITY(oldCapacity);
+    recur->values = GROW_ARRAY(Value, recur->values, oldCapacity, recur->capacity);
+  }
+
+  recur->values[recur->count] = item;
+  recur->count++;
+}
+
+Value recur_get(Value recur, Value index) {
+  /* size_t is the unsigned integer type returned by the sizeof operator */
+  size_t num_index = (size_t) AS_NUMBER(index);
+  if (num_index < AS_RECUR(recur)->count) {
+    return AS_RECUR(recur)->values[num_index];
+  }
+  else {
+    return NIL_VAL;
+  }
+}
+
+Value recur_count(Value recur) {
+  return NUMBER_VAL((int) AS_RECUR(recur)->count);
 }
 
 void map_init(ObjMap* map) {
