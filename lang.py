@@ -709,38 +709,22 @@ def evaluate(node, env=None):
 
 def add_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
-    type_ = type(params[0])
-    return {
-        'type': type_,
-        'code': f'add({c_params[0]}, {c_params[1]})',
-    }
+    return {'code': f'add({c_params[0]}, {c_params[1]})'}
 
 
 def subtract_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
-    type_ = type(params[0])
-    return {
-        'type': type_,
-        'code': f'subtract({c_params[0]}, {c_params[1]})',
-    }
+    return {'code': f'subtract({c_params[0]}, {c_params[1]})'}
 
 
 def multiply_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
-    type_ = type(params[0])
-    return {
-        'type': type_,
-        'code': f'multiply({c_params[0]}, {c_params[1]})',
-    }
+    return {'code': f'multiply({c_params[0]}, {c_params[1]})'}
 
 
 def divide_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
-    type_ = type(params[0])
-    return {
-        'type': type_,
-        'code': f'divide({c_params[0]}, {c_params[1]})',
-    }
+    return {'code': f'divide({c_params[0]}, {c_params[1]})'}
 
 
 def equal_c(params, env):
@@ -750,34 +734,22 @@ def equal_c(params, env):
 
 def greater_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
-    return {
-        'type': str,
-        'code': f'greater({c_params[0]}, {c_params[1]})',
-    }
+    return {'code': f'greater({c_params[0]}, {c_params[1]})'}
 
 
 def greater_equal_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
-    return {
-        'type': str,
-        'code': f'greater_equal({c_params[0]}, {c_params[1]})',
-    }
+    return {'code': f'greater_equal({c_params[0]}, {c_params[1]})'}
 
 
 def less_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
-    return {
-        'type': str,
-        'code': f'less({c_params[0]}, {c_params[1]})',
-    }
+    return {'code': f'less({c_params[0]}, {c_params[1]})'}
 
 
 def less_equal_c(params, env):
     c_params = [compile_form(p, env=env)['code'] for p in params]
-    return {
-        'type': str,
-        'code': f'less_equal({c_params[0]}, {c_params[1]})',
-    }
+    return {'code': f'less_equal({c_params[0]}, {c_params[1]})'}
 
 
 def def_c(params, env):
@@ -827,10 +799,7 @@ def if_form_c(params, env):
 
     env['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, f_params, f_code)
 
-    return {
-        'type': str,
-        'code': f'{f_name}({f_args})'
-    }
+    return {'code': f'{f_name}({f_args})'}
 
 
 def let_c(params, env):
@@ -899,12 +868,10 @@ def str_c(params, env):
         return {'code': ''}
     if len(params) == 1:
         return {
-            'type': str,
             'code': '"%s"' % str(compile_form(params[0], env=env)['code'])
         }
     else:
         return {
-            'type': str,
             'code': 'strcat(%s, %s)' % (compile_form(params[0], env=env)['code'], compile_form(params[1], env=env)['code'])
         }
 
@@ -912,18 +879,12 @@ def str_c(params, env):
 def nth_c(params, env):
     lst = compile_form(params[0], env=env)
     index = compile_form(params[1], env=env)['code']
-    return {
-        'type': int,
-        'code': f'list_get({lst["code"]}, {index})',
-    }
+    return {'code': f'list_get({lst["code"]}, {index})'}
 
 
 def count_c(params, env):
     lst = compile_form(params[0], env=env)
-    return {
-        'type': int,
-        'code': f'list_count({lst["code"]});',
-    }
+    return {'code': f'list_count({lst["code"]});'}
 
 
 def map_get_c(params, env):
@@ -1046,23 +1007,23 @@ def compile_form(node, env):
             elif first.name == 'do':
                 do_exprs = [compile_form(n, env=env) for n in rest]
                 last_expr = do_exprs[-1]
-                if last_expr.get('type') != None:
-                    fixed_last_expr = {
-                        'type': last_expr['type'],
-                        'code': f'return {last_expr["code"]};',
-                    }
-                    do_exprs = do_exprs[:-1] + [fixed_last_expr]
+                # if last_expr.get('type') != None:
+                #     fixed_last_expr = {
+                #         'type': last_expr['type'],
+                #         'code': f'return {last_expr["code"]};',
+                #     }
+                #     do_exprs = do_exprs[:-1] + [fixed_last_expr]
                 f_name = _get_generated_name('do_f', env)
 
                 f_code = ''
                 for d in do_exprs:
                     f_code += f'  {d["code"]};\n'
-                if not last_expr.get('type'):
-                    f_code = f'{f_code}  return NIL_VAL;\n'
+                # if not last_expr.get('type'):
+                #     f_code = f'{f_code}  return NIL_VAL;\n'
 
                 env['functions'][f_name] = 'Value %s(void) {\n%s}' % (f_name, f_code)
                 return {
-                    'type': last_expr.get('type'),
+                    # 'type': last_expr.get('type'),
                     'code': f'{f_name}()',
                 }
             elif first.name == 'recur':
@@ -1098,15 +1059,9 @@ def compile_form(node, env):
             val = 'false'
         return {'code': f'BOOL_VAL({val})'}
     if isinstance(node, int):
-        return {
-            'type': int,
-            'code': f'NUMBER_VAL({node})',
-        }
+        return {'code': f'NUMBER_VAL({node})'}
     if isinstance(node, float):
-        return {
-            'type': float,
-            'code': f'NUMBER_VAL({node})',
-        }
+        return {'code': f'NUMBER_VAL({node})'}
     if node is None:
         return {'code': 'NIL_VAL'}
     if isinstance(node, DictBuilder):
