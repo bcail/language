@@ -770,12 +770,8 @@ def if_form_c(params, envs):
         # return a recur struct with the new params
         recur_name = _get_generated_name('recur', envs=envs)
         # initialize ObjRecur - don't free here because we need to return it & free it in calling function
-        if 'local' in envs[0]:
-            envs[0]['local']['temps'][recur_name] = f'ObjRecur {recur_name};'
-            envs[0]['local']['pre'].append(f'recur_init(&{recur_name});')
-        else:
-            envs[0]['temps'][recur_name] = f'ObjRecur {recur_name};'
-            envs[0]['pre'].append(f'recur_init(&{recur_name});')
+        envs[-1]['temps'][recur_name] = f'ObjRecur {recur_name};'
+        envs[-1]['pre'].append(f'recur_init(&{recur_name});')
         true_code = ''
         for r in true_result[1:]:
             true_code += f'\nrecur_add(&{recur_name}, {r["code"]});'
@@ -790,12 +786,8 @@ def if_form_c(params, envs):
             # return a recur struct with the new params
             recur_name = _get_generated_name('recur', envs=envs)
             # initialize ObjRecur - don't free here because we need to return it & free it in calling function
-            if 'local' in envs[0]:
-                envs[0]['local']['temps'][recur_name] = f'ObjRecur {recur_name};'
-                envs[0]['local']['pre'].append(f'recur_init(&{recur_name});')
-            else:
-                envs[0]['temps'][recur_name] = f'ObjRecur {recur_name};'
-                envs[0]['pre'].append(f'recur_init(&{recur_name});')
+            envs[-1]['temps'][recur_name] = f'ObjRecur {recur_name};'
+            envs[-1]['pre'].append(f'recur_init(&{recur_name});')
             for r in false_result[1:]:
                 false_code += f'\n    recur_add(&{recur_name}, {r["code"]});'
             false_code += f'\n  return OBJ_VAL(&{recur_name});'
@@ -809,15 +801,15 @@ def if_form_c(params, envs):
     f_args = ''
     f_code = ''
 
-    if 'local' in envs[0]:
-        keys = list(envs[0]['local']['bindings'].keys())
+    keys = list(envs[-1].get('bindings', {}).keys())
+    if keys:
         f_params = f'Value {keys[0]}'
         f_args = keys[0]
         for key in keys[1:]:
             f_params += f', Value {key}'
             f_args += f', {key}'
-        f_code += '\n'.join(envs[0]['local']['temps'].values())
-        f_code += '\n' + '\n'.join(envs[0]['local']['pre'])
+    f_code += '\n'.join(envs[-1].get('temps', {}).values())
+    f_code += '\n' + '\n'.join(envs[-1].get('pre', []))
 
     f_code += '\n  if (AS_BOOL(%s)) {\n' % test_code
     f_code += '    return %s;\n  }' % true_code
@@ -839,10 +831,11 @@ def let_c(params, envs):
     f_name = _get_generated_name(base='let', envs=envs)
     f_code = ''
 
-    envs[0]['local'] = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+    envs.append(local_env)
     for binding in paired_bindings:
         result = compile_form(binding[1], envs=envs)
-        envs[0]['local']['bindings'][binding[0].name] = result
+        local_env['bindings'][binding[0].name] = result
         f_code += f'Value {binding[0].name} = {result["code"]};\n'
 
     result = compile_form(*body, envs=envs)
@@ -851,7 +844,7 @@ def let_c(params, envs):
 
     envs[0]['functions'][f_name] = 'Value %s(void) {\n  %s\n}' % (f_name, f_code)
 
-    del envs[0]['local']
+    envs.pop()
 
     return {'code': f'{f_name}()'}
 
@@ -865,10 +858,11 @@ def loop_c(params, envs):
 
     f_name = _get_generated_name(base='loop', envs=envs)
     c_loop_params = ', '.join([f'Value {p.name}' for p in loop_params])
-    envs[0]['local'] = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+    envs.append(local_env)
 
     for index, loop_param in enumerate(loop_params):
-        envs[0]['local']['bindings'][loop_param.name] = compile_form(initial_args[index], envs=envs)['code']
+        local_env['bindings'][loop_param.name] = compile_form(initial_args[index], envs=envs)['code']
 
     f_code = '  bool continueFlag = false;'
     f_code += '\n  do {\n'
@@ -877,7 +871,7 @@ def loop_c(params, envs):
         f_code += f'\n  Value result = {compiled["code"]};'
         f_code +=  '\n  if (IS_RECUR(result)) {'
         f_code += f'\n    /* grab values from result and update  */'
-        for index, loop_param in enumerate(list(envs[0]['local']['bindings'].keys())):
+        for index, loop_param in enumerate(list(local_env['bindings'].keys())):
             f_code += f'\n      {loop_param} = recur_get(result, NUMBER_VAL({index}));'
         f_code += f'\n    continueFlag = true;'
         f_code += f'\n    recur_free(AS_RECUR(result));'
@@ -890,7 +884,7 @@ def loop_c(params, envs):
 
     c_initial_args = ','.join([compile_form(arg, envs=envs)['code'] for arg in initial_args])
 
-    del envs[0]['local']
+    envs.pop()
 
     return {'code': f'{f_name}({c_initial_args})'}
 
@@ -974,12 +968,12 @@ global_compile_env = {
 
 def _get_generated_name(base, envs):
     env = envs[0]
-    if base not in env['functions'] and base not in env['temps'] and base not in env['user_globals'] and base not in env.get('local', {}).get('temps', {}):
+    if base not in env['functions'] and base not in env['temps'] and base not in env['user_globals'] and base not in envs[-1].get('temps', {}):
         return base
     i = 1
     while True:
         name = f'{base}_{i}'
-        if name not in env['functions'] and name not in env['temps'] and base not in env['user_globals'] and name not in env.get('local', {}).get('temps', {}):
+        if name not in env['functions'] and name not in env['temps'] and base not in env['user_globals'] and name not in envs[-1].get('temps', {}):
             return name
         i += 1
 
@@ -989,14 +983,9 @@ def new_string_c(s, envs):
     c_code = f'string_init(&{name});'
     c_code += f'\nstring_set(&{name}, "{s}", (size_t) {len(s)});'
 
-    if 'local' in envs[0]:
-        envs[0]['local']['temps'][name] = f'ObjString {name};'
-        envs[0]['local']['pre'].append(f'{c_code}\n')
-        envs[0]['local']['post'].append(f'string_free(&{name});')
-    else:
-        envs[0]['temps'][name] = f'ObjString {name};'
-        envs[0]['pre'].append(f'{c_code}\n')
-        envs[0]['post'].append(f'string_free(&{name});')
+    envs[-1]['temps'][name] = f'ObjString {name};'
+    envs[-1]['pre'].append(f'{c_code}\n')
+    envs[-1]['post'].append(f'string_free(&{name});')
     return name
 
 
@@ -1043,22 +1032,23 @@ def compile_form(node, envs):
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             elif first.name == 'do':
-                envs[0]['local'] = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+                local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+                envs.append(local_env)
                 do_exprs = [compile_form(n, envs=envs) for n in rest]
 
                 f_name = _get_generated_name('do_f', envs)
 
                 f_code = ''
-                f_code += '\n'.join([f for f in envs[0]['local']['temps'].values()])
-                f_code += '\n' + '\n'.join(envs[0]['local']['pre'])
+                f_code += '\n'.join([f for f in local_env['temps'].values()])
+                f_code += '\n' + '\n'.join(local_env['pre'])
                 for d in do_exprs[:-1]:
                     f_code += f'  {d["code"]};\n'
                 f_code += f'  Value result = {do_exprs[-1]["code"]};'
-                f_code += '\n' + '\n'.join(envs[0]['local']['post'])
+                f_code += '\n' + '\n'.join(local_env['post'])
                 f_code += '\n  return result;'
 
                 envs[0]['functions'][f_name] = 'Value %s(void) {\n%s\n}' % (f_name, f_code)
-                del envs[0]['local']
+                envs.pop()
                 return {'code': f'{f_name}()'}
             elif first.name == 'recur':
                 params = [compile_form(r, envs=envs) for r in rest]
@@ -1072,10 +1062,11 @@ def compile_form(node, envs):
     if isinstance(node, Symbol):
         if node.name in envs[0]['user_globals']:
             return {'code': envs[0]['user_globals'][node.name]['c_name']}
-        elif node.name in envs[0]['local']['bindings']:
-            return {'code': node.name}
         else:
-            raise Exception(f'unhandled symbol: {node}')
+            for env in envs:
+                if node.name in env.get('bindings', {}):
+                    return {'code': node.name}
+        raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
         name = new_vector_c(node, envs=envs)
         return {'code': f'OBJ_VAL(&{name})'}
