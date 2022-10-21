@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 
 
@@ -762,12 +763,15 @@ def def_c(params, envs):
 
 
 def if_form_c(params, envs):
+    local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+    envs.append(local_env)
+
     f_name = _get_generated_name(base='if_form', envs=envs)
 
     test_code = compile_form(params[0], envs=envs)['code']
     true_result = compile_form(params[1], envs=envs)
 
-    true_code = '\n  if (AS_BOOL(%s)) {\n' % test_code
+    true_code = '\n  if (AS_BOOL(%s)) {' % test_code
     if isinstance(true_result, tuple) and isinstance(true_result[0], Symbol) and true_result[0].name == 'recur':
         # return a recur struct with the new params
         recur_name = _get_generated_name('recur', envs=envs)
@@ -775,7 +779,7 @@ def if_form_c(params, envs):
         envs[-1]['temps'][recur_name] = f'ObjRecur {recur_name};'
         envs[-1]['pre'].append(f'recur_init(&{recur_name});')
         for r in true_result[1:]:
-            true_code += f'  recur_add(&{recur_name}, {r["code"]});'
+            true_code += f'\n    recur_add(&{recur_name}, {r["code"]});'
         true_code += f'\n  return OBJ_VAL(&{recur_name});'
         true_code += '\n  }\n'
     else:
@@ -804,9 +808,9 @@ def if_form_c(params, envs):
     f_args = ''
     f_code = ''
 
-    keys = list(envs[-1].get('bindings', {}).keys())
-    if len(envs) > 2:
-        keys.extend(list(envs[-2].get('bindings', {}).keys()))
+    keys = []
+    for e in envs[1:]:
+        keys.extend(list(e.get('bindings', {}).keys()))
     keys = list(set(keys))
     if keys:
         f_params = f'Value {keys[0]}'
@@ -821,6 +825,8 @@ def if_form_c(params, envs):
     f_code += false_code
 
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, f_params, f_code)
+
+    envs.pop()
 
     return {'code': f'{f_name}({f_args})'}
 
@@ -1605,7 +1611,12 @@ def compile_to_c(file_name, run=False):
                 f.write(c_program.encode('utf8'))
             compile_cmd = ['gcc', '-o', str(file_name.stem), c_filename]
             subprocess.run(compile_cmd, check=True)
-            subprocess.run([f'./{str(file_name.stem)}'], check=True)
+            try:
+                subprocess.run([f'./{str(file_name.stem)}'], check=True)
+            except subprocess.CalledProcessError as e:
+                print(c_program)
+                print(e)
+                sys.exit(1)
     else:
         tmp = tempfile.mkdtemp(dir='.', prefix='tmp')
         c_file = Path(tmp) / Path(f'{file_name.stem}.c')
