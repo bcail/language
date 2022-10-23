@@ -1598,6 +1598,31 @@ def _compile(source):
     return c_code
 
 
+def compile_c(file_name, output_file_name):
+    if os.environ.get('CC'):
+        compiler = os.environ['CC']
+    else:
+        compiler = 'gcc'
+    compile_cmd = [compiler, '-o', output_file_name, file_name]
+    try:
+        subprocess.run(compile_cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        if os.path.exists(file_name):
+            with open(file_name, 'rb') as f:
+                data = f.read().decode('utf8')
+                print(data)
+        print(e)
+        sys.exit(1)
+
+
+def run_executable(file_name):
+    try:
+        subprocess.run([f'./{file_name}'], check=True)
+    except subprocess.CalledProcessError as e:
+        print(e)
+        sys.exit(1)
+
+
 def compile_to_c(file_name, run=False):
     with open(file_name, 'rb') as f:
         source = f.read().decode('utf8')
@@ -1609,14 +1634,8 @@ def compile_to_c(file_name, run=False):
             c_filename = os.path.join(tmp, 'code.c')
             with open(c_filename, 'wb') as f:
                 f.write(c_program.encode('utf8'))
-            compile_cmd = ['gcc', '-o', str(file_name.stem), c_filename]
-            subprocess.run(compile_cmd, check=True)
-            try:
-                subprocess.run([f'./{str(file_name.stem)}'], check=True)
-            except subprocess.CalledProcessError as e:
-                print(c_program)
-                print(e)
-                sys.exit(1)
+            compile_c(c_filename, output_file_name=str(file_name.stem))
+            run_executable(str(file_name.stem))
     else:
         tmp = tempfile.mkdtemp(dir='.', prefix='tmp')
         c_file = Path(tmp) / Path(f'{file_name.stem}.c')
@@ -1645,7 +1664,12 @@ if __name__ == '__main__':
             print('no file to compile')
     elif args.run:
         if args.file:
-            compile_to_c(Path(args.file), run=True)
+            if args.file.endswith('.c'):
+                executable = Path(args.file).stem
+                compile_c(args.file, output_file_name=executable)
+                run_executable(executable)
+            else:
+                compile_to_c(Path(args.file), run=True)
         else:
             print('no file to compile')
     else:
