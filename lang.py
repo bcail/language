@@ -773,31 +773,29 @@ def if_form_c(params, envs):
 
     true_code = '\n  if (AS_BOOL(%s)) {' % test_code
     if isinstance(true_result, tuple) and isinstance(true_result[0], Symbol) and true_result[0].name == 'recur':
-        # return a recur struct with the new params
-        recur_name = _get_generated_name('recur', envs=envs)
-        # initialize ObjRecur - don't free here because we need to return it & free it in calling function
-        envs[-1]['temps'][recur_name] = f'ObjRecur {recur_name};'
-        envs[-1]['pre'].append(f'recur_init(&{recur_name});')
+        for e in envs:
+            for b in e.get('bindings', {}).keys():
+                if b.startswith('recur'):
+                    recur_name = b
         for r in true_result[1:]:
-            true_code += f'\n    recur_add(&{recur_name}, {r["code"]});'
-        true_code += f'\n  return OBJ_VAL(&{recur_name});'
+            true_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
+        true_code += f'\n  return {recur_name};'
         true_code += '\n  }\n'
     else:
-        true_code += '    return ' + true_result['code'] + ';\n  }\n'
+        true_code += '\n    return ' + true_result['code'] + ';\n  }\n'
 
     false_code = ''
     if len(params) > 2:
         false_code += '  else {'
         false_result = compile_form(params[2], envs=envs)
         if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
-            # return a recur struct with the new params
-            recur_name = _get_generated_name('recur', envs=envs)
-            # initialize ObjRecur - don't free here because we need to return it & free it in calling function
-            envs[-1]['temps'][recur_name] = f'ObjRecur {recur_name};'
-            envs[-1]['pre'].append(f'recur_init(&{recur_name});')
+            for e in envs:
+                for b in e.get('bindings', {}).keys():
+                    if b.startswith('recur'):
+                        recur_name = b
             for r in false_result[1:]:
-                false_code += f'\n    recur_add(&{recur_name}, {r["code"]});'
-            false_code += f'\n  return OBJ_VAL(&{recur_name});'
+                false_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
+            false_code += f'\n  return {recur_name};'
             false_code += '\n  }'
         else:
             false_code += '\n    return %s;\n  }' % false_result['code']
@@ -872,20 +870,28 @@ def loop_c(params, envs):
     local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
 
+    recur_name = _get_generated_name('recur', envs=envs)
+    local_env['temps'][recur_name] = f'  ObjRecur {recur_name}_1;'
+    local_env['pre'].append(f'  recur_init(&{recur_name}_1);')
+    local_env['pre'].append(f'  Value {recur_name} = OBJ_VAL(&{recur_name}_1);')
+    local_env['bindings'][recur_name] = None
+
     for index, loop_param in enumerate(loop_params):
         local_env['bindings'][loop_param.name] = compile_form(initial_args[index], envs=envs)['code']
 
-    f_code = '  bool continueFlag = false;'
+    f_code = '\n'.join(local_env['temps'].values())
+    f_code += '\n' + '\n'.join(local_env['pre'])
+    f_code += '\n  bool continueFlag = false;'
     f_code += '\n  do {\n'
     for form in body:
         compiled = compile_form(form, envs=envs)
         f_code += f'\n  Value result = {compiled["code"]};'
         f_code +=  '\n  if (IS_RECUR(result)) {'
         f_code += f'\n    /* grab values from result and update  */'
-        for index, loop_param in enumerate(list(local_env['bindings'].keys())):
+        for index, loop_param in enumerate(list(local_env['bindings'].keys())[1:]):
             f_code += f'\n      {loop_param} = recur_get(result, NUMBER_VAL({index}));'
         f_code += f'\n    continueFlag = true;'
-        f_code += f'\n    recur_free(AS_RECUR(result));'
+        f_code += f'\n    recur_free(&{recur_name}_1);'
         f_code +=  '\n  }\n  else {'
         f_code +=  '\n    return result;\n  }'
     f_code += '\n  } while (continueFlag);'
