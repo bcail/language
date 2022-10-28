@@ -960,6 +960,56 @@ def println_c(params, envs):
     return {'code': c_code}
 
 
+class CFunction:
+
+    def __init__(self, params, body):
+        self.params = params
+        self.body = body
+
+    def __call__(self, args, envs=None):
+        local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+        envs.append(local_env)
+        bindings = zip(self.params.items, args)
+        for binding in bindings:
+            local_env['bindings'][binding[0].name] = compile_form(binding[1], envs=envs)
+        result = compile_form(self.body, envs=envs)
+        envs.pop()
+        return result
+
+    def __str__(self):
+        return f'<Function params={self.params}; body={self.body}'
+
+    def __repr__(self):
+        return str(self)
+
+
+def fn_c(params, envs):
+    bindings = params[0]
+    body = params[1:]
+
+    f_name = _get_generated_name(base='fn', envs=envs)
+    f_code = ''
+
+    local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+    envs.append(local_env)
+    for binding in bindings:
+        local_env['bindings'][binding.name] = None
+    #     result = compile_form(binding[1], envs=envs)
+    #     local_env['bindings'][binding[0].name] = result
+    #     f_code += f'Value {binding[0].name} = {result["code"]};\n'
+
+    result = compile_form(*body, envs=envs)
+
+    f_code += f'  return {result["code"]};'
+
+    f_params = ', '.join([f'Value {binding.name}' for binding in bindings])
+    envs[0]['functions'][f_name] = 'Value %s(%s) {\n  %s\n}' % (f_name, f_params, f_code)
+
+    envs.pop()
+
+    return {'code': f'{f_name}'}
+
+
 global_compile_env = {
     '+': add_c,
     '-': subtract_c,
@@ -979,6 +1029,7 @@ global_compile_env = {
     'def': def_c,
     'let': let_c,
     'loop': loop_c,
+    'fn': fn_c,
     'str': str_c,
 }
 
@@ -1039,7 +1090,14 @@ def compile_form(node, envs):
     if isinstance(node, list):
         first = node[0]
         rest = node[1:]
-        if isinstance(first, Symbol):
+        if isinstance(first, list):
+            results = [compile_form(n, envs=envs) for n in node]
+            return {'code': f'{results[0]["code"]}()'}
+            # if callable(results[0]):
+            #     return results[0](rest, envs=envs)
+            # else:
+            #     raise Exception('first element of list not callable: {results[0]}')
+        elif isinstance(first, Symbol):
             if first.name in envs[0]['global']:
                 if isinstance(envs[0]['global'][first.name], Var) and isinstance(envs[0]['global'][first.name].value, Function):
                     f = envs[0]['global'][first.name].value
