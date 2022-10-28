@@ -994,9 +994,6 @@ def fn_c(params, envs):
     envs.append(local_env)
     for binding in bindings:
         local_env['bindings'][binding.name] = None
-    #     result = compile_form(binding[1], envs=envs)
-    #     local_env['bindings'][binding[0].name] = result
-    #     f_code += f'Value {binding[0].name} = {result["code"]};\n'
 
     result = compile_form(*body, envs=envs)
 
@@ -1092,11 +1089,8 @@ def compile_form(node, envs):
         rest = node[1:]
         if isinstance(first, list):
             results = [compile_form(n, envs=envs) for n in node]
-            return {'code': f'{results[0]["code"]}()'}
-            # if callable(results[0]):
-            #     return results[0](rest, envs=envs)
-            # else:
-            #     raise Exception('first element of list not callable: {results[0]}')
+            args = ', '.join([r['code'] for r in results[1:]])
+            return {'code': f'{results[0]["code"]}({args})'}
         elif isinstance(first, Symbol):
             if first.name in envs[0]['global']:
                 if isinstance(envs[0]['global'][first.name], Var) and isinstance(envs[0]['global'][first.name].value, Function):
