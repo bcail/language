@@ -757,8 +757,9 @@ def def_c(params, envs):
     name = params[0].name
     c_name = _get_generated_name(base=f'u_{name}', envs=envs)
     value = compile_form(params[1], envs=envs)['code']
-    code = f'Value {c_name} = {value};'
-    envs[0]['user_globals'][name] = {'c_name': c_name, 'code': code}
+    code = f'\nValue {c_name} = {value};'
+    envs[0]['user_globals'][name] = {'c_name': c_name}
+    envs[0]['pre'].append(code)
     return {'code': ''}
 
 
@@ -1047,7 +1048,7 @@ def new_vector_c(v, envs):
 
 def new_map_c(node, envs):
     name = _get_generated_name('map', envs=envs)
-    envs[0]['temps'].add(name)
+    envs[-1]['temps'].add(name)
     c_code = f'ObjMap {name};'
     c_code += f'\nmap_init(&{name});'
     keys = [compile_form(k, envs=envs)['code'] for k in node.items[::2]]
@@ -1057,8 +1058,8 @@ def new_map_c(node, envs):
     for key, value in c_items:
         c_code += f'\nmap_set(&{name}, {key}, {value});'
 
-    envs[0]['pre'].append(f'{c_code}\n')
-    envs[0]['post'].append(f'map_free(&{name});')
+    envs[-1]['pre'].append(f'{c_code}\n')
+    envs[-1]['post'].append(f'map_free(&{name});')
     return name
 
 
@@ -1613,7 +1614,7 @@ def _compile(source):
     for f in ast.forms:
         result = compile_form(f, envs=[env])
         c = result['code']
-        if not c.endswith(';'):
+        if c and not c.endswith(';'):
             c = f'{c};'
         compiled_forms.append(c)
 
@@ -1623,7 +1624,6 @@ def _compile(source):
     c_code += '\n'.join([f for f in c_functions.values()])
     c_code += '\n\n' + '\n\n'.join([f for f in env['functions'].values()])
     c_code += '\n\nint main(void)\n{'
-    c_code += '\n' + '\n'.join([g['code'] for g in env['user_globals'].values()])
     c_code += '\n' + '\n'.join(env['pre'])
     c_code += '\n' + '\n'.join(compiled_forms)
     c_code += '\n' + '\n'.join(env['post'])
