@@ -763,7 +763,7 @@ def def_c(params, envs):
 
 
 def if_form_c(params, envs):
-    local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
 
     f_name = _get_generated_name(base='if_form', envs=envs)
@@ -816,7 +816,6 @@ def if_form_c(params, envs):
         for key in keys[1:]:
             f_params += f', Value {key}'
             f_args += f', {key}'
-    f_code += '\n'.join(envs[-1].get('temps', {}).values())
     f_code += '\n' + '\n'.join(envs[-1].get('pre', []))
 
     f_code += true_code
@@ -840,7 +839,7 @@ def let_c(params, envs):
     f_name = _get_generated_name(base='let', envs=envs)
     f_code = ''
 
-    local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
     for binding in paired_bindings:
         result = compile_form(binding[1], envs=envs)
@@ -867,11 +866,12 @@ def loop_c(params, envs):
 
     f_name = _get_generated_name(base='loop', envs=envs)
     c_loop_params = ', '.join([f'Value {p.name}' for p in loop_params])
-    local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
 
     recur_name = _get_generated_name('recur', envs=envs)
-    local_env['temps'][recur_name] = f'  ObjRecur {recur_name}_1;'
+    local_env['temps'].add(recur_name)
+    local_env['pre'].append(f'  ObjRecur {recur_name}_1;')
     local_env['pre'].append(f'  recur_init(&{recur_name}_1);')
     local_env['pre'].append(f'  Value {recur_name} = OBJ_VAL(&{recur_name}_1);')
     local_env['bindings'][recur_name] = None
@@ -879,8 +879,7 @@ def loop_c(params, envs):
     for index, loop_param in enumerate(loop_params):
         local_env['bindings'][loop_param.name] = compile_form(initial_args[index], envs=envs)['code']
 
-    f_code = '\n'.join(local_env['temps'].values())
-    f_code += '\n' + '\n'.join(local_env['pre'])
+    f_code = '\n'.join(local_env['pre'])
     f_code += '\n  bool continueFlag = false;'
     f_code += '\n  do {\n'
     for form in body:
@@ -967,7 +966,7 @@ def fn_c(params, envs):
     f_name = _get_generated_name(base='fn', envs=envs)
     f_code = ''
 
-    local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
     for binding in bindings:
         local_env['bindings'][binding.name] = None
@@ -1010,12 +1009,12 @@ global_compile_env = {
 
 def _get_generated_name(base, envs):
     env = envs[0]
-    if base not in env['functions'] and base not in env['temps'] and base not in env['user_globals'] and base not in envs[-1].get('temps', {}):
+    if base not in env['functions'] and base not in env['temps'] and base not in env['user_globals'] and base not in envs[-1].get('temps', set()):
         return base
     i = 1
     while True:
         name = f'{base}_{i}'
-        if name not in env['functions'] and name not in env['temps'] and base not in env['user_globals'] and name not in envs[-1].get('temps', {}):
+        if name not in env['functions'] and name not in env['temps'] and base not in env['user_globals'] and name not in envs[-1].get('temps', set()):
             return name
         i += 1
 
@@ -1025,7 +1024,8 @@ def new_string_c(s, envs):
     c_code = f'string_init(&{name});'
     c_code += f'\nstring_set(&{name}, "{s}", (size_t) {len(s)});'
 
-    envs[-1]['temps'][name] = f'ObjString {name};'
+    envs[-1]['temps'].add(name)
+    envs[-1]['pre'].append(f'ObjString {name};')
     envs[-1]['pre'].append(f'{c_code}\n')
     envs[-1]['post'].append(f'string_free(&{name});')
     return name
@@ -1033,8 +1033,9 @@ def new_string_c(s, envs):
 
 def new_vector_c(v, envs):
     name = _get_generated_name('lst', envs=envs)
-    envs[0]['temps'][name] = 'ObjList %s;' % name
-    c_code = 'list_init(&%s);' % name
+    envs[0]['temps'].add(name)
+    c_code = f'ObjList {name};'
+    c_code += '\nlist_init(&%s);' % name
     c_items = [compile_form(item, envs=envs)['code'] for item in v.items]
     for c_item in c_items:
         c_code += f'\nlist_add(&{name}, {c_item});'
@@ -1046,8 +1047,9 @@ def new_vector_c(v, envs):
 
 def new_map_c(node, envs):
     name = _get_generated_name('map', envs=envs)
-    envs[0]['temps'][name] = f'ObjMap {name};'
-    c_code = f'map_init(&{name});'
+    envs[0]['temps'].add(name)
+    c_code = f'ObjMap {name};'
+    c_code += f'\nmap_init(&{name});'
     keys = [compile_form(k, envs=envs)['code'] for k in node.items[::2]]
     values = [compile_form(v, envs=envs)['code'] for v in node.items[1::2]]
     c_items = zip(keys, values)
@@ -1084,15 +1086,13 @@ def compile_form(node, envs):
                 if not do_params:
                     do_params = 'void'
 
-                local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
+                local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
                 envs.append(local_env)
                 do_exprs = [compile_form(n, envs=envs) for n in rest]
 
                 f_name = _get_generated_name('do_f', envs)
 
-                f_code = ''
-                f_code += '\n'.join([f for f in local_env['temps'].values()])
-                f_code += '\n' + '\n'.join(local_env['pre'])
+                f_code = '\n'.join(local_env['pre'])
                 for d in do_exprs[:-1]:
                     f_code += f'\n  {d["code"]};'
                 f_code += f'\n  Value result = {do_exprs[-1]["code"]};'
@@ -1606,7 +1606,7 @@ def _compile(source):
         'global': copy.deepcopy(global_compile_env),
         'functions': {},
         'user_globals': {},
-        'temps': {},
+        'temps': set(),
         'pre': [],
         'post': [],
     }
@@ -1624,7 +1624,6 @@ def _compile(source):
     c_code += '\n\n' + '\n\n'.join([f for f in env['functions'].values()])
     c_code += '\n\nint main(void)\n{'
     c_code += '\n' + '\n'.join([g['code'] for g in env['user_globals'].values()])
-    c_code += '\n' + '\n'.join([f for f in env['temps'].values()])
     c_code += '\n' + '\n'.join(env['pre'])
     c_code += '\n' + '\n'.join(compiled_forms)
     c_code += '\n' + '\n'.join(env['post'])
