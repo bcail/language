@@ -960,29 +960,6 @@ def println_c(params, envs):
     return {'code': c_code}
 
 
-class CFunction:
-
-    def __init__(self, params, body):
-        self.params = params
-        self.body = body
-
-    def __call__(self, args, envs=None):
-        local_env = {'temps': {}, 'pre': [], 'post': [], 'bindings': {}}
-        envs.append(local_env)
-        bindings = zip(self.params.items, args)
-        for binding in bindings:
-            local_env['bindings'][binding[0].name] = compile_form(binding[1], envs=envs)
-        result = compile_form(self.body, envs=envs)
-        envs.pop()
-        return result
-
-    def __str__(self):
-        return f'<Function params={self.params}; body={self.body}'
-
-    def __repr__(self):
-        return str(self)
-
-
 def fn_c(params, envs):
     bindings = params[0]
     body = params[1:]

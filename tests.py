@@ -401,6 +401,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(loop [n 0] (do (print n) (if (< n 2) (recur (+ n 1)))))', 'output': '012'},
             {'src': '(loop [n 0] (do (print n) (print "    ") (println (/ (* 5 (- n 32)) 9)) (if (< n 70) (recur (+ 20 n)))))', 'output': '0    -17.7778\n20    -6.66667\n40    4.44444\n60    15.5556\n80    26.6667\n'},
             {'src': '(print ((fn [x] x) 1))', 'output': '1'},
+            {'src': '(print ((fn [x y] (+ x y)) 1 2))', 'output': '3'},
+            # {'src': '(def d {}) (assoc d "a" 1) (print (get d "a"))', 'output': 'a'},
             # {'src': '(str)', 'output': ''},
             # {'src': '(print (str 1))', 'output': '1'},
         ]
