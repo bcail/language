@@ -403,6 +403,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(print ((fn [x] x) 1))', 'output': '1'},
             {'src': '(print ((fn [x y] (+ x y)) 1 2))', 'output': '3'},
             {'src': '(def d {}) (assoc d "a" 1) (print (get d "a"))', 'output': '1'},
+            {'src': '(def i 0) (print ((fn [n] n) i))', 'output': '0'},
+            {'src': '(print ((fn [n] (loop [cnt n acc 1] (if (= 0 cnt) acc (recur (- cnt 1) (* acc cnt))))) 3))', 'output': '6'},
             # {'src': '(str)', 'output': ''},
             # {'src': '(print (str 1))', 'output': '1'},
         ]

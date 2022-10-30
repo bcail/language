@@ -866,7 +866,13 @@ def loop_c(params, envs):
     initial_args = bindings.items[1::2]
 
     f_name = _get_generated_name(base='loop', envs=envs)
-    c_loop_params = ', '.join([f'Value {p.name}' for p in loop_params])
+
+    keys = []
+    for e in envs[1:]:
+        keys.extend(list(e.get('bindings', {}).keys()))
+    keys = list(set(keys))
+
+    c_loop_params = ', '.join([f'Value {k}' for k in keys] + [f'Value {p.name}' for p in loop_params])
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
 
@@ -899,7 +905,7 @@ def loop_c(params, envs):
 
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, c_loop_params, f_code)
 
-    c_initial_args = ','.join([compile_form(arg, envs=envs)['code'] for arg in initial_args])
+    c_initial_args = ','.join([k for k in keys] + [compile_form(arg, envs=envs)['code'] for arg in initial_args])
 
     envs.pop()
 
@@ -1637,7 +1643,7 @@ GCC_CMD = [
     'gcc',
     '-O2',
     '-Werror',
-    '-Wall',
+    # '-Wall',
     '-Wextra',
     '-std=c99',
     '-pedantic',
