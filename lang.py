@@ -971,7 +971,6 @@ def fn_c(params, envs):
     body = params[1:]
 
     f_name = _get_generated_name(base='fn', envs=envs)
-    f_code = ''
 
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
@@ -980,7 +979,7 @@ def fn_c(params, envs):
 
     result = compile_form(*body, envs=envs)
 
-    f_code += f'  return {result["code"]};'
+    f_code = f'  return {result["code"]};'
 
     f_params = ', '.join([f'Value {binding.name}' for binding in bindings])
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n  %s\n}' % (f_name, f_params, f_code)
@@ -988,6 +987,34 @@ def fn_c(params, envs):
     envs.pop()
 
     return {'code': f'{f_name}'}
+
+
+def defn_c(params, envs):
+    name = params[0].name
+    c_name = _get_generated_name(base=f'u_{name}', envs=envs)
+
+    bindings = params[1]
+    body = params[2:]
+
+    if bindings:
+        c_params = ', '.join([f'Value {b.name}' for b in bindings])
+    else:
+        c_params = 'void'
+
+    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+    envs.append(local_env)
+    for binding in bindings:
+        local_env['bindings'][binding.name] = None
+
+    result = compile_form(*body, envs=envs)
+    f_code = f'  return {result["code"]};'
+
+    envs[0]['user_globals'][name] = {'c_name': c_name}
+    envs[0]['functions'][c_name] = 'Value %s(%s) {\n  %s\n}' % (c_name, c_params, f_code)
+
+    envs.pop()
+
+    return {'code': ''}
 
 
 global_compile_env = {
@@ -1010,6 +1037,7 @@ global_compile_env = {
     'let': let_c,
     'loop': loop_c,
     'fn': fn_c,
+    'defn': defn_c,
     'str': str_c,
 }
 
@@ -1086,6 +1114,11 @@ def compile_form(node, envs):
                     return envs[0]['global'][first.name](rest, envs=envs)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
+            elif first.name in envs[0]['user_globals']:
+                f_name = envs[0]['user_globals'][first.name]['c_name']
+                results = [compile_form(n, envs=envs) for n in rest]
+                args = ', '.join([r['code'] for r in results])
+                return {'code': f'{f_name}({args})'}
             elif first.name == 'do':
                 env_vars = list(envs[-1].get('bindings', {}).keys())
                 do_params = ', '.join([f'Value {v}' for v in env_vars])
@@ -1113,6 +1146,8 @@ def compile_form(node, envs):
                 params = [compile_form(r, envs=envs) for r in rest]
                 return (first, *params)
             else:
+                print(f'global: {envs[0]["global"]}')
+                print(f'user globals: {envs[0]["user_globals"]}')
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
             return if_form_c(rest, envs=envs)
