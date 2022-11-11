@@ -1007,7 +1007,10 @@ def defn_c(params, envs):
         local_env['bindings'][binding.name] = None
 
     result = compile_form(*body, envs=envs)
-    f_code = f'  return {result["code"]};'
+    f_code = '\n'.join(local_env['pre'])
+    f_code += f'  Value result = {result["code"]};'
+    f_code += '\n' + '\n'.join(local_env['post'])
+    f_code += '  return result;'
 
     envs[0]['user_globals'][name] = {'c_name': c_name}
     envs[0]['functions'][c_name] = 'Value %s(%s) {\n  %s\n}' % (c_name, c_params, f_code)
@@ -1056,13 +1059,10 @@ def _get_generated_name(base, envs):
 
 def new_string_c(s, envs):
     name = _get_generated_name('str', envs=envs)
-    c_code = f'string_init(&{name});'
-    c_code += f'\nstring_set(&{name}, "{s}", (size_t) {len(s)});'
 
     envs[-1]['temps'].add(name)
-    envs[-1]['pre'].append(f'ObjString {name};')
-    envs[-1]['pre'].append(f'{c_code}\n')
-    envs[-1]['post'].append(f'string_free(&{name});')
+    envs[-1]['pre'].append(f'ObjString* {name} = copyString("{s}", (size_t) {len(s)});')
+    # envs[-1]['post'].append(f'string_free(&{name});')
     return name
 
 
@@ -1240,6 +1240,9 @@ c_types = '''
 #define ALLOCATE(type, count) \
     (type*)reallocate(NULL, sizeof(type) * (count))
 
+#define ALLOCATE_OBJ(type, objectType) \
+    (type*)allocateObject(sizeof(type), objectType)
+
 #define GROW_CAPACITY(capacity) \
             ((capacity) < 8 ? 8 : (capacity) * 2)
 
@@ -1290,6 +1293,7 @@ typedef enum {
 
 typedef struct {
   ObjType type;
+  struct Obj* next;
 } Obj;
 
 typedef enum {
@@ -1346,11 +1350,26 @@ typedef struct {
   MapEntry* entries;
 } ObjMap;
 
-void string_init(ObjString* string) {
-  string->obj = (Obj){.type = OBJ_STRING};
-  string->length = 0;
-  string->hash = 0;
-  string->chars = NULL;
+Obj* gc_objects = NULL;
+
+static Obj* allocateObject(size_t size, ObjType type) {
+  Obj* object = (Obj*)reallocate(NULL, size);
+  object->type = type;
+  return object;
+}
+
+static ObjString* allocateString(char* chars, size_t length) {
+  ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
+  string->length = length;
+  string->chars = chars;
+  return string;
+}
+
+ObjString* copyString(const char* chars, size_t length) {
+  char* heapChars = ALLOCATE(char, length + 1);
+  memcpy(heapChars, chars, length);
+  heapChars[length] = 0; /* terminate it w/ NULL, so we can pass c-string to functions that need it */
+  return allocateString(heapChars, length);
 }
 
 static uint32_t hashString(const char* key, size_t length) {
@@ -1373,7 +1392,7 @@ void string_set(ObjString* string, const char* chars, size_t length) {
 
 void string_free(ObjString* string) {
   FREE_ARRAY(char, string->chars);
-  string_init(string);
+  /* string_init(string); */
 }
 
 void list_init(ObjList* list) {
@@ -1636,6 +1655,10 @@ Value println(Value value) {
   printf("\\n");
   return NIL_VAL;
 }
+
+void free_objects(void) {
+  
+}
     '''
 
 
@@ -1668,6 +1691,7 @@ def _compile(source):
     c_code += '\n' + '\n'.join(env['pre'])
     c_code += '\n' + '\n'.join(compiled_forms)
     c_code += '\n' + '\n'.join(env['post'])
+    c_code += '\n  free_objects();'
     c_code += '\nreturn 0;\n}'
 
     return c_code
