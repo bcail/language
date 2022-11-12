@@ -1621,7 +1621,9 @@ Value print(Value value) {
   else if (IS_LIST(value)) {
     Value num_items = list_count(value);
     printf("[");
-    print(list_get(value, NUMBER_VAL(0)));
+    if (AS_NUMBER(num_items) > 0) {
+      print(list_get(value, NUMBER_VAL(0)));
+    }
     for (int i = 1; i < AS_NUMBER(num_items); i++) {
       printf(" ");
       print(list_get(value, NUMBER_VAL(i)));
