@@ -1069,14 +1069,12 @@ def new_string_c(s, envs):
 def new_vector_c(v, envs):
     name = _get_generated_name('lst', envs=envs)
     envs[0]['temps'].add(name)
-    c_code = f'ObjList {name};'
-    c_code += '\nlist_init(&%s);' % name
+    c_code = f'ObjList* {name} = allocate_list();'
     c_items = [compile_form(item, envs=envs)['code'] for item in v.items]
     for c_item in c_items:
-        c_code += f'\nlist_add(&{name}, {c_item});'
+        c_code += f'\nlist_add({name}, {c_item});'
 
     envs[0]['pre'].append(f'{c_code}\n')
-    envs[0]['post'].append(f'list_free(&{name});')
     return name
 
 
@@ -1164,7 +1162,7 @@ def compile_form(node, envs):
         raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
         name = new_vector_c(node, envs=envs)
-        return {'code': f'OBJ_VAL(&{name})'}
+        return {'code': f'OBJ_VAL({name})'}
     if isinstance(node, str):
         name = new_string_c(node, envs=envs)
         return {'code': f'OBJ_VAL({name})'}
@@ -1400,16 +1398,12 @@ void string_free(ObjString* string) {
   /* string_init(string); */
 }
 
-void list_init(ObjList* list) {
-  list->obj = (Obj){.type = OBJ_LIST};
+ObjList* allocate_list(void) {
+  ObjList* list = ALLOCATE_OBJ(ObjList, OBJ_LIST);
   list->count = 0;
   list->capacity = 0;
   list->values = NULL;
-}
-
-void list_free(ObjList* list) {
-  FREE_ARRAY(Value, list->values);
-  list_init(list);
+  return list;
 }
 
 void list_add(ObjList* list, Value item) {
@@ -1671,6 +1665,9 @@ void free_object(Obj* object) {
       break;
     }
     case OBJ_LIST: {
+      ObjList* list = (ObjList*)object;
+      FREE_ARRAY(Value, list->values);
+      FREE(ObjList, object);
       break;
     }
     case OBJ_MAP: {
