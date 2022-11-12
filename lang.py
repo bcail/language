@@ -1083,17 +1083,18 @@ def new_vector_c(v, envs):
 def new_map_c(node, envs):
     name = _get_generated_name('map', envs=envs)
     envs[-1]['temps'].add(name)
-    c_code = f'ObjMap {name};'
-    c_code += f'\nmap_init(&{name});'
+    # c_code = f'ObjMap {name};'
+    # c_code += f'\nmap_init(&{name});'
+    c_code = f'ObjMap* {name} = allocateMap();'
     keys = [compile_form(k, envs=envs)['code'] for k in node.items[::2]]
     values = [compile_form(v, envs=envs)['code'] for v in node.items[1::2]]
     c_items = zip(keys, values)
 
     for key, value in c_items:
-        c_code += f'\nmap_set(&{name}, {key}, {value});'
+        c_code += f'\nmap_set({name}, {key}, {value});'
 
     envs[-1]['pre'].append(f'{c_code}\n')
-    envs[-1]['post'].append(f'map_free(&{name});')
+    # envs[-1]['post'].append(f'map_free(&{name});')
     return name
 
 
@@ -1166,7 +1167,7 @@ def compile_form(node, envs):
         return {'code': f'OBJ_VAL(&{name})'}
     if isinstance(node, str):
         name = new_string_c(node, envs=envs)
-        return {'code': f'OBJ_VAL(&{name})'}
+        return {'code': f'OBJ_VAL({name})'}
     if isinstance(node, bool):
         if node:
             val = 'true'
@@ -1248,6 +1249,8 @@ c_types = '''
 
 #define GROW_ARRAY(type, pointer, oldCount, newCount) \
             (type*)reallocate(pointer, sizeof(type) * (newCount))
+
+#define FREE(type, pointer) reallocate(pointer, (size_t)0)
 
 #define FREE_ARRAY(type, pointer) \
             reallocate(pointer, (size_t)0)
@@ -1355,6 +1358,8 @@ Obj* gc_objects = NULL;
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, size);
   object->type = type;
+  object->next = (Obj*) gc_objects;
+  gc_objects = object;
   return object;
 }
 
@@ -1471,16 +1476,12 @@ Value recur_count(Value recur) {
   return NUMBER_VAL((int) AS_RECUR(recur)->count);
 }
 
-void map_init(ObjMap* map) {
-  map->obj = (Obj){.type = OBJ_MAP};
+ObjMap* allocateMap(void) {
+  ObjMap* map = ALLOCATE_OBJ(ObjMap, OBJ_MAP);
   map->count = 0;
   map->capacity = 0;
   map->entries = NULL;
-}
-
-void map_free(ObjMap* map) {
-  FREE_ARRAY(MapEntry, map->entries);
-  map_init(map);
+  return map;
 }
 
 Value map_count(Value map) {
@@ -1656,8 +1657,39 @@ Value println(Value value) {
   return NIL_VAL;
 }
 
+void free_object(Obj* object) {
+  switch (object->type) {
+    case OBJ_STRING: {
+      ObjString* string = (ObjString*)object;
+      FREE_ARRAY(char, string->chars);
+      FREE(ObjString, object);
+      break;
+    }
+    case OBJ_RECUR: {
+      break;
+    }
+    case OBJ_LIST: {
+      break;
+    }
+    case OBJ_MAP: {
+      ObjMap* map = (ObjMap*)object;
+      FREE_ARRAY(MapEntry, map->entries);
+      FREE(ObjMap, object);
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+}
+
 void free_objects(void) {
-  
+  Obj* object = gc_objects;
+  while (object != NULL) {
+    Obj* next = (Obj*) object->next;
+    free_object(object);
+    object = next;
+  }
 }
     '''
 
@@ -1705,6 +1737,7 @@ GCC_CMD = [
     '-Wall',
     '-Wextra',
     '-Wno-error=unused-parameter',
+    '-Wno-error=incompatible-pointer-types',
     '-std=c99',
     '-pedantic',
     '-Wpedantic',
