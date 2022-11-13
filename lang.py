@@ -1083,7 +1083,7 @@ def new_map_c(node, envs):
     envs[-1]['temps'].add(name)
     # c_code = f'ObjMap {name};'
     # c_code += f'\nmap_init(&{name});'
-    c_code = f'ObjMap* {name} = allocateMap();'
+    c_code = f'ObjMap* {name} = allocate_map();'
     keys = [compile_form(k, envs=envs)['code'] for k in node.items[::2]]
     values = [compile_form(v, envs=envs)['code'] for v in node.items[1::2]]
     c_items = zip(keys, values)
@@ -1180,7 +1180,7 @@ def compile_form(node, envs):
         return {'code': 'NIL_VAL'}
     if isinstance(node, DictBuilder):
         name = new_map_c(node, envs=envs)
-        return {'code': f'OBJ_VAL(&{name})'}
+        return {'code': f'OBJ_VAL({name})'}
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
@@ -1470,7 +1470,7 @@ Value recur_count(Value recur) {
   return NUMBER_VAL((int) AS_RECUR(recur)->count);
 }
 
-ObjMap* allocateMap(void) {
+ObjMap* allocate_map(void) {
   ObjMap* map = ALLOCATE_OBJ(ObjMap, OBJ_MAP);
   map->count = 0;
   map->capacity = 0;
