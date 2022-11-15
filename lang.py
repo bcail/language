@@ -1292,10 +1292,12 @@ typedef enum {
   OBJ_MAP,
 } ObjType;
 
-typedef struct {
+typedef struct Obj Obj;
+
+struct Obj {
   ObjType type;
   struct Obj* next;
-} Obj;
+};
 
 typedef enum {
   NIL,
@@ -1736,7 +1738,6 @@ GCC_CMD = [
     '-Wall',
     '-Wextra',
     '-Wno-error=unused-parameter',
-    '-Wno-error=incompatible-pointer-types',
     '-std=c99',
     '-pedantic',
     '-Wpedantic',
