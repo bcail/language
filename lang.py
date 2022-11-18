@@ -1614,6 +1614,7 @@ static void adjustCapacity(ObjMap* map, size_t capacity) {
   for (size_t i = 0; i < capacity; i++) {
     indices[i] = MAP_EMPTY;
     /* should these be copying over previous values? */
+    entries[i].hash = 0;
     entries[i].key = NIL_VAL;
     entries[i].value = NIL_VAL;
   }
@@ -1628,16 +1629,24 @@ Value map_set(ObjMap* map, Value key, Value value) {
   /* keep indices & entries same number of entries for now */
   if ((double)map->num_entries + 1 > (double)map->indices_capacity * MAP_MAX_LOAD) {
     size_t capacity = GROW_CAPACITY(map->indices_capacity);
+    /* printf("growing capacity to %d\\n", (int) capacity); */
     adjustCapacity(map, capacity);
   }
 
   int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
+  /* printf("indices_index: %d\\n", indices_index); */
   /* MapEntry* entry = findEntry(map->entries, map->capacity, key); */
   /* bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL)); */
-  bool isNewKey = (map->indices[indices_index] == MAP_EMPTY);
-  if (isNewKey) map->num_entries++;
+  int32_t entries_index = (int32_t) map->indices[indices_index];
+  /* printf("entries_index: %d\\n", entries_index); */
 
-  MapEntry* entry = &(map->entries[map->indices[indices_index]]);
+  bool isNewKey = (map->indices[indices_index] == MAP_EMPTY);
+  if (isNewKey) {
+    entries_index = (int32_t) map->num_entries;
+    map->num_entries++;
+  }
+
+  MapEntry* entry = &(map->entries[entries_index]);
 
   entry->hash = AS_STRING(key)->hash;
   entry->key = key;
@@ -1739,6 +1748,7 @@ void free_object(Obj* object) {
     }
     case OBJ_MAP: {
       ObjMap* map = (ObjMap*)object;
+      FREE_ARRAY(int32_t, map->indices);
       FREE_ARRAY(MapEntry, map->entries);
       FREE(ObjMap, object);
       break;

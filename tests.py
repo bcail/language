@@ -212,7 +212,6 @@ class EvalTests(unittest.TestCase):
 
         for test in tests:
             with self.subTest(test=test):
-                print(f'*** test: {test["src"]}')
                 self.assertEqual(parse(scan_tokens(test['src'])).evaluate(), test['result'])
 
     def test_other(self):
