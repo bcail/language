@@ -957,6 +957,16 @@ def map_keys_c(params, envs):
     return {'code': f'map_keys(AS_MAP({m}))'}
 
 
+def map_vals_c(params, envs):
+    m = compile_form(params[0], envs=envs)['code']
+    return {'code': f'map_vals(AS_MAP({m}))'}
+
+
+def map_pairs_c(params, envs):
+    m = compile_form(params[0], envs=envs)['code']
+    return {'code': f'map_pairs(AS_MAP({m}))'}
+
+
 def print_c(params, envs):
     result = compile_form(params[0], envs=envs)
     param = result['code']
@@ -1042,6 +1052,8 @@ global_compile_env = {
     'get': map_get_c,
     'assoc': map_assoc_c,
     'keys': map_keys_c,
+    'vals': map_vals_c,
+    'pairs': map_pairs_c,
     'def': def_c,
     'let': let_c,
     'loop': loop_c,
@@ -1669,7 +1681,40 @@ Value map_get(ObjMap* map, Value key, Value defaultVal) {
 }
 
 Value map_keys(ObjMap* map) {
-  return NIL_VAL;
+  ObjList* keys = allocate_list();
+  size_t num_entries = map->num_entries;
+  for (size_t i = 0; i < num_entries; i++) {
+    Value key = map->entries[i].key;
+    if (!AS_BOOL(equal(key, NIL_VAL))) {
+      list_add(keys, key);
+    }
+  }
+  return OBJ_VAL(keys);
+}
+
+Value map_vals(ObjMap* map) {
+  ObjList* vals = allocate_list();
+  size_t num_entries = map->num_entries;
+  for (size_t i = 0; i < num_entries; i++) {
+    if (!AS_BOOL(equal(map->entries[i].key, NIL_VAL))) {
+      list_add(vals, map->entries[i].value);
+    }
+  }
+  return OBJ_VAL(vals);
+}
+
+Value map_pairs(ObjMap* map) {
+  ObjList* pairs = allocate_list();
+  size_t num_entries = map->num_entries;
+  for (size_t i = 0; i < num_entries; i++) {
+    if (!AS_BOOL(equal(map->entries[i].key, NIL_VAL))) {
+      ObjList* pair = allocate_list();
+      list_add(pair, map->entries[i].key);
+      list_add(pair, map->entries[i].value);
+      list_add(pairs, OBJ_VAL(pair));
+    }
+  }
+  return OBJ_VAL(pairs);
 }
 
 Value print(Value value) {
