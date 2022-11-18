@@ -941,8 +941,8 @@ def map_get_c(params, envs):
     key = compile_form(params[1], envs=envs)['code']
     if len(params) > 2:
         default = compile_form(params[2], envs=envs)['code']
-        return {'code': f'map_get({m}, {key}, {default})'}
-    return {'code': f'map_get({m}, {key}, NIL_VAL)'}
+        return {'code': f'map_get(AS_MAP({m}), {key}, {default})'}
+    return {'code': f'map_get(AS_MAP({m}), {key}, NIL_VAL)'}
 
 
 def map_assoc_c(params, envs):
@@ -950,6 +950,11 @@ def map_assoc_c(params, envs):
     key = compile_form(params[1], envs=envs)['code']
     value = compile_form(params[2], envs=envs)['code']
     return {'code': f'map_set(AS_MAP({m}), {key}, {value})'}
+
+
+def map_keys_c(params, envs):
+    m = compile_form(params[0], envs=envs)['code']
+    return {'code': f'map_keys(AS_MAP({m}))'}
 
 
 def print_c(params, envs):
@@ -1036,6 +1041,7 @@ global_compile_env = {
     'nth': nth_c,
     'get': map_get_c,
     'assoc': map_assoc_c,
+    'keys': map_keys_c,
     'def': def_c,
     'let': let_c,
     'loop': loop_c,
@@ -1081,8 +1087,6 @@ def new_vector_c(v, envs):
 def new_map_c(node, envs):
     name = _get_generated_name('map', envs=envs)
     envs[-1]['temps'].add(name)
-    # c_code = f'ObjMap {name};'
-    # c_code += f'\nmap_init(&{name});'
     c_code = f'ObjMap* {name} = allocate_map();'
     keys = [compile_form(k, envs=envs)['code'] for k in node.items[::2]]
     values = [compile_form(v, envs=envs)['code'] for v in node.items[1::2]]
@@ -1092,7 +1096,6 @@ def new_map_c(node, envs):
         c_code += f'\nmap_set({name}, {key}, {value});'
 
     envs[-1]['pre'].append(f'{c_code}\n')
-    # envs[-1]['post'].append(f'map_free(&{name});')
     return name
 
 
@@ -1273,6 +1276,7 @@ c_types = '''
 #define IS_STRING(value)  isObjType(value, OBJ_STRING)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
 #define IS_MAP(value)  isObjType(value, OBJ_MAP)
+#define MAP_EMPTY (-1)
 #define MAP_MAX_LOAD 0.75
 
 void* reallocate(void* pointer, size_t newSize) {
@@ -1341,15 +1345,32 @@ typedef struct {
   Value* values;
 } ObjList;
 
+/* Maps
+ * Ideas from:
+ *   https://github.com/python/cpython/blob/main/Objects/dictobject.c
+ *   https://github.com/python/cpython/blob/main/Include/internal/pycore_dict.h
+ *   https://mail.python.org/pipermail/python-dev/2012-December/123028.html
+ *   https://morepypy.blogspot.com/2015/01/faster-more-memory-efficient-and-more.html
+ * Use a sparse list that contains indices into a compact list of MapEntries
+ *
+ * MAP_EMPTY (-1) - marks a slot as never used
+ * 0 - 2147483648 - marks an index into the entries list
+ *
+ * MinSize - starting size of new dict - 8 might be good
+ */
+
 typedef struct {
+  uint32_t hash;
   Value key;
   Value value;
 } MapEntry;
 
 typedef struct {
   Obj obj;
-  size_t count;
-  size_t capacity;
+  size_t num_entries;
+  size_t indices_capacity;
+  size_t entries_capacity;
+  int32_t* indices; /* start with always using int32 for now */
   MapEntry* entries;
 } ObjMap;
 
@@ -1474,14 +1495,16 @@ Value recur_count(Value recur) {
 
 ObjMap* allocate_map(void) {
   ObjMap* map = ALLOCATE_OBJ(ObjMap, OBJ_MAP);
-  map->count = 0;
-  map->capacity = 0;
+  map->num_entries = 0;
+  map->indices_capacity = 0;
+  map->entries_capacity = 0;
+  map->indices = NULL;
   map->entries = NULL;
   return map;
 }
 
 Value map_count(Value map) {
-  return NUMBER_VAL((int) AS_MAP(map)->count);
+  return NUMBER_VAL((int) AS_MAP(map)->num_entries);
 }
 
 Value equal(Value x, Value y) {
@@ -1525,12 +1548,12 @@ Value equal(Value x, Value y) {
   else if (IS_MAP(x)) {
     ObjMap* xMap = AS_MAP(x);
     ObjMap* yMap = AS_MAP(y);
-    size_t x_num_items = xMap->count;
-    size_t y_num_items = yMap->count;
+    size_t x_num_items = xMap->num_entries;
+    size_t y_num_items = yMap->num_entries;
     if (x_num_items != y_num_items) {
       return BOOL_VAL(false);
     }
-    size_t x_num_entries = xMap->capacity;
+    size_t x_num_entries = xMap->num_entries;
     for (size_t i = 0; i < x_num_entries; i++) {
       MapEntry x_entry = xMap->entries[i];
       MapEntry y_entry = yMap->entries[i];
@@ -1548,7 +1571,7 @@ Value equal(Value x, Value y) {
   }
 }
 
-static MapEntry* findEntry(MapEntry* entries, size_t capacity, Value key) {
+/* static MapEntry* findEntry(MapEntry* entries, size_t capacity, Value key) {
   ObjString* keyString = AS_STRING(key);
   uint32_t index = keyString->hash % (uint32_t) capacity;
   for (;;) {
@@ -1559,44 +1582,86 @@ static MapEntry* findEntry(MapEntry* entries, size_t capacity, Value key) {
 
     index = (index + 1) % (uint32_t)capacity;
   }
+} */
+
+static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t capacity, Value key) {
+  /* hash the key and get an index
+   * - if indices[index] is empty, return it
+   * - if indices[index] points to an entry in entries with a hash that matches our hash, return index
+   * Otherwise, keep adding one till we get to the correct key or an empty slot. */
+
+  ObjString* keyString = AS_STRING(key);
+  uint32_t index = keyString->hash % (uint32_t) capacity;
+  for (;;) {
+    if (indices[index] == MAP_EMPTY) {
+      return (int32_t) index;
+    }
+    if (entries[indices[index]].hash == keyString->hash) {
+      return (int32_t) index;
+    }
+    // MapEntry* entry = &entries[index];
+    /* if (AS_BOOL(equal(entry->key, key)) || AS_BOOL(equal(entry->key, NIL_VAL))) {
+      return entry;
+    } */
+
+    index = (index + 1) % (uint32_t)capacity;
+  }
 }
 
 static void adjustCapacity(ObjMap* map, size_t capacity) {
+  int32_t* indices = ALLOCATE(int32_t, capacity);
   MapEntry* entries = ALLOCATE(MapEntry, capacity);
   for (size_t i = 0; i < capacity; i++) {
+    indices[i] = MAP_EMPTY;
+    /* should these be copying over previous values? */
     entries[i].key = NIL_VAL;
     entries[i].value = NIL_VAL;
   }
 
+  map->indices_capacity = capacity;
+  map->entries_capacity = capacity;
+  map->indices = indices;
   map->entries = entries;
-  map->capacity = capacity;
 }
 
 Value map_set(ObjMap* map, Value key, Value value) {
-  if ((double)map->count + 1 > (double)map->capacity * MAP_MAX_LOAD) {
-    size_t capacity = GROW_CAPACITY(map->capacity);
+  /* keep indices & entries same number of entries for now */
+  if ((double)map->num_entries + 1 > (double)map->indices_capacity * MAP_MAX_LOAD) {
+    size_t capacity = GROW_CAPACITY(map->indices_capacity);
     adjustCapacity(map, capacity);
   }
 
-  MapEntry* entry = findEntry(map->entries, map->capacity, key);
-  bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL));
-  if (isNewKey) map->count++;
+  int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
+  /* MapEntry* entry = findEntry(map->entries, map->capacity, key); */
+  /* bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL)); */
+  bool isNewKey = (map->indices[indices_index] == MAP_EMPTY);
+  if (isNewKey) map->num_entries++;
 
+  MapEntry* entry = &(map->entries[map->indices[indices_index]]);
+
+  entry->hash = AS_STRING(key)->hash;
   entry->key = key;
   entry->value = value;
   return OBJ_VAL(map);
 }
 
-Value map_get(Value map, Value key, Value defaultVal) {
-  ObjMap* objMap = AS_MAP(map);
-  MapEntry* entry = findEntry(objMap->entries, objMap->capacity, key);
-  bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL));
+Value map_get(ObjMap* map, Value key, Value defaultVal) {
+  /* ObjMap* objMap = AS_MAP(map); */
+  int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
+  /* MapEntry* entry = findEntry(objMap->entries, objMap->capacity, key); */
+  bool isNewKey = (map->indices[indices_index] == MAP_EMPTY);
+  /* bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL)); */
   if (isNewKey) {
     return defaultVal;
   }
   else {
+    MapEntry* entry = &(map->entries[map->indices[indices_index]]);
     return entry->value;
   }
+}
+
+Value map_keys(ObjMap* map) {
+  return NIL_VAL;
 }
 
 Value print(Value value) {
@@ -1627,7 +1692,7 @@ Value print(Value value) {
     printf("]");
   }
   else if (IS_MAP(value)) {
-    size_t num_entries = AS_MAP(value)->capacity;
+    size_t num_entries = AS_MAP(value)->num_entries;
     printf("{");
     bool first_entry = true;
     for (size_t i = 0; i < num_entries; i++) {
