@@ -1596,7 +1596,7 @@ static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t ca
     if (indices[index] == MAP_EMPTY) {
       return (int32_t) index;
     }
-    if (entries[indices[index]].hash == keyString->hash) {
+    if (AS_BOOL(equal(entries[indices[index]].key, key))) {
       return (int32_t) index;
     }
     // MapEntry* entry = &entries[index];
@@ -1629,21 +1629,19 @@ Value map_set(ObjMap* map, Value key, Value value) {
   /* keep indices & entries same number of entries for now */
   if ((double)map->num_entries + 1 > (double)map->indices_capacity * MAP_MAX_LOAD) {
     size_t capacity = GROW_CAPACITY(map->indices_capacity);
-    /* printf("growing capacity to %d\\n", (int) capacity); */
     adjustCapacity(map, capacity);
   }
 
   int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
-  /* printf("indices_index: %d\\n", indices_index); */
   /* MapEntry* entry = findEntry(map->entries, map->capacity, key); */
   /* bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL)); */
   int32_t entries_index = (int32_t) map->indices[indices_index];
-  /* printf("entries_index: %d\\n", entries_index); */
 
-  bool isNewKey = (map->indices[indices_index] == MAP_EMPTY);
+  bool isNewKey = (entries_index == MAP_EMPTY);
   if (isNewKey) {
     entries_index = (int32_t) map->num_entries;
     map->num_entries++;
+    map->indices[indices_index] = entries_index;
   }
 
   MapEntry* entry = &(map->entries[entries_index]);
@@ -1658,13 +1656,14 @@ Value map_get(ObjMap* map, Value key, Value defaultVal) {
   /* ObjMap* objMap = AS_MAP(map); */
   int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
   /* MapEntry* entry = findEntry(objMap->entries, objMap->capacity, key); */
-  bool isNewKey = (map->indices[indices_index] == MAP_EMPTY);
+  int32_t entries_index = map->indices[indices_index];
+  bool isNewKey = (entries_index == MAP_EMPTY);
   /* bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL)); */
   if (isNewKey) {
     return defaultVal;
   }
   else {
-    MapEntry* entry = &(map->entries[map->indices[indices_index]]);
+    MapEntry* entry = &(map->entries[entries_index]);
     return entry->value;
   }
 }
