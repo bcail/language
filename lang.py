@@ -931,6 +931,11 @@ def nth_c(params, envs):
     return {'code': f'list_get({lst["code"]}, {index})'}
 
 
+def sort_c(params, envs):
+    lst = compile_form(params[0], envs=envs)
+    return {'code': f'list_sort({lst["code"]})'}
+
+
 def count_c(params, envs):
     lst = compile_form(params[0], envs=envs)
     return {'code': f'list_count({lst["code"]})'}
@@ -1049,6 +1054,7 @@ global_compile_env = {
     'println': println_c,
     'count': count_c,
     'nth': nth_c,
+    'sort': sort_c,
     'get': map_get_c,
     'assoc': map_assoc_c,
     'keys': map_keys_c,
@@ -1245,7 +1251,6 @@ c_functions = {
     'divide': 'Value divide(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y)); }',
     'greater': 'Value greater(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) > AS_NUMBER(y)); }',
     'greater_equal': 'Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBER(y)); }',
-    'less': 'Value less(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y)); }',
     'less_equal': 'Value less_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) <= AS_NUMBER(y)); }',
 }
 
@@ -1465,6 +1470,40 @@ Value list_get(Value list, Value index) {
 
 Value list_count(Value list) {
   return NUMBER_VAL((int) AS_LIST(list)->count);
+}
+
+void swap(Value v[], size_t i, size_t j) {
+  Value temp = v[i];
+  v[i] = v[j];
+  v[j] = temp;
+}
+
+Value less(Value x, Value y) {
+  return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y));
+}
+
+void quick_sort(Value v[], size_t left, size_t right) {
+  /* C Programming Language K&R p87*/
+  size_t i, last;
+  if (left >= right) {
+    return;
+  }
+  swap(v, left, (left + right)/2);
+  last = left;
+  for (i = left+1; i <= right; i++) {
+    if (AS_BOOL(less(v[i], v[left]))) {
+      swap(v, ++last, i);
+    }
+  }
+  swap(v, left, last);
+  quick_sort(v, left, last-1);
+  quick_sort(v, last+1, right);
+}
+
+Value list_sort(Value list) {
+  ObjList* lst = AS_LIST(list);
+  quick_sort(lst->values, (size_t)0, (lst->count)-1);
+  return OBJ_VAL(lst);
 }
 
 void recur_init(ObjRecur* recur) {
