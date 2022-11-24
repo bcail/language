@@ -404,6 +404,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (sort [1 2]))', 'output': '[1 2]'},
             {'src': '(print (sort [1 3 2]))', 'output': '[1 2 3]'},
             {'src': '(print (sort > [1 3 2]))', 'output': '[3 2 1]'},
+            {'src': '(defn compare [a b] (> (nth a 1) (nth b 1))) (print (sort compare [["a" 1] ["b" 2]]))', 'output': '[[b 2] [a 1]]'},
             {'src': '(def a 1) (print a)', 'output': '1'},
             {'src': '(print (let [x 1] x))', 'output': '1'},
             {'src': '(let [x 1] (print x))', 'output': '1'},
