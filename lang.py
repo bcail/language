@@ -932,8 +932,14 @@ def nth_c(params, envs):
 
 
 def sort_c(params, envs):
-    lst = compile_form(params[0], envs=envs)
-    return {'code': f'list_sort({lst["code"]}, *less)'}
+    if len(params) == 1:
+        lst = compile_form(params[0], envs=envs)
+        return {'code': f'list_sort({lst["code"]}, *less)'}
+    else:
+        compare = compile_form(params[0], envs=envs)
+        lst = compile_form(params[1], envs=envs)
+        return {'code': f'list_sort({lst["code"]}, {compare["code"]})'}
+        # return {'code': f'list_sort({lst["code"]}, *less)'}
 
 
 def count_c(params, envs):
@@ -1041,31 +1047,31 @@ def defn_c(params, envs):
 
 
 global_compile_env = {
-    '+': add_c,
-    '-': subtract_c,
-    '*': multiply_c,
-    '/': divide_c,
-    '=': equal_c,
-    '>': greater_c,
-    '>=': greater_equal_c,
-    '<': less_c,
-    '<=': less_equal_c,
-    'print': print_c,
-    'println': println_c,
-    'count': count_c,
-    'nth': nth_c,
-    'sort': sort_c,
-    'get': map_get_c,
-    'assoc': map_assoc_c,
-    'keys': map_keys_c,
-    'vals': map_vals_c,
-    'pairs': map_pairs_c,
-    'def': def_c,
-    'let': let_c,
-    'loop': loop_c,
-    'fn': fn_c,
-    'defn': defn_c,
-    'str': str_c,
+    '+': {'function': add_c},
+    '-': {'function': subtract_c},
+    '*': {'function': multiply_c},
+    '/': {'function': divide_c},
+    '=': {'function': equal_c},
+    '>': {'function': greater_c, 'c_name': '*greater'},
+    '>=': {'function': greater_equal_c},
+    '<': {'function': less_c},
+    '<=': {'function': less_equal_c},
+    'print': {'function': print_c},
+    'println': {'function': println_c},
+    'count': {'function': count_c},
+    'nth': {'function': nth_c},
+    'sort': {'function': sort_c},
+    'get': {'function': map_get_c},
+    'assoc': {'function': map_assoc_c},
+    'keys': {'function': map_keys_c},
+    'vals': {'function': map_vals_c},
+    'pairs': {'function': map_pairs_c},
+    'def': {'function': def_c},
+    'let': {'function': let_c},
+    'loop': {'function': loop_c},
+    'fn': {'function': fn_c},
+    'defn': {'function': defn_c},
+    'str': {'function': str_c},
 }
 
 
@@ -1127,11 +1133,11 @@ def compile_form(node, envs):
             return {'code': f'{results[0]["code"]}({args})'}
         elif isinstance(first, Symbol):
             if first.name in envs[0]['global']:
-                if isinstance(envs[0]['global'][first.name], Var) and isinstance(envs[0]['global'][first.name].value, Function):
-                    f = envs[0]['global'][first.name].value
+                if isinstance(envs[0]['global'][first.name]['function'], Var) and isinstance(envs[0]['global'][first.name]['function'].value, Function):
+                    f = envs[0]['global'][first.name]['function'].value
                     return f(rest)
-                if callable(envs[0]['global'][first.name]):
-                    return envs[0]['global'][first.name](rest, envs=envs)
+                if callable(envs[0]['global'][first.name]['function']):
+                    return envs[0]['global'][first.name]['function'](rest, envs=envs)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             elif first.name in envs[0]['user_globals']:
@@ -1180,6 +1186,8 @@ def compile_form(node, envs):
             for env in envs:
                 if node.name in env.get('bindings', {}):
                     return {'code': node.name}
+        if node.name in envs[0]['global']:
+            return {'code': envs[0]['global'][node.name]['c_name']}
         raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
         name = new_vector_c(node, envs=envs)
@@ -1242,17 +1250,6 @@ c_includes = [
     '<stdbool.h>',
     '<string.h>',
 ]
-
-
-c_functions = {
-    'add': 'Value add(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y)); }',
-    'subtract': 'Value subtract(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y)); }',
-    'multiply': 'Value multiply(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y)); }',
-    'divide': 'Value divide(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y)); }',
-    'greater': 'Value greater(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) > AS_NUMBER(y)); }',
-    'greater_equal': 'Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBER(y)); }',
-    'less_equal': 'Value less_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) <= AS_NUMBER(y)); }',
-}
 
 
 c_types = '''
@@ -1478,9 +1475,14 @@ void swap(Value v[], size_t i, size_t j) {
   v[j] = temp;
 }
 
-Value less(Value x, Value y) {
-  return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y));
-}
+Value add(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y)); }
+Value subtract(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y)); }
+Value multiply(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y)); }
+Value divide(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y)); }
+Value greater(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) > AS_NUMBER(y)); }
+Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBER(y)); }
+Value less_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) <= AS_NUMBER(y)); }
+Value less(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y)); }
 
 void quick_sort(Value v[], size_t left, size_t right, Value (*compare) (Value, Value)) {
   /* C Programming Language K&R p87*/
@@ -1876,7 +1878,6 @@ def _compile(source):
     c_code = '\n'.join([f'#include {i}' for i in c_includes])
     c_code += '\n\n'
     c_code += c_types
-    c_code += '\n'.join([f for f in c_functions.values()])
     c_code += '\n\n' + '\n\n'.join([f for f in env['functions'].values()])
     c_code += '\n\nint main(void)\n{'
     c_code += '\n' + '\n'.join(env['pre'])
