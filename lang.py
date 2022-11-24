@@ -1470,6 +1470,9 @@ Value list_count(Value list) {
 }
 
 void swap(Value v[], size_t i, size_t j) {
+  if (i == j) {
+    return;
+  }
   Value temp = v[i];
   v[i] = v[j];
   v[j] = temp;
@@ -1488,6 +1491,12 @@ void quick_sort(Value v[], size_t left, size_t right, Value (*compare) (Value, V
   /* C Programming Language K&R p87*/
   size_t i, last;
   if (left >= right) {
+    return;
+  }
+  if ((int) left < 0) {
+    return;
+  }
+  if ((int) right < 0) {
     return;
   }
   swap(v, left, (left + right)/2);
@@ -1992,7 +2001,10 @@ def compile_to_c(file_name, run=False):
             c_filename = os.path.join(tmp, 'code.c')
             with open(c_filename, 'wb') as f:
                 f.write(c_program.encode('utf8'))
-            compile_c(c_filename, output_file_name=str(file_name.stem))
+            output_file_name = str(file_name.stem)
+            if os.path.exists(output_file_name):
+                output_file_name = f'{output_file_name}_bin'
+            compile_c(c_filename, output_file_name=output_file_name)
             run_executable(str(file_name.stem))
     else:
         tmp = tempfile.mkdtemp(dir='.', prefix='tmp')
