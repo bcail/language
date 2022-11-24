@@ -933,7 +933,7 @@ def nth_c(params, envs):
 
 def sort_c(params, envs):
     lst = compile_form(params[0], envs=envs)
-    return {'code': f'list_sort({lst["code"]})'}
+    return {'code': f'list_sort({lst["code"]}, *less)'}
 
 
 def count_c(params, envs):
@@ -1482,7 +1482,7 @@ Value less(Value x, Value y) {
   return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y));
 }
 
-void quick_sort(Value v[], size_t left, size_t right) {
+void quick_sort(Value v[], size_t left, size_t right, Value (*compare) (Value, Value)) {
   /* C Programming Language K&R p87*/
   size_t i, last;
   if (left >= right) {
@@ -1491,18 +1491,18 @@ void quick_sort(Value v[], size_t left, size_t right) {
   swap(v, left, (left + right)/2);
   last = left;
   for (i = left+1; i <= right; i++) {
-    if (AS_BOOL(less(v[i], v[left]))) {
+    if (AS_BOOL((*compare) (v[i], v[left]))) {
       swap(v, ++last, i);
     }
   }
   swap(v, left, last);
-  quick_sort(v, left, last-1);
-  quick_sort(v, last+1, right);
+  quick_sort(v, left, last-1, *compare);
+  quick_sort(v, last+1, right, *compare);
 }
 
-Value list_sort(Value list) {
+Value list_sort(Value list, Value (*compare) (Value, Value)) {
   ObjList* lst = AS_LIST(list);
-  quick_sort(lst->values, (size_t)0, (lst->count)-1);
+  quick_sort(lst->values, (size_t)0, (lst->count)-1, *compare);
   return OBJ_VAL(lst);
 }
 
