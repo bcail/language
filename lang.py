@@ -1046,6 +1046,10 @@ def defn_c(params, envs):
     return {'code': ''}
 
 
+def readline_c(params, envs):
+    return {'code': 'readline()'}
+
+
 global_compile_env = {
     '+': {'function': add_c},
     '-': {'function': subtract_c},
@@ -1071,6 +1075,7 @@ global_compile_env = {
     'loop': {'function': loop_c},
     'fn': {'function': fn_c},
     'defn': {'function': defn_c},
+    'read-line': {'function': readline_c},
     'str': {'function': str_c},
 }
 
@@ -1292,6 +1297,7 @@ c_types = '''
 #define IS_MAP(value)  isObjType(value, OBJ_MAP)
 #define MAP_EMPTY (-1)
 #define MAP_MAX_LOAD 0.75
+#define MAX_LINE 1000
 
 void* reallocate(void* pointer, size_t newSize) {
   if (newSize == 0) {
@@ -1821,6 +1827,17 @@ Value println(Value value) {
   print(value);
   printf("\\n");
   return NIL_VAL;
+}
+
+Value readline(void) {
+  /* K&R p29 */
+  int ch;
+  char buffer[MAX_LINE];
+  int num_chars;
+  for (num_chars=0; num_chars<(MAX_LINE-1) && (ch=getchar()) != EOF && ch != '\\n'; num_chars++) {
+    buffer[num_chars] = (char) ch;
+  }
+  return OBJ_VAL(copyString(buffer, (size_t) num_chars));
 }
 
 void free_object(Obj* object) {
