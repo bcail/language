@@ -847,6 +847,7 @@ def let_c(params, envs):
         local_env['bindings'][binding[0].name] = result
         f_code += f'Value {binding[0].name} = {result["code"]};\n'
 
+    f_code = '\n'.join(local_env['pre']) + '\n' + f_code
     result = compile_form(*body, envs=envs)
 
     f_code += f'  return {result["code"]};'

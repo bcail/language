@@ -408,6 +408,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(def a 1) (print a)', 'output': '1'},
             {'src': '(print (let [x 1] x))', 'output': '1'},
             {'src': '(let [x 1] (print x))', 'output': '1'},
+            {'src': '(let [x {}] (print x))', 'output': '{}'},
             {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},
             {'src': '(print (loop [cnt 3 acc 0] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc 1)))))', 'output': '3'},
             {'src': '(print (loop [cnt 3 acc 0] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc cnt)))))', 'output': '6'},
