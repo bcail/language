@@ -1152,7 +1152,9 @@ def compile_form(node, envs):
                 args = ', '.join([r['code'] for r in results])
                 return {'code': f'{f_name}({args})'}
             elif first.name == 'do':
-                env_vars = list(envs[-1].get('bindings', {}).keys())
+                env_vars = []
+                for env in envs[::-1]:
+                    env_vars.extend(list(env.get('bindings', {}).keys()))
                 do_params = ', '.join([f'Value {v}' for v in env_vars])
                 do_args = ', '.join([v for v in env_vars])
                 if not do_params:
@@ -1167,9 +1169,18 @@ def compile_form(node, envs):
                 f_code = '\n'.join(local_env['pre'])
                 for d in do_exprs[:-1]:
                     f_code += f'\n  {d["code"]};'
-                f_code += f'\n  Value result = {do_exprs[-1]["code"]};'
-                f_code += '\n' + '\n'.join(local_env['post'])
-                f_code += '\n  return result;'
+                if isinstance(do_exprs[-1], tuple) and isinstance(do_exprs[-1][0], Symbol) and do_exprs[-1][0].name == 'recur':
+                    for e in envs:
+                        for b in e.get('bindings', {}).keys():
+                            if b.startswith('recur'):
+                                recur_name = b
+                    for r in do_exprs[-1][1:]:
+                        f_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
+                    f_code += f'\n  return {recur_name};'
+                else:
+                    f_code += f'\n  Value result = {do_exprs[-1]["code"]};'
+                    f_code += '\n' + '\n'.join(local_env['post'])
+                    f_code += '\n  return result;'
 
                 envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, do_params, f_code)
                 envs.pop()
