@@ -461,38 +461,45 @@ class CompileTests(unittest.TestCase):
                             raise
 
     def test_other(self):
-        c_code = _compile('(print (read-line))')
+        tests = [
+            {'src': '(print (read-line))', 'input': 'line\n', 'output': 'line'},
+            {'src': '(print (read-line))', 'input': '\n', 'output': ''},
+            {'src': '(print (read-line))', 'input': '', 'output': 'nil'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                c_code = _compile(test['src'])
 
-        with tempfile.TemporaryDirectory() as tmp:
-            c_filename = os.path.join(tmp, 'code.c')
-            with open(c_filename, 'wb') as f:
-                f.write(c_code.encode('utf8'))
+                with tempfile.TemporaryDirectory() as tmp:
+                    c_filename = os.path.join(tmp, 'code.c')
+                    with open(c_filename, 'wb') as f:
+                        f.write(c_code.encode('utf8'))
 
-            for gcc_cmd, env, program in [(GCC_CMD, GCC_ENV, 'program_safe'),
-                                          ([GCC_CMD[0]], None, 'program_regular')]:
-                program_filename = os.path.join(tmp, program)
+                    for gcc_cmd, env, program in [(GCC_CMD, GCC_ENV, 'program_safe'),
+                                                  ([GCC_CMD[0]], None, 'program_regular')]:
+                        program_filename = os.path.join(tmp, program)
 
-                compile_cmd = gcc_cmd + ['-o', program_filename, c_filename]
-                try:
-                    subprocess.run(compile_cmd, check=True, env=GCC_ENV)
-                except subprocess.CalledProcessError:
-                    print(f'bad c code:\n{c_code}')
-                    raise
+                        compile_cmd = gcc_cmd + ['-o', program_filename, c_filename]
+                        try:
+                            subprocess.run(compile_cmd, check=True, env=GCC_ENV)
+                        except subprocess.CalledProcessError:
+                            print(f'bad c code:\n{c_code}')
+                            raise
 
-                program_cmd = [program_filename]
-                try:
-                    result = subprocess.run(program_cmd, check=True, input='line1\n'.encode('utf8'), capture_output=True)
-                except subprocess.CalledProcessError as e:
-                    print(f'bad c code:\n{c_code}')
-                    print(f'err: {e.stderr.decode("utf8")}')
-                    print(f'out: {e.stdout.decode("utf8")}')
-                    raise
+                        program_cmd = [program_filename]
+                        try:
+                            result = subprocess.run(program_cmd, check=True, input=test['input'].encode('utf8'), capture_output=True)
+                        except subprocess.CalledProcessError as e:
+                            print(f'bad c code:\n{c_code}')
+                            print(f'err: {e.stderr.decode("utf8")}')
+                            print(f'out: {e.stdout.decode("utf8")}')
+                            raise
 
-                try:
-                    self.assertEqual(result.stdout.decode('utf8'), 'line1')
-                except AssertionError:
-                    print(f'bad c code:\n{c_code}')
-                    raise
+                        try:
+                            self.assertEqual(result.stdout.decode('utf8'), test['output'])
+                        except AssertionError:
+                            print(f'bad c code:\n{c_code}')
+                            raise
 
 
 if __name__ == '__main__':

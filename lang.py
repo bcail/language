@@ -1837,6 +1837,9 @@ Value readline(void) {
   for (num_chars=0; num_chars<(MAX_LINE-1) && (ch=getchar()) != EOF && ch != '\\n'; num_chars++) {
     buffer[num_chars] = (char) ch;
   }
+  if ((ch == EOF) && (num_chars == 0)) {
+    return NIL_VAL;
+  }
   return OBJ_VAL(copyString(buffer, (size_t) num_chars));
 }
 
