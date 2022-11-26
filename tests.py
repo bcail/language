@@ -421,6 +421,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(def i 0) (print ((fn [n] n) i))', 'output': '0'},
             {'src': '(print ((fn [n] (loop [cnt n acc 1] (if (= 0 cnt) acc (recur (- cnt 1) (* acc cnt))))) 3))', 'output': '6'},
             {'src': '(defn f1 [x y] (+ x y)) (print (f1 1 2))', 'output': '3'},
+            {'src': '(defn f1 [x] (let [y (+ x 1)] y)) (print (f1 1))', 'output': '2'},
             {'src': '(defn f1 [] {"key" "value"}) (print (get (f1) "key"))', 'output': 'value'},
             {'src': '(print (str/split "hello world"))', 'output': '[hello world]'},
             {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},

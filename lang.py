@@ -837,6 +837,19 @@ def let_c(params, envs):
     for i in range(0, len(bindings.items), 2):
         paired_bindings.append(bindings.items[i:i+2])
 
+    f_params = 'void'
+    f_args = ''
+    keys = []
+    for e in envs[1:]:
+        keys.extend(list(e.get('bindings', {}).keys()))
+    keys = list(set(keys))
+    if keys:
+        f_params = f'Value {keys[0]}'
+        f_args = keys[0]
+        for key in keys[1:]:
+            f_params += f', Value {key}'
+            f_args += f', {key}'
+
     f_name = _get_generated_name(base='let', envs=envs)
     f_code = ''
 
@@ -852,11 +865,11 @@ def let_c(params, envs):
 
     f_code += f'  return {result["code"]};'
 
-    envs[0]['functions'][f_name] = 'Value %s(void) {\n  %s\n}' % (f_name, f_code)
+    envs[0]['functions'][f_name] = 'Value %s(%s) {\n  %s\n}' % (f_name, f_params, f_code)
 
     envs.pop()
 
-    return {'code': f'{f_name}()'}
+    return {'code': f'{f_name}({f_args})'}
 
 
 def loop_c(params, envs):
