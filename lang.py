@@ -926,6 +926,11 @@ def str_c(params, envs):
         }
 
 
+def str_split_c(params, envs):
+    s = compile_form(params[0], envs=envs)
+    return {'code': f'str_split(AS_STRING({s["code"]}))'}
+
+
 def nth_c(params, envs):
     lst = compile_form(params[0], envs=envs)
     index = compile_form(params[1], envs=envs)['code']
@@ -1078,6 +1083,7 @@ global_compile_env = {
     'defn': {'function': defn_c},
     'read-line': {'function': readline_c},
     'str': {'function': str_c},
+    'str/split': {'function': str_split_c},
 }
 
 
@@ -1853,6 +1859,26 @@ Value readline(void) {
     return NIL_VAL;
   }
   return OBJ_VAL(copyString(buffer, (size_t) num_chars));
+}
+
+Value str_split(ObjString* s) {
+  ObjList* splits = allocate_list();
+  size_t split_length = 0;
+  int split_start_index = 0;
+  for (int i=0; s->chars[i] != '\\0'; i++) {
+    if (s->chars[i] == ' ') {
+      ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
+      list_add(splits, OBJ_VAL(split));
+      split_start_index = i + 1;
+      split_length = 0;
+    }
+    else {
+      split_length++;
+    }
+  }
+  ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
+  list_add(splits, OBJ_VAL(split));
+  return OBJ_VAL(splits);
 }
 
 void free_object(Obj* object) {
