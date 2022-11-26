@@ -931,6 +931,11 @@ def str_split_c(params, envs):
     return {'code': f'str_split(AS_STRING({s["code"]}))'}
 
 
+def str_lower_c(params, envs):
+    s = compile_form(params[0], envs=envs)
+    return {'code': f'str_lower(AS_STRING({s["code"]}))'}
+
+
 def nth_c(params, envs):
     lst = compile_form(params[0], envs=envs)
     index = compile_form(params[1], envs=envs)['code']
@@ -1084,6 +1089,7 @@ global_compile_env = {
     'read-line': {'function': readline_c},
     'str': {'function': str_c},
     'str/split': {'function': str_split_c},
+    'str/lower': {'function': str_lower_c},
 }
 
 
@@ -1269,6 +1275,7 @@ def main(file_name):
 c_includes = [
     '<stdio.h>',
     '<stdint.h>',
+    '<ctype.h>',
     '<stdlib.h>',
     '<stdbool.h>',
     '<string.h>',
@@ -1879,6 +1886,13 @@ Value str_split(ObjString* s) {
   ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
   list_add(splits, OBJ_VAL(split));
   return OBJ_VAL(splits);
+}
+
+Value str_lower(ObjString* s) {
+  for (int i=0; s->chars[i] != '\\0'; i++) {
+    s->chars[i] = (char) tolower((int) s->chars[i]);
+  }
+  return OBJ_VAL(s);
 }
 
 void free_object(Obj* object) {

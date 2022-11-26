@@ -423,6 +423,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(defn f1 [x y] (+ x y)) (print (f1 1 2))', 'output': '3'},
             {'src': '(defn f1 [] {"key" "value"}) (print (get (f1) "key"))', 'output': 'value'},
             {'src': '(print (str/split "hello world"))', 'output': '[hello world]'},
+            {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},
             # {'src': '(str)', 'output': ''},
             # {'src': '(print (str 1))', 'output': '1'},
         ]
