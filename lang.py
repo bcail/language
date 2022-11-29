@@ -863,7 +863,16 @@ def let_c(params, envs):
     f_code = '\n'.join(local_env['pre']) + '\n' + f_code
     result = compile_form(*body, envs=envs)
 
-    f_code += f'  return {result["code"]};'
+    if isinstance(result, tuple) and isinstance(result[0], Symbol) and result[0].name == 'recur':
+        for e in envs:
+            for b in e.get('bindings', {}).keys():
+                if b.startswith('recur'):
+                    recur_name = b
+        for r in result[1:]:
+            f_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
+        f_code += f'\n  return {recur_name};'
+    else:
+        f_code += f'  return {result["code"]};'
 
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n  %s\n}' % (f_name, f_params, f_code)
 
