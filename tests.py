@@ -333,7 +333,48 @@ counts'''
         self.assertEqual(result[3], {'the': 0})
 
 
-class CompileTests(unittest.TestCase):
+def _run_test(test, assert_equal):
+    print(f'*** c test: {test["src"]}')
+    c_code = _compile(test['src'])
+
+    with tempfile.TemporaryDirectory() as tmp:
+        c_filename = os.path.join(tmp, 'code.c')
+        with open(c_filename, 'wb') as f:
+            f.write(c_code.encode('utf8'))
+
+        for gcc_cmd, env, program in [(GCC_CMD, GCC_ENV, 'program_safe'),
+                                      ([GCC_CMD[0]], None, 'program_regular')]:
+            program_filename = os.path.join(tmp, program)
+
+            compile_cmd = gcc_cmd + ['-o', program_filename, c_filename]
+            try:
+                subprocess.run(compile_cmd, check=True, env=GCC_ENV)
+            except subprocess.CalledProcessError:
+                print(f'bad c code:\n{c_code}')
+                raise
+
+            program_cmd = [program_filename]
+            if 'input' in test:
+                input_ = test['input'].encode('utf8')
+            else:
+                input_ = None
+
+            try:
+                result = subprocess.run(program_cmd, check=True, input=input_, capture_output=True)
+            except subprocess.CalledProcessError as e:
+                print(f'bad c code:\n{c_code}')
+                print(f'err: {e.stderr.decode("utf8")}')
+                print(f'out: {e.stdout.decode("utf8")}')
+                raise
+
+            try:
+                assert_equal(result.stdout.decode('utf8'), test['output'])
+            except AssertionError:
+                print(f'bad c code:\n{c_code}')
+                raise
+
+
+class CompileBasicTests(unittest.TestCase):
     def test(self):
         tests = [
             {'src': '(print nil)', 'output': 'nil'},
@@ -383,6 +424,16 @@ class CompileTests(unittest.TestCase):
             {'src': '(if (< 2 1) (print true) (print false))', 'output': 'false'},
             {'src': '(if (<= 2 2) (print true))', 'output': 'true'},
             {'src': '(if (<= 2 1) (print true) (print false))', 'output': 'false'},
+        ]
+
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
+
+class CompileAdvancedTests(unittest.TestCase):
+    def test(self):
+        tests = [
             {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
             {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
             {'src': '(print [1 nil "hello" 2.34 true])', 'output': '[1 nil hello 2.34 true]'},
@@ -434,41 +485,12 @@ class CompileTests(unittest.TestCase):
 
         for test in tests:
             with self.subTest(test=test):
-                print(f'*** c test: {test["src"]}')
-                c_code = _compile(test['src'])
+                _run_test(test, self.assertEqual)
 
-                with tempfile.TemporaryDirectory() as tmp:
-                    c_filename = os.path.join(tmp, 'code.c')
-                    with open(c_filename, 'wb') as f:
-                        f.write(c_code.encode('utf8'))
 
-                    for gcc_cmd, env, program in [(GCC_CMD, GCC_ENV, 'program_safe'),
-                                                  ([GCC_CMD[0]], None, 'program_regular')]:
-                        program_filename = os.path.join(tmp, program)
+class CompileOtherTests(unittest.TestCase):
 
-                        compile_cmd = gcc_cmd + ['-o', program_filename, c_filename]
-                        try:
-                            subprocess.run(compile_cmd, check=True, env=GCC_ENV)
-                        except subprocess.CalledProcessError:
-                            print(f'bad c code:\n{c_code}')
-                            raise
-
-                        program_cmd = [program_filename]
-                        try:
-                            result = subprocess.run(program_cmd, check=True, capture_output=True)
-                        except subprocess.CalledProcessError as e:
-                            print(f'bad c code:\n{c_code}')
-                            print(f'err: {e.stderr.decode("utf8")}')
-                            print(f'out: {e.stdout.decode("utf8")}')
-                            raise
-
-                        try:
-                            self.assertEqual(result.stdout.decode('utf8'), test['output'])
-                        except AssertionError:
-                            print(f'bad c code:\n{c_code}')
-                            raise
-
-    def test_other(self):
+    def test(self):
         tests = [
             {'src': '(print (read-line))', 'input': 'line\n', 'output': 'line'},
             {'src': '(print (read-line))', 'input': '\n', 'output': ''},
@@ -476,38 +498,7 @@ class CompileTests(unittest.TestCase):
         ]
         for test in tests:
             with self.subTest(test=test):
-                c_code = _compile(test['src'])
-
-                with tempfile.TemporaryDirectory() as tmp:
-                    c_filename = os.path.join(tmp, 'code.c')
-                    with open(c_filename, 'wb') as f:
-                        f.write(c_code.encode('utf8'))
-
-                    for gcc_cmd, env, program in [(GCC_CMD, GCC_ENV, 'program_safe'),
-                                                  ([GCC_CMD[0]], None, 'program_regular')]:
-                        program_filename = os.path.join(tmp, program)
-
-                        compile_cmd = gcc_cmd + ['-o', program_filename, c_filename]
-                        try:
-                            subprocess.run(compile_cmd, check=True, env=GCC_ENV)
-                        except subprocess.CalledProcessError:
-                            print(f'bad c code:\n{c_code}')
-                            raise
-
-                        program_cmd = [program_filename]
-                        try:
-                            result = subprocess.run(program_cmd, check=True, input=test['input'].encode('utf8'), capture_output=True)
-                        except subprocess.CalledProcessError as e:
-                            print(f'bad c code:\n{c_code}')
-                            print(f'err: {e.stderr.decode("utf8")}')
-                            print(f'out: {e.stdout.decode("utf8")}')
-                            raise
-
-                        try:
-                            self.assertEqual(result.stdout.decode('utf8'), test['output'])
-                        except AssertionError:
-                            print(f'bad c code:\n{c_code}')
-                            raise
+                _run_test(test, self.assertEqual)
 
 
 if __name__ == '__main__':
