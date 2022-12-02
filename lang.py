@@ -1142,7 +1142,6 @@ def new_string_c(s, envs):
 
     envs[-1]['temps'].add(name)
     envs[-1]['pre'].append(f'ObjString* {name} = copyString("{s}", (size_t) {len(s)});')
-    # envs[-1]['post'].append(f'string_free(&{name});')
     return name
 
 
@@ -1392,7 +1391,6 @@ typedef struct {
   union {
     bool boolean;
     double number;
-    char* string;
     Obj* obj;
   } data;
 } Value;
