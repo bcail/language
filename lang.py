@@ -1115,7 +1115,17 @@ global_compile_env = {
 }
 
 
+character_replacements = {
+    '-': '_M_',
+    '?': '_Q_',
+    '!': '_E_',
+}
+
+
 def _get_generated_name(base, envs):
+    for c, replacement in character_replacements.items():
+        base = base.replace(c, replacement)
+
     env = envs[0]
     if base not in env['functions'] and base not in env['temps'] and base not in env['user_globals'] and base not in envs[-1].get('temps', set()):
         return base
