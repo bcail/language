@@ -757,9 +757,9 @@ def def_c(params, envs):
     name = params[0].name
     c_name = _get_generated_name(base=f'u_{name}', envs=envs)
     value = compile_form(params[1], envs=envs)['code']
-    code = f'\nValue {c_name} = {value};'
-    envs[0]['user_globals'][name] = {'c_name': c_name}
-    envs[0]['pre'].append(code)
+    # code = f'\nValue {c_name} = {value};'
+    envs[0]['user_globals'][name] = {'type': 'var', 'c_name': c_name, 'code': value}
+    # envs[0]['pre'].append(code)
     return {'code': ''}
 
 
@@ -837,16 +837,14 @@ def let_c(params, envs):
     for i in range(0, len(bindings.items), 2):
         paired_bindings.append(bindings.items[i:i+2])
 
-    f_params = 'void'
-    f_args = ''
+    f_params = 'ObjMap* user_globals'
+    f_args = 'user_globals'
     keys = []
     for e in envs[1:]:
         keys.extend(list(e.get('bindings', {}).keys()))
     keys = list(set(keys))
     if keys:
-        f_params = f'Value {keys[0]}'
-        f_args = keys[0]
-        for key in keys[1:]:
+        for key in keys:
             f_params += f', Value {key}'
             f_args += f', {key}'
 
@@ -896,6 +894,11 @@ def loop_c(params, envs):
     keys = list(set(keys))
 
     c_loop_params = ', '.join([f'Value {k}' for k in keys] + [f'Value {p.name}' for p in loop_params])
+    if c_loop_params:
+        c_loop_params = f'ObjMap* user_globals, {c_loop_params}'
+    else:
+        c_loop_params = 'ObjMap* user_globals'
+
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
 
@@ -929,6 +932,10 @@ def loop_c(params, envs):
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, c_loop_params, f_code)
 
     c_initial_args = ','.join([k for k in keys] + [compile_form(arg, envs=envs)['code'] for arg in initial_args])
+    if c_initial_args:
+        c_initial_args = f'user_globals, {c_initial_args}'
+    else:
+        c_initial_args = 'user_globals'
 
     envs.pop()
 
@@ -1055,10 +1062,9 @@ def defn_c(params, envs):
     bindings = params[1]
     body = params[2:]
 
+    c_params = 'ObjMap* user_globals'
     if bindings:
-        c_params = ', '.join([f'Value {b.name}' for b in bindings])
-    else:
-        c_params = 'void'
+        c_params += ', ' + ', '.join([f'Value {b.name}' for b in bindings])
 
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
@@ -1071,7 +1077,7 @@ def defn_c(params, envs):
     f_code += '\n' + '\n'.join(local_env['post'])
     f_code += '  return result;'
 
-    envs[0]['user_globals'][name] = {'c_name': c_name}
+    envs[0]['user_globals'][name] = {'type': 'function', 'c_name': c_name}
     envs[0]['functions'][c_name] = 'Value %s(%s) {\n  %s\n}' % (c_name, c_params, f_code)
 
     envs.pop()
@@ -1192,7 +1198,9 @@ def compile_form(node, envs):
             elif first.name in envs[0]['user_globals']:
                 f_name = envs[0]['user_globals'][first.name]['c_name']
                 results = [compile_form(n, envs=envs) for n in rest]
-                args = ', '.join([r['code'] for r in results])
+                args = 'user_globals'
+                if results:
+                    args += ', ' + ', '.join([r['code'] for r in results])
                 return {'code': f'{f_name}({args})'}
             elif first.name == 'do':
                 env_vars = []
@@ -1200,8 +1208,14 @@ def compile_form(node, envs):
                     env_vars.extend(list(env.get('bindings', {}).keys()))
                 do_params = ', '.join([f'Value {v}' for v in env_vars])
                 do_args = ', '.join([v for v in env_vars])
-                if not do_params:
-                    do_params = 'void'
+                if do_params:
+                    do_params = f'ObjMap* user_globals, {do_params}'
+                else:
+                    do_params = 'ObjMap* user_globals'
+                if do_args:
+                    do_args = f'user_globals, {do_args}'
+                else:
+                    do_args = 'user_globals'
 
                 local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
                 envs.append(local_env)
@@ -1241,13 +1255,17 @@ def compile_form(node, envs):
             raise Exception(f'unhandled list: {node}')
     if isinstance(node, Symbol):
         if node.name in envs[0]['user_globals']:
-            return {'code': envs[0]['user_globals'][node.name]['c_name']}
+            if envs[0]['user_globals'][node.name]['type'] == 'var':
+                return {'code': f'map_get(user_globals, OBJ_VAL(copyString("{node.name}", (size_t) {len(node.name)})), NIL_VAL)'}
+            else:
+                return {'code': envs[0]['user_globals'][node.name]['c_name']}
         else:
             for env in envs:
                 if node.name in env.get('bindings', {}):
                     return {'code': node.name}
         if node.name in envs[0]['global']:
             return {'code': envs[0]['global'][node.name]['c_name']}
+            # return {'code': f'map_get(user_globals, OBJ_VAL({node.name}))'}
         raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
         name = new_vector_c(node, envs=envs)
@@ -1992,6 +2010,12 @@ def _compile(source):
     c_code += '\n\n' + '\n\n'.join([f for f in env['functions'].values()])
     c_code += '\n\nint main(void)\n{'
     c_code += '\n' + '\n'.join(env['pre'])
+
+    c_code += '\n  ObjMap* user_globals = allocate_map();\n'
+    for name, value in env['user_globals'].items():
+        if value['type'] == 'var':
+            c_code += f'  map_set(user_globals, OBJ_VAL(copyString("{name}", (size_t) {len(name)})), {value["code"]});\n'
+
     c_code += '\n' + '\n'.join(compiled_forms)
     c_code += '\n' + '\n'.join(env['post'])
     c_code += '\n  free_objects();'
@@ -2008,6 +2032,7 @@ GCC_CMD = [
     '-Wall',
     '-Wextra',
     '-Wno-error=unused-parameter',
+    '-Wno-error=unused-variable',
     '-std=c99',
     '-pedantic',
     '-Wpedantic',
