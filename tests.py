@@ -348,9 +348,10 @@ def _run_test(test, assert_equal):
 
             compile_cmd = gcc_cmd + ['-o', program_filename, c_filename]
             try:
-                subprocess.run(compile_cmd, check=True, env=GCC_ENV)
-            except subprocess.CalledProcessError:
+                subprocess.run(compile_cmd, check=True, env=GCC_ENV, capture_output=True)
+            except subprocess.CalledProcessError as e:
                 print(f'bad c code:\n{c_code}')
+                print(f'err: {e.stderr.decode("utf8")}')
                 raise
 
             program_cmd = [program_filename]
@@ -374,48 +375,52 @@ def _run_test(test, assert_equal):
                 raise
 
 
-class CompileBasicTests(unittest.TestCase):
-    def test(self):
+class CompileTests(unittest.TestCase):
+    def test_values(self):
         tests = [
             {'src': '(print nil)', 'output': 'nil'},
             {'src': '(print true)', 'output': 'true'},
             {'src': '(print false)', 'output': 'false'},
+            {'src': '(print 1)', 'output': '1'},
+            {'src': '(print 1.2)', 'output': '1.2'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
+    def test_strings(self):
+        tests = [
+            {'src': '(print "abc")', 'output': 'abc'},
+            {'src': '(print (str/split "hello world"))', 'output': '[hello world]'},
+            {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},
+            # {'src': '(str)', 'output': ''},
+            # {'src': '(print (str 1))', 'output': '1'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
+    def test_comparisons(self):
+        tests = [
             {'src': '(print (= nil nil))', 'output': 'true'},
             {'src': '(print (= true true))', 'output': 'true'},
             {'src': '(print (= false false))', 'output': 'true'},
             {'src': '(print (= nil false))', 'output': 'false'},
             {'src': '(print (= nil true))', 'output': 'false'},
             {'src': '(print (= false true))', 'output': 'false'},
-            {'src': '(print 1)', 'output': '1'},
             {'src': '(print (= 1 1))', 'output': 'true'},
             {'src': '(print (= 1 "1"))', 'output': 'false'},
             {'src': '(print (= 1 1.0))', 'output': 'true'}, #different from clojure
-            {'src': '(print "abc")', 'output': 'abc'},
             {'src': '(print (= "abc" "abc"))', 'output': 'true'},
             {'src': '(print (= "abc" "def"))', 'output': 'false'},
-            {'src': '(print [])', 'output': '[]'},
-            {'src': '(print [1])', 'output': '[1]'},
             {'src': '(print (= [] []))', 'output': 'true'},
             {'src': '(print (= [1] [2]))', 'output': 'false'},
             {'src': '(print (= [1] [1]))', 'output': 'true'},
             {'src': '(print (= ["a" 1] ["a" 1]))', 'output': 'true'},
-            {'src': '(print {})', 'output': '{}'},
-            {'src': '(print {"a" 1})', 'output': '{a 1}'},
-            {'src': '(print {"a" 1 "b" 2})', 'output': '{a 1, b 2}'},
             {'src': '(print (= {} {}))', 'output': 'true'},
             {'src': '(print (= {"a" 1} {"a" 1}))', 'output': 'true'},
             {'src': '(print (= {"a" 2} {"a" 1}))', 'output': 'false'},
             {'src': '(print (= {"a" 1} {"b" 1}))', 'output': 'false'},
-            {'src': '(print (+ 1 3))', 'output': '4'},
-            {'src': '(print (+ 1.5 2.3))', 'output': '3.8'},
-            {'src': '(print (- 3 2))', 'output': '1'},
-            {'src': '(print (- 3.5 2.1))', 'output': '1.4'},
-            {'src': '(print (* 3 2))', 'output': '6'},
-            {'src': '(print (* 3.6 2.5))', 'output': '9'},
-            {'src': '(print (/ 6 2))', 'output': '3'},
-            {'src': '(print (/ 7.5 2.5))', 'output': '3'},
-            {'src': '(print "hello")', 'output': 'hello'},
-            {'src': '(println "hello")', 'output': 'hello\n'},
             {'src': '(if (> 3 2) (print true))', 'output': 'true'},
             {'src': '(if (> 3 4) (print true) (print false)', 'output': 'false'},
             {'src': '(if (>= 3 3) (print true))', 'output': 'true'},
@@ -425,25 +430,30 @@ class CompileBasicTests(unittest.TestCase):
             {'src': '(if (<= 2 2) (print true))', 'output': 'true'},
             {'src': '(if (<= 2 1) (print true) (print false))', 'output': 'false'},
         ]
-
         for test in tests:
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
-
-class CompileAdvancedTests(unittest.TestCase):
-    def test(self):
+    def test_math_operations(self):
         tests = [
-            {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
-            {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
+            {'src': '(print (+ 1 3))', 'output': '4'},
+            {'src': '(print (+ 1.5 2.3))', 'output': '3.8'},
+            {'src': '(print (- 3 2))', 'output': '1'},
+            {'src': '(print (- 3.5 2.1))', 'output': '1.4'},
+            {'src': '(print (* 3 2))', 'output': '6'},
+            {'src': '(print (* 3.6 2.5))', 'output': '9'},
+            {'src': '(print (/ 6 2))', 'output': '3'},
+            {'src': '(print (/ 7.5 2.5))', 'output': '3'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
+    def test_lists(self):
+        tests = [
+            {'src': '(print [])', 'output': '[]'},
+            {'src': '(print [1])', 'output': '[1]'},
             {'src': '(print [1 nil "hello" 2.34 true])', 'output': '[1 nil hello 2.34 true]'},
-            {'src': '(print (keys {"a" 2 "b" 3}))', 'output': '[a b]'},
-            {'src': '(print (vals {"a" 2 "b" 3}))', 'output': '[2 3]'},
-            {'src': '(print (pairs {"a" 2 "b" 3}))', 'output': '[[a 2] [b 3]]'},
-            {'src': '(print (assoc {"1" 2 "a" 3} "new-key" "new-val"))', 'output': '{1 2, a 3, new-key new-val}'},
-            {'src': '(print (get {"a" 1} "a"))', 'output': '1'},
-            {'src': '(print (get {"a" 1} "b"))', 'output': 'nil'},
-            {'src': '(print (get {"a" 1} "b" 99))', 'output': '99'},
             {'src': '(print (nth [1 2] 0))', 'output': '1'},
             {'src': '(print (nth [1 (+ 1 1)] 1))', 'output': '2'},
             {'src': '(print (nth [1 (nth [2 3] 0)] 1))', 'output': '2'},
@@ -455,20 +465,53 @@ class CompileAdvancedTests(unittest.TestCase):
             {'src': '(print (sort [1 2]))', 'output': '[1 2]'},
             {'src': '(print (sort [1 3 2]))', 'output': '[1 2 3]'},
             {'src': '(print (sort > [1 3 2]))', 'output': '[3 2 1]'},
-            {'src': '(def a 1) (print a)', 'output': '1'},
-            {'src': '(def some-thing 1) (print some-thing)', 'output': '1'},
-            {'src': '(def a 1) (let [b 2] (print (+ a b)))', 'output': '3'},
             {'src': '(defn compare [a b] (> (nth a 1) (nth b 1))) (print (sort compare [["a" 1] ["b" 2]]))', 'output': '[[b 2] [a 1]]'},
-            {'src': '(print (let [x 1] x))', 'output': '1'},
-            {'src': '(let [x 1] (print x))', 'output': '1'},
-            {'src': '(let [x {}] (print x))', 'output': '{}'},
-            {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
+    def test_maps(self):
+        tests = [
+            {'src': '(print {})', 'output': '{}'},
+            {'src': '(print {"a" 1})', 'output': '{a 1}'},
+            {'src': '(print {"a" 1 "b" 2})', 'output': '{a 1, b 2}'},
+            {'src': '(print (keys {"a" 2 "b" 3}))', 'output': '[a b]'},
+            {'src': '(print (vals {"a" 2 "b" 3}))', 'output': '[2 3]'},
+            {'src': '(print (pairs {"a" 2 "b" 3}))', 'output': '[[a 2] [b 3]]'},
+            {'src': '(print (assoc {"1" 2 "a" 3} "new-key" "new-val"))', 'output': '{1 2, a 3, new-key new-val}'},
+            {'src': '(print (get {"a" 1} "a"))', 'output': '1'},
+            {'src': '(print (get {"a" 1} "b"))', 'output': 'nil'},
+            {'src': '(print (get {"a" 1} "b" 99))', 'output': '99'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
+    def test_loops(self):
+        tests = [
             {'src': '(print (loop [cnt 3 acc 0] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc 1)))))', 'output': '3'},
             {'src': '(print (loop [cnt 3 acc 0] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc cnt)))))', 'output': '6'},
             {'src': '(loop [n 0] (do (print n) (if (< n 2) (recur (+ n 1)))))', 'output': '012'},
             {'src': '(loop [n 0] (if (> n 2) (print n) (let [y 1] (recur (+ n y)))))', 'output': '3'},
             {'src': '(loop [n 0] (if (> n 2) (print "done") (do (print n) (recur (+ n 1)))))', 'output': '012done'},
             {'src': '(loop [n 0] (do (print n) (print "    ") (println (/ (* 5 (- n 32)) 9)) (if (< n 70) (recur (+ 20 n)))))', 'output': '0    -17.7778\n20    -6.66667\n40    4.44444\n60    15.5556\n80    26.6667\n'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
+    def test_advanced(self):
+        tests = [
+            {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
+            {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
+            {'src': '(def a 1) (print a)', 'output': '1'},
+            {'src': '(def some-thing 1) (print some-thing)', 'output': '1'},
+            {'src': '(def a 1) (let [b 2] (print (+ a b)))', 'output': '3'},
+            {'src': '(print (let [x 1] x))', 'output': '1'},
+            {'src': '(let [x 1] (print x))', 'output': '1'},
+            {'src': '(let [x {}] (print x))', 'output': '{}'},
+            {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},
             {'src': '(print ((fn [x] x) 1))', 'output': '1'},
             {'src': '(print ((fn [x y] (+ x y)) 1 2))', 'output': '3'},
             {'src': '(def d {}) (assoc d "a" 1) (print (get d "a"))', 'output': '1'},
@@ -479,21 +522,14 @@ class CompileAdvancedTests(unittest.TestCase):
             {'src': '(defn f1 [x] (+ x 1)) (let [y 1] (print (f1 y)))', 'output': '2'},
             {'src': '(defn f1 [z] (let [x 1] (loop [y 2] (if (< y 5) (recur (+ y 1)) (+ x z))))) (print (f1 3))', 'output': '4'},
             {'src': '(defn f1 [] {"key" "value"}) (print (get (f1) "key"))', 'output': 'value'},
-            {'src': '(print (str/split "hello world"))', 'output': '[hello world]'},
-            {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},
-            # {'src': '(str)', 'output': ''},
-            # {'src': '(print (str 1))', 'output': '1'},
         ]
-
         for test in tests:
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
-
-class CompileOtherTests(unittest.TestCase):
-
-    def test(self):
+    def test_other(self):
         tests = [
+            {'src': '(println "hello")', 'output': 'hello\n'},
             {'src': '(print (read-line))', 'input': 'line\n', 'output': 'line'},
             {'src': '(print (read-line))', 'input': '\n', 'output': ''},
             {'src': '(print (read-line))', 'input': '', 'output': 'nil'},
