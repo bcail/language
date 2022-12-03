@@ -511,6 +511,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (let [x 1] x))', 'output': '1'},
             {'src': '(let [x 1] (print x))', 'output': '1'},
             {'src': '(let [x {}] (print x))', 'output': '{}'},
+            {'src': '(let [x-y {}] (print x-y))', 'output': '{}'},
             {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},
             {'src': '(print ((fn [x] x) 1))', 'output': '1'},
             {'src': '(print ((fn [x y] (+ x y)) 1 2))', 'output': '3'},

@@ -855,8 +855,10 @@ def let_c(params, envs):
     envs.append(local_env)
     for binding in paired_bindings:
         result = compile_form(binding[1], envs=envs)
+        binding_name = _get_generated_name(base=binding[0].name, envs=envs)
+        result['c_name'] = binding_name
         local_env['bindings'][binding[0].name] = result
-        f_code += f'Value {binding[0].name} = {result["code"]};\n'
+        f_code += f'  Value {binding_name} = {result["code"]};\n'
 
     f_code = '\n'.join(local_env['pre']) + '\n' + f_code
     result = compile_form(*body, envs=envs)
@@ -1268,7 +1270,10 @@ def compile_form(node, envs):
         else:
             for env in envs:
                 if node.name in env.get('bindings', {}):
-                    return {'code': node.name}
+                    if env['bindings'][node.name] and 'c_name' in env['bindings'][node.name]:
+                        return {'code': env['bindings'][node.name]['c_name']}
+                    else:
+                        return {'code': node.name}
         if node.name in envs[0]['global']:
             return {'code': envs[0]['global'][node.name]['c_name']}
             # return {'code': f'map_get(user_globals, OBJ_VAL({node.name}))'}
