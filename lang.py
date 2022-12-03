@@ -735,7 +735,7 @@ def equal_c(params, envs):
 
 def greater_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'greater({c_params[0]}, {c_params[1]})'}
+    return {'code': f'greater(user_globals, {c_params[0]}, {c_params[1]})'}
 
 
 def greater_equal_c(params, envs):
@@ -745,7 +745,7 @@ def greater_equal_c(params, envs):
 
 def less_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'less({c_params[0]}, {c_params[1]})'}
+    return {'code': f'less(user_globals, {c_params[0]}, {c_params[1]})'}
 
 
 def less_equal_c(params, envs):
@@ -803,8 +803,8 @@ def if_form_c(params, envs):
     else:
         false_code += '\n  else {\n    return NIL_VAL;\n  }'
 
-    f_params = 'void'
-    f_args = ''
+    f_params = 'ObjMap* user_globals'
+    f_args = 'user_globals'
     f_code = ''
 
     keys = []
@@ -812,9 +812,9 @@ def if_form_c(params, envs):
         keys.extend(list(e.get('bindings', {}).keys()))
     keys = list(set(keys))
     if keys:
-        f_params = f'Value {keys[0]}'
-        f_args = keys[0]
-        for key in keys[1:]:
+        # f_params = f'Value {keys[0]}'
+        # f_args = keys[0]
+        for key in keys:
             f_params += f', Value {key}'
             f_args += f', {key}'
     f_code += '\n' + '\n'.join(envs[-1].get('pre', []))
@@ -974,11 +974,11 @@ def nth_c(params, envs):
 def sort_c(params, envs):
     if len(params) == 1:
         lst = compile_form(params[0], envs=envs)
-        return {'code': f'list_sort({lst["code"]}, *less)'}
+        return {'code': f'list_sort(user_globals, {lst["code"]}, *less)'}
     else:
         compare = compile_form(params[0], envs=envs)
         lst = compile_form(params[1], envs=envs)
-        return {'code': f'list_sort({lst["code"]}, {compare["code"]})'}
+        return {'code': f'list_sort(user_globals, {lst["code"]}, {compare["code"]})'}
         # return {'code': f'list_sort({lst["code"]}, *less)'}
 
 
@@ -1048,6 +1048,11 @@ def fn_c(params, envs):
     f_code = f'  return {result["code"]};'
 
     f_params = ', '.join([f'Value {binding.name}' for binding in bindings])
+    if f_params:
+        f_params = f'ObjMap* user_globals, {f_params}'
+    else:
+        f_params = 'ObjMap* user_globals'
+
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n  %s\n}' % (f_name, f_params, f_code)
 
     envs.pop()
@@ -1184,7 +1189,8 @@ def compile_form(node, envs):
         rest = node[1:]
         if isinstance(first, list):
             results = [compile_form(n, envs=envs) for n in node]
-            args = ', '.join([r['code'] for r in results[1:]])
+            args = 'user_globals'
+            args += ', ' + ', '.join([r['code'] for r in results[1:]])
             return {'code': f'{results[0]["code"]}({args})'}
         elif isinstance(first, Symbol):
             if first.name in envs[0]['global']:
@@ -1561,12 +1567,12 @@ Value add(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y)); }
 Value subtract(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y)); }
 Value multiply(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y)); }
 Value divide(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y)); }
-Value greater(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) > AS_NUMBER(y)); }
+Value greater(ObjMap* user_globals, Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) > AS_NUMBER(y)); }
 Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBER(y)); }
 Value less_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) <= AS_NUMBER(y)); }
-Value less(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y)); }
+Value less(ObjMap* user_globals, Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y)); }
 
-void quick_sort(Value v[], size_t left, size_t right, Value (*compare) (Value, Value)) {
+void quick_sort(ObjMap* user_globals, Value v[], size_t left, size_t right, Value (*compare) (ObjMap*, Value, Value)) {
   /* C Programming Language K&R p87*/
   size_t i, last;
   if (left >= right) {
@@ -1581,18 +1587,18 @@ void quick_sort(Value v[], size_t left, size_t right, Value (*compare) (Value, V
   swap(v, left, (left + right)/2);
   last = left;
   for (i = left+1; i <= right; i++) {
-    if (AS_BOOL((*compare) (v[i], v[left]))) {
+    if (AS_BOOL((*compare) (user_globals, v[i], v[left]))) {
       swap(v, ++last, i);
     }
   }
   swap(v, left, last);
-  quick_sort(v, left, last-1, *compare);
-  quick_sort(v, last+1, right, *compare);
+  quick_sort(user_globals, v, left, last-1, *compare);
+  quick_sort(user_globals, v, last+1, right, *compare);
 }
 
-Value list_sort(Value list, Value (*compare) (Value, Value)) {
+Value list_sort(ObjMap* user_globals, Value list, Value (*compare) (ObjMap*, Value, Value)) {
   ObjList* lst = AS_LIST(list);
-  quick_sort(lst->values, (size_t)0, (lst->count)-1, *compare);
+  quick_sort(user_globals, lst->values, (size_t)0, (lst->count)-1, *compare);
   return OBJ_VAL(lst);
 }
 
