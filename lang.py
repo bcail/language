@@ -757,9 +757,7 @@ def def_c(params, envs):
     name = params[0].name
     c_name = _get_generated_name(base=f'u_{name}', envs=envs)
     value = compile_form(params[1], envs=envs)['code']
-    # code = f'\nValue {c_name} = {value};'
     envs[0]['user_globals'][name] = {'type': 'var', 'c_name': c_name, 'code': value}
-    # envs[0]['pre'].append(code)
     return {'code': ''}
 
 
@@ -807,16 +805,18 @@ def if_form_c(params, envs):
     f_args = 'user_globals'
     f_code = ''
 
-    keys = []
+    bindings = []
     for e in envs[1:]:
-        keys.extend(list(e.get('bindings', {}).keys()))
-    keys = list(set(keys))
-    if keys:
-        # f_params = f'Value {keys[0]}'
-        # f_args = keys[0]
-        for key in keys:
-            f_params += f', Value {key}'
-            f_args += f', {key}'
+        for name, value in e.get('bindings', {}).items():
+            if value and 'c_name' in value:
+                bindings.append(value['c_name'])
+            else:
+                bindings.append(name)
+    bindings = list(set(bindings))
+    if bindings:
+        for binding in bindings:
+            f_params += f', Value {binding}'
+            f_args += f', {binding}'
     f_code += '\n' + '\n'.join(envs[-1].get('pre', []))
 
     f_code += true_code
@@ -839,14 +839,15 @@ def let_c(params, envs):
 
     f_params = 'ObjMap* user_globals'
     f_args = 'user_globals'
-    keys = []
+
+    previous_bindings = []
     for e in envs[1:]:
-        keys.extend(list(e.get('bindings', {}).keys()))
-    keys = list(set(keys))
-    if keys:
-        for key in keys:
-            f_params += f', Value {key}'
-            f_args += f', {key}'
+        previous_bindings.extend(list(e.get('bindings', {}).keys()))
+    previous_bindings = list(set(previous_bindings))
+    if previous_bindings:
+        for previous_binding in previous_bindings:
+            f_params += f', Value {previous_binding}'
+            f_args += f', {previous_binding}'
 
     f_name = _get_generated_name(base='let', envs=envs)
     f_code = ''
@@ -890,16 +891,15 @@ def loop_c(params, envs):
 
     f_name = _get_generated_name(base='loop', envs=envs)
 
-    keys = []
+    previous_bindings = []
     for e in envs[1:]:
-        keys.extend(list(e.get('bindings', {}).keys()))
-    keys = list(set(keys))
-
-    c_loop_params = ', '.join([f'Value {k}' for k in keys] + [f'Value {p.name}' for p in loop_params])
-    if c_loop_params:
-        c_loop_params = f'ObjMap* user_globals, {c_loop_params}'
-    else:
-        c_loop_params = 'ObjMap* user_globals'
+        for name, value in e.get('bindings', {}).items():
+            if value and 'c_name' in value:
+                previous_bindings.append(value['c_name'])
+            else:
+                previous_bindings.append(name)
+        # previous_bindings.extend(list(e.get('bindings', {}).keys()))
+    previous_bindings = list(set(previous_bindings))
 
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
@@ -912,7 +912,21 @@ def loop_c(params, envs):
     local_env['bindings'][recur_name] = None
 
     for index, loop_param in enumerate(loop_params):
-        local_env['bindings'][loop_param.name] = compile_form(initial_args[index], envs=envs)['code']
+        c_name = _get_generated_name(base=loop_param.name, envs=envs)
+        local_env['bindings'][loop_param.name] = {
+            'code': compile_form(initial_args[index], envs=envs)['code'],
+            'c_name': c_name,
+        }
+
+    c_loop_params = [f'Value {pb}' for pb in previous_bindings]
+    for lp in loop_params:
+        c_loop_params.append(f'Value {local_env["bindings"][lp.name]["c_name"]}')
+    # c_loop_params_str = ', '.join([f'Value {pb}' for pb in previous_bindings] + [f'Value {p.name}' for p in loop_params])
+    c_loop_params_str = ', '.join(c_loop_params)
+    if c_loop_params_str:
+        c_loop_params_str = f'ObjMap* user_globals, {c_loop_params_str}'
+    else:
+        c_loop_params_str = 'ObjMap* user_globals'
 
     f_code = '\n'.join(local_env['pre'])
     f_code += '\n  bool continueFlag = false;'
@@ -922,8 +936,8 @@ def loop_c(params, envs):
         f_code += f'\n  Value result = {compiled["code"]};'
         f_code +=  '\n  if (IS_RECUR(result)) {'
         f_code += f'\n    /* grab values from result and update  */'
-        for index, loop_param in enumerate(list(local_env['bindings'].keys())[1:]):
-            f_code += f'\n      {loop_param} = recur_get(result, NUMBER_VAL({index}));'
+        for index, loop_param_value in enumerate(list(local_env['bindings'].values())[1:]):
+            f_code += f'\n      {loop_param_value["c_name"]} = recur_get(result, NUMBER_VAL({index}));'
         f_code += f'\n    continueFlag = true;'
         f_code += f'\n    recur_free(&{recur_name}_1);'
         f_code +=  '\n  }\n  else {'
@@ -931,9 +945,9 @@ def loop_c(params, envs):
     f_code += '\n  } while (continueFlag);'
     f_code += '\n  return NIL_VAL;'
 
-    envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, c_loop_params, f_code)
+    envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, c_loop_params_str, f_code)
 
-    c_initial_args = ','.join([k for k in keys] + [compile_form(arg, envs=envs)['code'] for arg in initial_args])
+    c_initial_args = ','.join([pb for pb in previous_bindings] + [compile_form(arg, envs=envs)['code'] for arg in initial_args])
     if c_initial_args:
         c_initial_args = f'user_globals, {c_initial_args}'
     else:
