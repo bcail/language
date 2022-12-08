@@ -515,7 +515,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(let [x-y {}] (print x-y))', 'output': '{}'},
             {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},
             {'src': '(let [x-y 1] (loop [n-p 0] (if (= n-p 1) (print x-y) (recur (+ n-p 1)))))', 'output': '1'},
-            {'src': '(let [a 1] (let [b 2] (+ a b)))', 'output': '3'},
+            {'src': '(let [a 1] (let [b 2] (print (+ a b))))', 'output': '3'},
             {'src': '(print ((fn [x] x) 1))', 'output': '1'},
             {'src': '(print ((fn [x y] (+ x y)) 1 2))', 'output': '3'},
             {'src': '(def d {}) (assoc d "a" 1) (print (get d "a"))', 'output': '1'},
