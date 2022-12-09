@@ -1793,8 +1793,6 @@ Value map_set(ObjMap* map, Value key, Value value) {
   }
 
   int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
-  /* MapEntry* entry = findEntry(map->entries, map->capacity, key); */
-  /* bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL)); */
   int32_t entries_index = (int32_t) map->indices[indices_index];
 
   bool isNewKey = (entries_index == MAP_EMPTY);
@@ -1813,12 +1811,14 @@ Value map_set(ObjMap* map, Value key, Value value) {
 }
 
 Value map_get(ObjMap* map, Value key, Value defaultVal) {
-  /* ObjMap* objMap = AS_MAP(map); */
+  if (map->num_entries == 0) {
+    return defaultVal;
+  }
+
   int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
-  /* MapEntry* entry = findEntry(objMap->entries, objMap->capacity, key); */
   int32_t entries_index = map->indices[indices_index];
+
   bool isNewKey = (entries_index == MAP_EMPTY);
-  /* bool isNewKey = AS_BOOL(equal(entry->key, NIL_VAL)); */
   if (isNewKey) {
     return defaultVal;
   }
