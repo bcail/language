@@ -765,9 +765,6 @@ def if_form_c(params, envs):
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
 
-    f_name = _get_generated_name(base='if_form', envs=envs)
-    envs[0]['functions'][f_name] = None
-
     test_code = compile_form(params[0], envs=envs)['code']
     true_result = compile_form(params[1], envs=envs)
 
@@ -823,6 +820,7 @@ def if_form_c(params, envs):
     f_code += true_code
     f_code += false_code
 
+    f_name = _get_generated_name(base='if_form', envs=envs)
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, f_params, f_code)
 
     envs.pop()
@@ -850,10 +848,6 @@ def let_c(params, envs):
             f_params += f', Value {previous_binding}'
             f_args += f', {previous_binding}'
 
-    f_name = _get_generated_name(base='let', envs=envs)
-    # need to add it here now, so that it's registered as a function when we compile the body below
-    envs[0]['functions'][f_name] = None
-
     f_code = ''
 
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
@@ -879,6 +873,7 @@ def let_c(params, envs):
     else:
         f_code += f'  return {result["code"]};'
 
+    f_name = _get_generated_name(base='let', envs=envs)
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n  %s\n}' % (f_name, f_params, f_code)
 
     envs.pop()
@@ -892,9 +887,6 @@ def loop_c(params, envs):
 
     loop_params = bindings.items[::2]
     initial_args = bindings.items[1::2]
-
-    f_name = _get_generated_name(base='loop', envs=envs)
-    envs[0]['functions'][f_name] = None
 
     previous_bindings = []
     for e in envs[1:]:
@@ -948,13 +940,14 @@ def loop_c(params, envs):
     f_code += '\n  } while (continueFlag);'
     f_code += '\n  return NIL_VAL;'
 
-    envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, c_loop_params_str, f_code)
-
     c_initial_args = ','.join([pb for pb in previous_bindings] + [compile_form(arg, envs=envs)['code'] for arg in initial_args])
     if c_initial_args:
         c_initial_args = f'user_globals, {c_initial_args}'
     else:
         c_initial_args = 'user_globals'
+
+    f_name = _get_generated_name(base='loop', envs=envs)
+    envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, c_loop_params_str, f_code)
 
     envs.pop()
 
@@ -1055,9 +1048,6 @@ def fn_c(params, envs):
     bindings = params[0]
     body = params[1:]
 
-    f_name = _get_generated_name(base='fn', envs=envs)
-    envs[0]['functions'][f_name] = None
-
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
     for binding in bindings:
@@ -1073,6 +1063,7 @@ def fn_c(params, envs):
     else:
         f_params = 'ObjMap* user_globals'
 
+    f_name = _get_generated_name(base='fn', envs=envs)
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n  %s\n}' % (f_name, f_params, f_code)
 
     envs.pop()
@@ -1082,9 +1073,6 @@ def fn_c(params, envs):
 
 def defn_c(params, envs):
     name = params[0].name
-    c_name = _get_generated_name(base=f'u_{name}', envs=envs)
-    envs[0]['functions'][c_name] = None
-    envs[0]['user_globals'][name] = {'type': 'function', 'c_name': c_name}
 
     bindings = params[1]
     body = params[2:]
@@ -1104,6 +1092,8 @@ def defn_c(params, envs):
     f_code += '\n' + '\n'.join(local_env['post'])
     f_code += '  return result;'
 
+    c_name = _get_generated_name(base=f'u_{name}', envs=envs)
+    envs[0]['user_globals'][name] = {'type': 'function', 'c_name': c_name}
     envs[0]['functions'][c_name] = 'Value %s(%s) {\n  %s\n}' % (c_name, c_params, f_code)
 
     envs.pop()
@@ -1244,9 +1234,6 @@ def compile_form(node, envs):
                 else:
                     do_args = 'user_globals'
 
-                f_name = _get_generated_name('do_f', envs)
-                envs[0]['functions'][f_name] = None
-
                 local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
                 envs.append(local_env)
                 do_exprs = [compile_form(n, envs=envs) for n in rest]
@@ -1267,6 +1254,7 @@ def compile_form(node, envs):
                     f_code += '\n' + '\n'.join(local_env['post'])
                     f_code += '\n  return result;'
 
+                f_name = _get_generated_name('do_f', envs)
                 envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, do_params, f_code)
                 envs.pop()
                 return {'code': f'{f_name}({do_args})'}
@@ -2038,7 +2026,7 @@ def _compile(source):
     c_code = '\n'.join([f'#include {i}' for i in c_includes])
     c_code += '\n\n'
     c_code += c_types
-    c_code += '\n\n' + '\n\n'.join(reversed([f for f in env['functions'].values()]))
+    c_code += '\n\n' + '\n\n'.join([f for f in env['functions'].values()])
     c_code += '\n\nint main(void)\n{'
     c_code += '\n' + '\n'.join(env['pre'])
 
