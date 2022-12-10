@@ -977,6 +977,11 @@ def str_lower_c(params, envs):
     return {'code': f'str_lower(AS_STRING({s["code"]}))'}
 
 
+def str_blank_c(params, envs):
+    s = compile_form(params[0], envs=envs)
+    return {'code': f'str_blank({s["code"]})'}
+
+
 def nth_c(params, envs):
     lst = compile_form(params[0], envs=envs)
     index = compile_form(params[1], envs=envs)['code']
@@ -1134,6 +1139,7 @@ global_compile_env = {
     'str': {'function': str_c},
     'str/split': {'function': str_split_c},
     'str/lower': {'function': str_lower_c},
+    'str/blank?': {'function': str_blank_c},
 }
 
 
@@ -1960,6 +1966,22 @@ Value str_lower(ObjString* s) {
     s->chars[i] = (char) tolower((int) s->chars[i]);
   }
   return OBJ_VAL(s);
+}
+
+Value str_blank(Value string) {
+  if (IS_NIL(string)) {
+    return BOOL_VAL(true);
+  }
+  ObjString* s = AS_STRING(string);
+  if (s->length == 0) {
+    return BOOL_VAL(true);
+  }
+  for (int i = 0; s->chars[i] != '\\0'; i++) {
+    if (!isspace(s->chars[i])) {
+      return BOOL_VAL(false);
+    }
+  }
+  return BOOL_VAL(true);
 }
 
 void free_object(Obj* object) {

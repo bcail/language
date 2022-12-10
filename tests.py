@@ -396,7 +396,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (str/blank? "Hello World"))', 'output': 'false'},
             {'src': '(print (str/blank? ""))', 'output': 'true'},
             {'src': '(print (str/blank? nil))', 'output': 'true'},
-            {'src': '(print (str/blank? "\n"))', 'output': 'true'},
+            {'src': '(print (str/blank? "\\n"))', 'output': 'true'},
             # {'src': '(str)', 'output': ''},
             # {'src': '(print (str 1))', 'output': '1'},
         ]
