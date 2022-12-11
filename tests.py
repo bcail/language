@@ -484,6 +484,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (vals {"a" 2 "b" 3}))', 'output': '[2 3]'},
             {'src': '(print (pairs {"a" 2 "b" 3}))', 'output': '[[a 2] [b 3]]'},
             {'src': '(print (assoc {"1" 2 "a" 3} "new-key" "new-val"))', 'output': '{1 2, a 3, new-key new-val}'},
+            {'src': '(print (assoc {"1" 2 "a" 3} "1" "new-val"))', 'output': '{1 new-val, a 3}'},
             {'src': '(print (get {} "a"))', 'output': 'nil'},
             {'src': '(print (get {"a" 1} "a"))', 'output': '1'},
             {'src': '(print (get {"a" 1} "b"))', 'output': 'nil'},
