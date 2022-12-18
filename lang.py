@@ -1903,15 +1903,13 @@ Value print(Value value) {
     printf("{");
     bool first_entry = true;
     for (size_t i = 0; i < num_entries; i++) {
-      if (!AS_BOOL(equal(AS_MAP(value)->entries[i].key, NIL_VAL))) {
-        if (!first_entry) {
-          printf(", ");
-        }
-        print(AS_MAP(value)->entries[i].key);
-        printf(" ");
-        print(AS_MAP(value)->entries[i].value);
-        first_entry = false;
+      if (!first_entry) {
+        printf(", ");
       }
+      print(AS_MAP(value)->entries[i].key);
+      printf(" ");
+      print(AS_MAP(value)->entries[i].value);
+      first_entry = false;
     }
     printf("}");
   }
