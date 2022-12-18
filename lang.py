@@ -1775,15 +1775,33 @@ static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t ca
 }
 
 static void adjustCapacity(ObjMap* map, size_t capacity) {
+  // allocate new space
   int32_t* indices = ALLOCATE(int32_t, capacity);
   MapEntry* entries = ALLOCATE(MapEntry, capacity);
+
+  // initialize all indices to MAP_EMPTY
   for (size_t i = 0; i < capacity; i++) {
     indices[i] = MAP_EMPTY;
-    /* should these be copying over previous values? */
-    entries[i].hash = 0;
-    entries[i].key = NIL_VAL;
-    entries[i].value = NIL_VAL;
   }
+
+  // copy entries over to new space
+  size_t num_entries = map->num_entries;
+  size_t entries_index = 0;
+  for (; entries_index < num_entries; entries_index++) {
+    // find new index
+    int32_t indices_index = find_indices_index(indices, entries, capacity, map->entries[entries_index].key);
+    indices[indices_index] = (int32_t) entries_index;
+    entries[entries_index] = map->entries[entries_index];
+  }
+
+  for (; entries_index < capacity; entries_index++) {
+    entries[entries_index].hash = 0;
+    entries[entries_index].key = NIL_VAL;
+    entries[entries_index].value = NIL_VAL;
+  }
+
+  FREE_ARRAY(int32_t, map->indices);
+  FREE_ARRAY(MapEntry, map->entries);
 
   map->indices_capacity = capacity;
   map->entries_capacity = capacity;
