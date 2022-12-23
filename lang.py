@@ -2147,7 +2147,7 @@ GCC_ENV = {
 }
 
 
-def compile_c(file_name, output_file_name):
+def build_executable(file_name, output_file_name):
     if os.environ.get('CC'):
         compiler = [os.environ['CC']]
         env = None
@@ -2174,31 +2174,14 @@ def run_executable(file_name):
         sys.exit(1)
 
 
-def compile_to_c(file_name, run=False):
+def compile_to_c(file_name, output_file_name):
     with open(file_name, 'rb') as f:
         source = f.read().decode('utf8')
 
     c_program = _compile(source)
 
-    if run:
-        with tempfile.TemporaryDirectory() as tmp:
-            c_filename = os.path.join(tmp, 'code.c')
-            with open(c_filename, 'wb') as f:
-                f.write(c_program.encode('utf8'))
-            output_file_name = str(file_name.stem)
-            if os.path.exists(output_file_name):
-                output_file_name = f'{output_file_name}_bin'
-            compile_c(c_filename, output_file_name=output_file_name)
-            run_executable(str(file_name.stem))
-    else:
-        tmp = tempfile.mkdtemp(dir='.', prefix='tmp')
-        c_file = Path(tmp) / Path(f'{file_name.stem}.c')
-
-        with open(c_file, mode='wb') as f:
-            f.write(c_program.encode('utf8'))
-
-        executable = Path(tmp) / file_name.stem
-        print(f'Compile with: gcc -o {executable} {c_file}')
+    with open(output_file_name, mode='wb') as f:
+        f.write(c_program.encode('utf8'))
 
 
 if __name__ == '__main__':
@@ -2206,25 +2189,55 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Random language')
     parser.add_argument('-c', action='store_true', dest='compile', help='compile the file to C')
-    parser.add_argument('-r', action='store_true', dest='run', help='compile to C & run')
+    parser.add_argument('-b', action='store_true', dest='build', help='build executable')
+    parser.add_argument('-r', action='store_true', dest='run', help='compile, build, & run')
+    parser.add_argument('-o', action='store', dest='output', help='output file')
     parser.add_argument('file', type=str, nargs='?', help='file to interpret')
 
     args = parser.parse_args()
 
     if args.compile:
         if args.file:
-            compile_to_c(Path(args.file))
+            if args.output:
+                c_file_name = args.output
+            else:
+                tmp = tempfile.mkdtemp(dir='.')
+                c_file_name = os.path.join(tmp, 'code.c')
+            compile_to_c(Path(args.file), c_file_name)
+            print(f'Compiled to {c_file_name}')
         else:
             print('no file to compile')
+    elif args.build:
+        if args.file:
+            if args.output:
+                executable = args.output
+            else:
+                tmp = tempfile.mkdtemp(dir='.')
+                executable = os.path.join(tmp, 'program')
+            if not args.file.endswith('.c'):
+                with tempfile.TemporaryDirectory() as c_tmp:
+                    c_file_name = os.path.join(c_tmp, 'code.c')
+                    compile_to_c(Path(args.file), c_file_name)
+                    build_executable(c_file_name, output_file_name=executable)
+            else:
+                c_file_name = args.file
+                build_executable(c_file_name, output_file_name=executable)
+            print(f'Built executable at {executable}')
+        else:
+            print('no file to build')
     elif args.run:
         if args.file:
-            if args.file.endswith('.c'):
-                executable = Path(args.file).stem
-                compile_c(args.file, output_file_name=executable)
-                run_executable(executable)
-            else:
-                compile_to_c(Path(args.file), run=True)
+            with tempfile.TemporaryDirectory(dir='.') as tmp:
+                executable = os.path.join(tmp, 'program')
+                if args.file.endswith('.c'):
+                    build_executable(args.file, output_file_name=executable)
+                    run_executable(executable)
+                else:
+                    c_file_name = os.path.join(tmp, 'code.c')
+                    compile_to_c(Path(args.file), c_file_name)
+                    build_executable(c_file_name, output_file_name=executable)
+                    run_executable(executable)
         else:
-            print('no file to compile')
+            print('no file to run')
     else:
         main(args.file)
