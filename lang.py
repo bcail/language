@@ -1170,6 +1170,7 @@ def new_string_c(s, envs):
 
     envs[-1]['temps'].add(name)
     envs[-1]['pre'].append(f'ObjString* {name} = copyString("{s}", (size_t) {len(s)});')
+    envs[-1]['post'].append(f'dec_ref_and_free((Obj*){name});')
     return name
 
 
@@ -1419,6 +1420,7 @@ typedef struct Obj Obj;
 
 struct Obj {
   ObjType type;
+  uint32_t ref_cnt;
   struct Obj* next;
 };
 
@@ -1437,6 +1439,21 @@ typedef struct {
     Obj* obj;
   } data;
 } Value;
+
+void free_object(Obj*);
+
+void inc_ref(Obj* obj) {
+  obj->ref_cnt++;
+}
+
+void dec_ref_and_free(Obj* obj) {
+  obj->ref_cnt--;
+  /* printf("ref_cnt: %d", (int)obj->ref_cnt);
+  fflush(stdout); */
+  if (obj->ref_cnt == 0) {
+    free_object(obj);
+  }
+}
 
 static inline bool isObjType(Value value, ObjType type) {
   return IS_OBJ(value) && AS_OBJ(value)->type == type;
@@ -1497,8 +1514,11 @@ Obj* gc_objects = NULL;
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, size);
   object->type = type;
-  object->next = (Obj*) gc_objects;
-  gc_objects = object;
+  object->ref_cnt = 0;
+  if (type != OBJ_STRING) {
+    object->next = (Obj*) gc_objects;
+    gc_objects = object;
+  }
   return object;
 }
 
@@ -1506,6 +1526,7 @@ static ObjString* allocateString(char* chars, size_t length) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->chars = chars;
+  inc_ref((Obj*)string);
   return string;
 }
 
@@ -1554,6 +1575,9 @@ void list_add(ObjList* list, Value item) {
     list->values = GROW_ARRAY(Value, list->values, oldCapacity, list->capacity);
   }
 
+  if (IS_STRING(item)) {
+    inc_ref((Obj*) AS_STRING(item));
+  }
   list->values[list->count] = item;
   list->count++;
 }
@@ -1974,6 +1998,9 @@ Value str_split(ObjString* s) {
   }
   ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
   list_add(splits, OBJ_VAL(split));
+  for (size_t i = 0; i < splits->count; i++) {
+    dec_ref_and_free((Obj*) AS_STRING(splits->values[i]));
+  }
   return OBJ_VAL(splits);
 }
 
@@ -2013,6 +2040,12 @@ void free_object(Obj* object) {
     }
     case OBJ_LIST: {
       ObjList* list = (ObjList*)object;
+      for (size_t i = 0; i < list->count; i++) {
+        Value v = list->values[i];
+        if (IS_STRING(v)) {
+          dec_ref_and_free((Obj*) AS_STRING(v));
+        }
+      }
       FREE_ARRAY(Value, list->values);
       FREE(ObjList, object);
       break;
@@ -2054,8 +2087,9 @@ def _compile(source):
         'pre': [],
         'post': [],
     }
+    envs = [env]
     for f in ast.forms:
-        result = compile_form(f, envs=[env])
+        result = compile_form(f, envs=envs)
         c = result['code']
         if c and not c.endswith(';'):
             c = f'{c};'
