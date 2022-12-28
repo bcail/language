@@ -988,6 +988,8 @@ def str_split_c(params, envs):
     param_name = result['code']
     name = _get_generated_name('str_split_', envs=envs)
     envs[-1]['pre'].append(f'  Value {name} = str_split({param_name});')
+    envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
     return {'code': name}
 
 
@@ -1182,6 +1184,8 @@ def new_string_c(s, envs):
 
     envs[-1]['temps'].add(name)
     envs[-1]['pre'].append(f'  Value {name} = OBJ_VAL(copyString("{s}", (size_t) {len(s)}));')
+    envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
     return name
 
 
@@ -1431,7 +1435,8 @@ typedef struct Obj Obj;
 
 struct Obj {
   ObjType type;
-  struct Obj* next;
+  uint32_t ref_cnt;
+  // struct Obj* next;
 };
 
 typedef enum {
@@ -1504,14 +1509,28 @@ typedef struct {
   MapEntry* entries;
 } ObjMap;
 
-Obj* gc_objects = NULL;
+// Obj* gc_objects = NULL;
 
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, size);
   object->type = type;
-  object->next = (Obj*) gc_objects;
-  gc_objects = object;
+  object->ref_cnt = 0;
+  // object->next = (Obj*) gc_objects;
+  // gc_objects = object;
   return object;
+}
+
+void free_object(Obj* object);
+
+void inc_ref(Obj* object) {
+  object->ref_cnt++;
+}
+
+void dec_ref_and_free(Obj* object) {
+  object->ref_cnt--;
+  if (object->ref_cnt == 0) {
+    free_object(object);
+  }
 }
 
 static ObjString* allocateString(char* chars, size_t length) {
@@ -1568,6 +1587,7 @@ void list_add(ObjList* list, Value item) {
 
   list->values[list->count] = item;
   list->count++;
+  inc_ref(AS_OBJ(item));
 }
 
 Value list_get(Value list, Value index) {
@@ -2027,6 +2047,12 @@ void free_object(Obj* object) {
     }
     case OBJ_LIST: {
       ObjList* list = (ObjList*)object;
+      for (size_t i = 0; i < list->count; i++) {
+        Value v = list_get(OBJ_VAL(object), NUMBER_VAL((double)i));
+        if (IS_OBJ(v)) {
+          dec_ref_and_free(AS_OBJ(v));
+        }
+      }
       FREE_ARRAY(Value, list->values);
       FREE(ObjList, object);
       break;
@@ -2044,14 +2070,14 @@ void free_object(Obj* object) {
   }
 }
 
-void free_objects(void) {
+/* void free_objects(void) {
   Obj* object = gc_objects;
   while (object != NULL) {
     Obj* next = (Obj*) object->next;
     free_object(object);
     object = next;
   }
-}
+} */
     '''
 
 
@@ -2091,7 +2117,7 @@ def _compile(source):
         c_code += '\n' + '\n'.join(compiled_forms)
     if env['post']:
         c_code += '\n' + '\n'.join(env['post'])
-    c_code += '\n  free_objects();'
+    c_code += '\n  free_object((Obj*)user_globals);'
     c_code += '\n  return 0;\n}'
 
     return c_code
