@@ -967,19 +967,28 @@ def str_c(params, envs):
         }
 
 
-def str_split_c(params, envs):
-    s = compile_form(params[0], envs=envs)
-    return {'code': f'str_split(AS_STRING({s["code"]}))'}
-
-
 def str_lower_c(params, envs):
-    s = compile_form(params[0], envs=envs)
-    return {'code': f'str_lower(AS_STRING({s["code"]}))'}
+    result = compile_form(params[0], envs=envs)
+    param_name = result['code']
+    name = _get_generated_name('str_lower_', envs=envs)
+    envs[-1]['pre'].append(f'  Value {name} = str_lower({param_name});')
+    return {'code': name}
 
 
 def str_blank_c(params, envs):
-    s = compile_form(params[0], envs=envs)
-    return {'code': f'str_blank({s["code"]})'}
+    result = compile_form(params[0], envs=envs)
+    param_name = result['code']
+    name = _get_generated_name('str_blank_', envs=envs)
+    envs[-1]['pre'].append(f'  Value {name} = str_blank({param_name});')
+    return {'code': name}
+
+
+def str_split_c(params, envs):
+    result = compile_form(params[0], envs=envs)
+    param_name = result['code']
+    name = _get_generated_name('str_split_', envs=envs)
+    envs[-1]['pre'].append(f'  Value {name} = str_split({param_name});')
+    return {'code': name}
 
 
 def nth_c(params, envs):
@@ -1037,9 +1046,12 @@ def map_pairs_c(params, envs):
 
 def print_c(params, envs):
     result = compile_form(params[0], envs=envs)
-    param = result['code']
-    c_code = f'print({param})'
-    return {'code': c_code}
+    param_name = result['code']
+    name = _get_generated_name('print_', envs=envs)
+    envs[-1]['pre'].append(f'  Value {name} = print({param_name});')
+    # c_code = f'  Value r = {param};\n'
+    # c_code = f'Value p = print(r);'
+    return {'code': name}
 
 
 def println_c(params, envs):
@@ -1169,7 +1181,7 @@ def new_string_c(s, envs):
     name = _get_generated_name('str', envs=envs)
 
     envs[-1]['temps'].add(name)
-    envs[-1]['pre'].append(f'ObjString* {name} = copyString("{s}", (size_t) {len(s)});')
+    envs[-1]['pre'].append(f'  Value {name} = OBJ_VAL(copyString("{s}", (size_t) {len(s)}));')
     return name
 
 
@@ -1297,7 +1309,7 @@ def compile_form(node, envs):
         return {'code': f'OBJ_VAL({name})'}
     if isinstance(node, str):
         name = new_string_c(node, envs=envs)
-        return {'code': f'OBJ_VAL({name})'}
+        return {'code': name}
     if isinstance(node, bool):
         if node:
             val = 'true'
@@ -1957,7 +1969,32 @@ Value readline(void) {
   return OBJ_VAL(copyString(buffer, (size_t) num_chars));
 }
 
-Value str_split(ObjString* s) {
+Value str_lower(Value string) {
+  ObjString* s = AS_STRING(string);
+  for (int i=0; s->chars[i] != '\\0'; i++) {
+    s->chars[i] = (char) tolower((int) s->chars[i]);
+  }
+  return string;
+}
+
+Value str_blank(Value string) {
+  if (IS_NIL(string)) {
+    return BOOL_VAL(true);
+  }
+  ObjString* s = AS_STRING(string);
+  if (s->length == 0) {
+    return BOOL_VAL(true);
+  }
+  for (int i = 0; s->chars[i] != '\\0'; i++) {
+    if (!isspace(s->chars[i])) {
+      return BOOL_VAL(false);
+    }
+  }
+  return BOOL_VAL(true);
+}
+
+Value str_split(Value string) {
+  ObjString* s = AS_STRING(string);
   ObjList* splits = allocate_list();
   size_t split_length = 0;
   int split_start_index = 0;
@@ -1975,29 +2012,6 @@ Value str_split(ObjString* s) {
   ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
   list_add(splits, OBJ_VAL(split));
   return OBJ_VAL(splits);
-}
-
-Value str_lower(ObjString* s) {
-  for (int i=0; s->chars[i] != '\\0'; i++) {
-    s->chars[i] = (char) tolower((int) s->chars[i]);
-  }
-  return OBJ_VAL(s);
-}
-
-Value str_blank(Value string) {
-  if (IS_NIL(string)) {
-    return BOOL_VAL(true);
-  }
-  ObjString* s = AS_STRING(string);
-  if (s->length == 0) {
-    return BOOL_VAL(true);
-  }
-  for (int i = 0; s->chars[i] != '\\0'; i++) {
-    if (!isspace(s->chars[i])) {
-      return BOOL_VAL(false);
-    }
-  }
-  return BOOL_VAL(true);
 }
 
 void free_object(Obj* object) {
@@ -2056,27 +2070,29 @@ def _compile(source):
     }
     for f in ast.forms:
         result = compile_form(f, envs=[env])
-        c = result['code']
-        if c and not c.endswith(';'):
-            c = f'{c};'
-        compiled_forms.append(c)
+        # c = result['code']
+        # if c and not c.endswith(';'):
+        #     c = f'{c};'
+        # compiled_forms.append(c)
 
     c_code = '\n'.join([f'#include {i}' for i in c_includes])
     c_code += '\n\n'
     c_code += c_types
     c_code += '\n\n' + '\n\n'.join([f for f in env['functions'].values()])
     c_code += '\n\nint main(void)\n{'
+    c_code += '\n  ObjMap* user_globals = allocate_map();\n'
     c_code += '\n' + '\n'.join(env['pre'])
 
-    c_code += '\n  ObjMap* user_globals = allocate_map();\n'
     for name, value in env['user_globals'].items():
         if value['type'] == 'var':
             c_code += f'  map_set(user_globals, OBJ_VAL(copyString("{name}", (size_t) {len(name)})), {value["code"]});\n'
 
-    c_code += '\n' + '\n'.join(compiled_forms)
-    c_code += '\n' + '\n'.join(env['post'])
+    if compiled_forms:
+        c_code += '\n' + '\n'.join(compiled_forms)
+    if env['post']:
+        c_code += '\n' + '\n'.join(env['post'])
     c_code += '\n  free_objects();'
-    c_code += '\nreturn 0;\n}'
+    c_code += '\n  return 0;\n}'
 
     return c_code
 
