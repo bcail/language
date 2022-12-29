@@ -1028,22 +1028,43 @@ def map_assoc_c(params, envs):
     m = compile_form(params[0], envs=envs)['code']
     key = compile_form(params[1], envs=envs)['code']
     value = compile_form(params[2], envs=envs)['code']
-    return {'code': f'map_set(AS_MAP({m}), {key}, {value})'}
+    return {'code': f'  map_set(AS_MAP({m}), {key}, {value})'}
+
+
+    result = compile_form(params[0], envs=envs)
+    param_name = result['code']
+    name = _get_generated_name('str_split_', envs=envs)
+    envs[-1]['pre'].append(f'  Value {name} = str_split({param_name});')
+    envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+    return {'code': name}
 
 
 def map_keys_c(params, envs):
     m = compile_form(params[0], envs=envs)['code']
-    return {'code': f'map_keys(AS_MAP({m}))'}
+    name = _get_generated_name('map_keys_', envs=envs)
+    envs[-1]['pre'].append(f'  Value {name} = map_keys(AS_MAP({m}));')
+    envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+    return {'code': name}
 
 
 def map_vals_c(params, envs):
     m = compile_form(params[0], envs=envs)['code']
-    return {'code': f'map_vals(AS_MAP({m}))'}
+    name = _get_generated_name('map_vals_', envs=envs)
+    envs[-1]['pre'].append(f'  Value {name} = map_vals(AS_MAP({m}));')
+    envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+    return {'code': name}
 
 
 def map_pairs_c(params, envs):
     m = compile_form(params[0], envs=envs)['code']
-    return {'code': f'map_pairs(AS_MAP({m}))'}
+    name = _get_generated_name('map_pairs_', envs=envs)
+    envs[-1]['pre'].append(f'  Value {name} = map_pairs(AS_MAP({m}));')
+    envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+    return {'code': name}
 
 
 def print_c(params, envs):
@@ -1191,28 +1212,30 @@ def new_string_c(s, envs):
 
 def new_vector_c(v, envs):
     name = _get_generated_name('lst', envs=envs)
-    envs[0]['temps'].add(name)
-    c_code = f'ObjList* {name} = allocate_list();'
+    envs[-1]['temps'].add(name)
+    c_code = f'  Value {name} = OBJ_VAL(allocate_list());\n  inc_ref(AS_OBJ({name}));'
     c_items = [compile_form(item, envs=envs)['code'] for item in v.items]
     for c_item in c_items:
-        c_code += f'\nlist_add({name}, {c_item});'
+        c_code += f'\n  list_add({name}, {c_item});'
 
-    envs[0]['pre'].append(f'{c_code}\n')
+    envs[-1]['pre'].append(f'{c_code}\n')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
     return name
 
 
 def new_map_c(node, envs):
     name = _get_generated_name('map', envs=envs)
     envs[-1]['temps'].add(name)
-    c_code = f'ObjMap* {name} = allocate_map();'
+    c_code = f'  Value {name} = OBJ_VAL(allocate_map());\n  inc_ref(AS_OBJ({name}));'
     keys = [compile_form(k, envs=envs)['code'] for k in node.items[::2]]
     values = [compile_form(v, envs=envs)['code'] for v in node.items[1::2]]
     c_items = zip(keys, values)
 
     for key, value in c_items:
-        c_code += f'\nmap_set({name}, {key}, {value});'
+        c_code += f'\n  map_set(AS_MAP({name}), {key}, {value});'
 
     envs[-1]['pre'].append(f'{c_code}\n')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
     return name
 
 
@@ -1310,7 +1333,7 @@ def compile_form(node, envs):
         raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
         name = new_vector_c(node, envs=envs)
-        return {'code': f'OBJ_VAL({name})'}
+        return {'code': name}
     if isinstance(node, str):
         name = new_string_c(node, envs=envs)
         return {'code': name}
@@ -1328,7 +1351,7 @@ def compile_form(node, envs):
         return {'code': 'NIL_VAL'}
     if isinstance(node, DictBuilder):
         name = new_map_c(node, envs=envs)
-        return {'code': f'OBJ_VAL({name})'}
+        return {'code': name}
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
@@ -1578,7 +1601,8 @@ ObjList* allocate_list(void) {
   return list;
 }
 
-void list_add(ObjList* list, Value item) {
+void list_add(Value list_value, Value item) {
+  ObjList* list = AS_LIST(list_value);
   if (list->capacity < list->count + 1) {
     size_t oldCapacity = list->capacity;
     list->capacity = GROW_CAPACITY(oldCapacity);
@@ -1587,7 +1611,9 @@ void list_add(ObjList* list, Value item) {
 
   list->values[list->count] = item;
   list->count++;
-  inc_ref(AS_OBJ(item));
+  if (IS_OBJ(item)) {
+    inc_ref(AS_OBJ(item));
+  }
 }
 
 Value list_get(Value list, Value index) {
@@ -1888,10 +1914,7 @@ Value map_keys(ObjMap* map) {
   ObjList* keys = allocate_list();
   size_t num_entries = map->num_entries;
   for (size_t i = 0; i < num_entries; i++) {
-    Value key = map->entries[i].key;
-    if (!AS_BOOL(equal(key, NIL_VAL))) {
-      list_add(keys, key);
-    }
+    list_add(OBJ_VAL(keys), map->entries[i].key);
   }
   return OBJ_VAL(keys);
 }
@@ -1900,9 +1923,7 @@ Value map_vals(ObjMap* map) {
   ObjList* vals = allocate_list();
   size_t num_entries = map->num_entries;
   for (size_t i = 0; i < num_entries; i++) {
-    if (!AS_BOOL(equal(map->entries[i].key, NIL_VAL))) {
-      list_add(vals, map->entries[i].value);
-    }
+    list_add(OBJ_VAL(vals), map->entries[i].value);
   }
   return OBJ_VAL(vals);
 }
@@ -1913,9 +1934,9 @@ Value map_pairs(ObjMap* map) {
   for (size_t i = 0; i < num_entries; i++) {
     if (!AS_BOOL(equal(map->entries[i].key, NIL_VAL))) {
       ObjList* pair = allocate_list();
-      list_add(pair, map->entries[i].key);
-      list_add(pair, map->entries[i].value);
-      list_add(pairs, OBJ_VAL(pair));
+      list_add(OBJ_VAL(pair), map->entries[i].key);
+      list_add(OBJ_VAL(pair), map->entries[i].value);
+      list_add(OBJ_VAL(pairs), OBJ_VAL(pair));
     }
   }
   return OBJ_VAL(pairs);
@@ -2021,7 +2042,7 @@ Value str_split(Value string) {
   for (int i=0; s->chars[i] != '\\0'; i++) {
     if (s->chars[i] == ' ') {
       ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
-      list_add(splits, OBJ_VAL(split));
+      list_add(OBJ_VAL(splits), OBJ_VAL(split));
       split_start_index = i + 1;
       split_length = 0;
     }
@@ -2030,7 +2051,7 @@ Value str_split(Value string) {
     }
   }
   ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
-  list_add(splits, OBJ_VAL(split));
+  list_add(OBJ_VAL(splits), OBJ_VAL(split));
   return OBJ_VAL(splits);
 }
 

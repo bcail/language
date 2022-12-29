@@ -391,11 +391,11 @@ class CompileTests(unittest.TestCase):
     def test_strings(self):
         tests = [
             {'src': '(print "abc")', 'output': 'abc'},
-            ### {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},
-            ### {'src': '(print (str/blank? "Hello World"))', 'output': 'false'},
-            ### {'src': '(print (str/blank? ""))', 'output': 'true'},
-            ### {'src': '(print (str/blank? nil))', 'output': 'true'},
-            ### {'src': '(print (str/blank? "\\n"))', 'output': 'true'},
+            {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},
+            {'src': '(print (str/blank? "Hello World"))', 'output': 'false'},
+            {'src': '(print (str/blank? ""))', 'output': 'true'},
+            {'src': '(print (str/blank? nil))', 'output': 'true'},
+            {'src': '(print (str/blank? "\\n"))', 'output': 'true'},
             {'src': '(print (str/split "hello world"))', 'output': '[hello world]'},
             # {'src': '(str)', 'output': ''},
             # {'src': '(print (str 1))', 'output': '1'},
@@ -459,6 +459,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print [1])', 'output': '[1]'},
             {'src': '(print [1 nil "hello" 2.34 true])', 'output': '[1 nil hello 2.34 true]'},
             {'src': '(print (nth [1 2] 0))', 'output': '1'},
+            {'src': '(print (nth ["1" 2] 0))', 'output': '1'},
             {'src': '(print (nth [1 (+ 1 1)] 1))', 'output': '2'},
             {'src': '(print (nth [1 (nth [2 3] 0)] 1))', 'output': '2'},
             {'src': '(print (nth [1 nil 2] 1))', 'output': 'nil'},
@@ -469,7 +470,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (sort [1 2]))', 'output': '[1 2]'},
             {'src': '(print (sort [1 3 2]))', 'output': '[1 2 3]'},
             {'src': '(print (sort > [1 3 2]))', 'output': '[3 2 1]'},
-            {'src': '(defn compare [a b] (> (nth a 1) (nth b 1))) (print (sort compare [["a" 1] ["b" 2]]))', 'output': '[[b 2] [a 1]]'},
+            ### {'src': '(defn compare [a b] (> (nth a 1) (nth b 1))) (print (sort compare [["a" 1] ["b" 2]]))', 'output': '[[b 2] [a 1]]'},
         ]
         for test in tests:
             with self.subTest(test=test):
