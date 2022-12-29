@@ -514,6 +514,16 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
+    def test_do(self):
+        tests = [
+            {'src': '(do (print 1) (print 2))', 'output': '12'},
+            {'src': '(do (print 1) (if (< 1 2) (print 1) (print 2)))', 'output': '11'},
+            {'src': '(print (do (print 1) (if (< 1 2) (print 1) (print 2)) "3"))', 'output': '113'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
     def test_loops(self):
         tests = [
             {'src': '(print (loop [cnt 3 acc 0] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc 1)))))', 'output': '3'},

@@ -1100,7 +1100,8 @@ def map_pairs_c(params, envs):
 def print_c(params, envs):
     result = compile_form(params[0], envs=envs)
     param_name = result['code']
-    name = _get_generated_name('print_', envs=envs)
+    name = _get_generated_name('print_result', envs=envs)
+    envs[-1]['temps'].add(name)
     envs[-1]['pre'].append(f'  Value {name} = print({param_name});')
     # c_code = f'  Value r = {param};\n'
     # c_code = f'Value p = print(r);'
@@ -1313,9 +1314,11 @@ def compile_form(node, envs):
                 envs.append(local_env)
                 do_exprs = [compile_form(n, envs=envs) for n in rest]
 
-                f_code = '\n'.join(local_env['pre'])
-                for d in do_exprs[:-1]:
-                    f_code += f'\n  {d["code"]};'
+                f_code = ''
+                if local_env['pre']:
+                    f_code += '\n'.join(local_env['pre'])
+                # for d in do_exprs[:-1]:
+                #     f_code += f'\n  {d["code"]};'
                 if isinstance(do_exprs[-1], tuple) and isinstance(do_exprs[-1][0], Symbol) and do_exprs[-1][0].name == 'recur':
                     for e in envs:
                         for b in e.get('bindings', {}).keys():
@@ -1326,13 +1329,18 @@ def compile_form(node, envs):
                     f_code += f'\n  return {recur_name};'
                 else:
                     f_code += f'\n  Value result = {do_exprs[-1]["code"]};'
+                    f_code += '\n  if (IS_OBJ(result)) {\n    inc_ref(AS_OBJ(result));\n  }'
                     f_code += '\n' + '\n'.join(local_env['post'])
                     f_code += '\n  return result;'
 
                 f_name = _get_generated_name('do_f', envs)
                 envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, do_params, f_code)
                 envs.pop()
-                return {'code': f'{f_name}({do_args})'}
+                do_result = _get_generated_name('do_result', envs=envs)
+                envs[-1]['temps'].add(do_result)
+                envs[-1]['pre'].append(f'  Value {do_result} = {f_name}({do_args});')
+                envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (do_result, do_result))
+                return {'code': do_result}
             elif first.name == 'recur':
                 params = [compile_form(r, envs=envs) for r in rest]
                 return (first, *params)
