@@ -766,9 +766,13 @@ def if_form_c(params, envs):
     envs.append(local_env)
 
     test_code = compile_form(params[0], envs=envs)['code']
+    true_env = {'pre': [], 'post': [], 'bindings': {}}
+    envs.append(true_env)
     true_result = compile_form(params[1], envs=envs)
 
-    true_code = '\n  if (AS_BOOL(%s)) {' % test_code
+    true_code = '  if (AS_BOOL(%s)) {\n' % test_code
+    if true_env['pre']:
+        true_code += '\n'.join(true_env['pre'])
     if isinstance(true_result, tuple) and isinstance(true_result[0], Symbol) and true_result[0].name == 'recur':
         for e in envs:
             for b in e.get('bindings', {}).keys():
@@ -780,11 +784,16 @@ def if_form_c(params, envs):
         true_code += '\n  }\n'
     else:
         true_code += '\n    return ' + true_result['code'] + ';\n  }\n'
+    envs.pop()
 
     false_code = ''
     if len(params) > 2:
-        false_code += '  else {'
+        false_env = {'pre': [], 'post': [], 'bindings': {}}
+        envs.append(false_env)
+        false_code += '  else {\n'
         false_result = compile_form(params[2], envs=envs)
+        if false_env['pre']:
+            false_code += '\n'.join(false_env['pre'])
         if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
             for e in envs:
                 for b in e.get('bindings', {}).keys():
@@ -796,6 +805,7 @@ def if_form_c(params, envs):
             false_code += '\n  }'
         else:
             false_code += '\n    return %s;\n  }' % false_result['code']
+        envs.pop()
     else:
         false_code += '\n  else {\n    return NIL_VAL;\n  }'
 
@@ -2117,10 +2127,12 @@ def _compile(source):
     }
     for f in ast.forms:
         result = compile_form(f, envs=[env])
-        # c = result['code']
-        # if c and not c.endswith(';'):
-        #     c = f'{c};'
-        # compiled_forms.append(c)
+        c = result['code']
+        # hack to check if there's a function call we need to put in
+        if c and '(' in c and ')' in c:
+            if not c.endswith(';'):
+                c = f'{c};'
+            compiled_forms.append(f'  {c}')
 
     c_code = '\n'.join([f'#include {i}' for i in c_includes])
     c_code += '\n\n'
