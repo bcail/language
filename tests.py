@@ -423,7 +423,7 @@ class CompileTests(unittest.TestCase):
         tests = [
             {'src': '(print [])', 'output': '[]'},
             {'src': '(print [1])', 'output': '[1]'},
-            {'src': '(print [1 nil "hello" 2.34 true])', 'output': '[1 nil hello 2.34 true]'},
+            {'src': '(print [1 nil "hello" 2.34 true [1] {"a" 1}])', 'output': '[1 nil hello 2.34 true [1] {a 1}]'},
             {'src': '(print (nth [1 2] 0))', 'output': '1'},
             {'src': '(print (nth ["1" 2] 0))', 'output': '1'},
             {'src': '(print (nth [1 (+ 1 1)] 1))', 'output': '2'},
@@ -446,6 +446,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print {})', 'output': '{}'},
             {'src': '(print {"a" 1})', 'output': '{a 1}'},
             {'src': '(print {"a" 1 "b" 2})', 'output': '{a 1, b 2}'},
+            {'src': '(print {"a" [1] "b" [2]})', 'output': '{a [1], b [2]}'},
             {'src': '(print (keys {"a" 2 "b" 3}))', 'output': '[a b]'},
             {'src': '(print (vals {"a" 2 "b" 3}))', 'output': '[2 3]'},
             {'src': '(print (pairs {"a" 2 "b" 3}))', 'output': '[[a 2] [b 3]]'},
