@@ -952,7 +952,11 @@ def loop_c(params, envs):
     f_code += '\n  bool continueFlag = false;'
     f_code += '\n  do {\n'
     for form in body:
+        form_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+        envs.append(form_env)
         compiled = compile_form(form, envs=envs)
+        if form_env['pre']:
+            f_code += '\n'.join(form_env['pre'])
         f_code += f'\n  Value result = {compiled["code"]};'
         f_code +=  '\n  if (IS_RECUR(result)) {'
         f_code += f'\n    /* grab values from result and update  */'
@@ -962,6 +966,7 @@ def loop_c(params, envs):
         f_code += f'\n    recur_free(&{recur_name}_1);'
         f_code +=  '\n  }\n  else {'
         f_code +=  '\n    return result;\n  }'
+        envs.pop()
     f_code += '\n  } while (continueFlag);'
     f_code += '\n  return NIL_VAL;'
 
