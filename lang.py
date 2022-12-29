@@ -766,13 +766,14 @@ def if_form_c(params, envs):
     envs.append(local_env)
 
     test_code = compile_form(params[0], envs=envs)['code']
-    true_env = {'pre': [], 'post': [], 'bindings': {}}
+    true_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(true_env)
     true_result = compile_form(params[1], envs=envs)
 
     true_code = '  if (AS_BOOL(%s)) {\n' % test_code
     if true_env['pre']:
         true_code += '\n'.join(true_env['pre'])
+    true_return_val = ''
     if isinstance(true_result, tuple) and isinstance(true_result[0], Symbol) and true_result[0].name == 'recur':
         for e in envs:
             for b in e.get('bindings', {}).keys():
@@ -780,20 +781,25 @@ def if_form_c(params, envs):
                     recur_name = b
         for r in true_result[1:]:
             true_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
-        true_code += f'\n  return {recur_name};'
-        true_code += '\n  }\n'
+        true_return_val = recur_name
     else:
-        true_code += '\n    return ' + true_result['code'] + ';\n  }\n'
+        true_return_val = true_result['code']
+        true_code += '\n  if (IS_OBJ(%s)) {\n  inc_ref(AS_OBJ(%s));\n  }\n' % (true_return_val, true_return_val)
+    if true_env['post']:
+        true_code += '\n'.join(true_env['post'])
+    true_code += '\n  return %s;' % true_return_val
+    true_code += '\n  }\n'
     envs.pop()
 
     false_code = ''
     if len(params) > 2:
-        false_env = {'pre': [], 'post': [], 'bindings': {}}
+        false_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
         envs.append(false_env)
         false_code += '  else {\n'
         false_result = compile_form(params[2], envs=envs)
         if false_env['pre']:
             false_code += '\n'.join(false_env['pre'])
+        false_return_val = ''
         if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
             for e in envs:
                 for b in e.get('bindings', {}).keys():
@@ -801,10 +807,15 @@ def if_form_c(params, envs):
                         recur_name = b
             for r in false_result[1:]:
                 false_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
-            false_code += f'\n  return {recur_name};'
-            false_code += '\n  }'
+            false_return_val = recur_name
         else:
-            false_code += '\n    return %s;\n  }' % false_result['code']
+            false_return_val = false_result['code']
+            false_code += '\n  if (IS_OBJ(%s)) {\n  inc_ref(AS_OBJ(%s));\n  }\n' % (false_return_val, false_return_val)
+
+        if false_env['post']:
+            false_code += '\n'.join(false_env['post'])
+        false_code += '\n    return %s;' % false_return_val
+        false_code += '\n  }'
         envs.pop()
     else:
         false_code += '\n  else {\n    return NIL_VAL;\n  }'
@@ -833,9 +844,13 @@ def if_form_c(params, envs):
     f_name = _get_generated_name(base='if_form', envs=envs)
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, f_params, f_code)
 
-    envs.pop()
+    result_name = _get_generated_name('if_form_result', envs=envs)
 
-    return {'code': f'{f_name}({f_args})'}
+    envs.pop()
+    envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({f_args});')
+    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n}' % (result_name, result_name))
+
+    return {'code': result_name}
 
 
 def let_c(params, envs):
@@ -1894,7 +1909,21 @@ Value map_set(ObjMap* map, Value key, Value value) {
     map->indices[indices_index] = entries_index;
   }
 
+  if (IS_OBJ(key)) {
+    inc_ref(AS_OBJ(key));
+  }
+  if (IS_OBJ(value)) {
+    inc_ref(AS_OBJ(value));
+  }
+
   MapEntry* entry = &(map->entries[entries_index]);
+
+  if (IS_OBJ(entry->key)) {
+    dec_ref_and_free(AS_OBJ(entry->key));
+  }
+  if (IS_OBJ(entry->value)) {
+    dec_ref_and_free(AS_OBJ(entry->value));
+  }
 
   entry->hash = AS_STRING(key)->hash;
   entry->key = key;
@@ -2090,6 +2119,15 @@ void free_object(Obj* object) {
     }
     case OBJ_MAP: {
       ObjMap* map = (ObjMap*)object;
+      for (size_t i = 0; i < map->num_entries; i++) {
+        MapEntry entry = map->entries[i];
+        if (IS_OBJ(entry.key)) {
+          dec_ref_and_free(AS_OBJ(entry.key));
+        }
+        if (IS_OBJ(entry.value)) {
+          dec_ref_and_free(AS_OBJ(entry.value));
+        }
+      }
       FREE_ARRAY(int32_t, map->indices);
       FREE_ARRAY(MapEntry, map->entries);
       FREE(ObjMap, object);

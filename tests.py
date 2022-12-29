@@ -503,6 +503,11 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (if true true false))', 'output': 'true'},
             {'src': '(print (if false true))', 'output': 'nil'},
             {'src': '(print (if false true false))', 'output': 'false'},
+            {'src': '(print (if false true "False"))', 'output': 'False'},
+            {'src': '(print (if true ["True"] false))', 'output': '[True]'},
+            {'src': '(print (if true {"True" "1"} false))', 'output': '{True 1}'},
+            {'src': '(print (if false true ["False"]))', 'output': '[False]'},
+            {'src': '(print (if false true {"False" "1"}))', 'output': '{False 1}'},
         ]
         for test in tests:
             with self.subTest(test=test):
