@@ -519,6 +519,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(do (print 1) (print 2))', 'output': '12'},
             {'src': '(do (print 1) (if (< 1 2) (print 1) (print 2)))', 'output': '11'},
             {'src': '(print (do (print 1) (if (< 1 2) (print 1) (print 2)) "3"))', 'output': '113'},
+            {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
+            {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -529,6 +531,9 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (let [y 1] y))', 'output': '1'},
             {'src': '(print (let [y 1] [y]))', 'output': '[1]'},
             {'src': '(print (let [y 1] {"a" y}))', 'output': '{a 1}'},
+            {'src': '(let [x 1] (print x))', 'output': '1'},
+            {'src': '(let [x {}] (print x))', 'output': '{}'},
+            {'src': '(let [x-y {}] (print x-y))', 'output': '{}'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -549,22 +554,31 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
-    def test_advanced(self):
+    def test_fn(self):
         tests = [
-            {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
-            {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
+            {'src': '(print ((fn [x] x) 1))', 'output': '1'},
+            {'src': '(print ((fn [x y] (+ x y)) 1 2))', 'output': '3'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
+    def test_def(self):
+        tests = [
             {'src': '(def a 1) (print a)', 'output': '1'},
             {'src': '(def some-thing 1) (print some-thing)', 'output': '1'},
+            {'src': '(def some-thing {"a" "b"}) (print some-thing)', 'output': '1'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
+    def test_advanced(self):
+        tests = [
             {'src': '(def a 1) (let [b 2] (print (+ a b)))', 'output': '3'},
-            {'src': '(print (let [x 1] x))', 'output': '1'},
-            {'src': '(let [x 1] (print x))', 'output': '1'},
-            {'src': '(let [x {}] (print x))', 'output': '{}'},
-            {'src': '(let [x-y {}] (print x-y))', 'output': '{}'},
             {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},
             {'src': '(let [x-y 1] (loop [n-p 0] (if (= n-p 1) (print x-y) (recur (+ n-p 1)))))', 'output': '1'},
             {'src': '(let [a 1] (let [b 2] (print (+ a b))))', 'output': '3'},
-            {'src': '(print ((fn [x] x) 1))', 'output': '1'},
-            {'src': '(print ((fn [x y] (+ x y)) 1 2))', 'output': '3'},
             {'src': '(def d {}) (assoc d "a" 1) (print (get d "a"))', 'output': '1'},
             {'src': '(def i 0) (print ((fn [n] n) i))', 'output': '0'},
             {'src': '(print ((fn [n] (loop [cnt n acc 1] (if (= 0 cnt) acc (recur (- cnt 1) (* acc cnt))))) 3))', 'output': '6'},
@@ -573,7 +587,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(defn f1 [x] (+ x 1)) (let [y 1] (print (f1 y)))', 'output': '2'},
             {'src': '(defn f1 [z] (let [x 1] (loop [y 2] (if (< y 5) (recur (+ y 1)) (+ x z))))) (print (f1 3))', 'output': '4'},
             {'src': '(defn f1 [] {"key" "value"}) (print (get (f1) "key"))', 'output': 'value'},
-            ### {'src': '(defn compare [a b] (> (nth a 1) (nth b 1))) (print (sort compare [["a" 1] ["b" 2]]))', 'output': '[[b 2] [a 1]]'},
+            {'src': '(defn compare [a b] (> (nth a 1) (nth b 1))) (print (sort compare [["a" 1] ["b" 2]]))', 'output': '[[b 2] [a 1]]'},
         ]
         for test in tests:
             with self.subTest(test=test):
