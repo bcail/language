@@ -873,8 +873,6 @@ def let_c(params, envs):
             f_params += f', Value {previous_binding}'
             f_args += f', {previous_binding}'
 
-    f_code = ''
-
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
     for binding in paired_bindings:
@@ -882,11 +880,15 @@ def let_c(params, envs):
         binding_name = _get_generated_name(base=binding[0].name, envs=envs)
         result['c_name'] = binding_name
         local_env['bindings'][binding[0].name] = result
-        f_code += f'  Value {binding_name} = {result["code"]};\n'
+        local_env['pre'].append(f'  Value {binding_name} = {result["code"]};\n')
 
-    f_code = '\n'.join(local_env['pre']) + '\n' + f_code
     result = compile_form(*body, envs=envs)
 
+    f_code = ''
+    if local_env['pre']:
+        f_code += '\n'.join(local_env['pre']) + '\n'
+
+    return_val = ''
     if isinstance(result, tuple) and isinstance(result[0], Symbol) and result[0].name == 'recur':
         for e in envs:
             for b in e.get('bindings', {}).keys():
@@ -894,16 +896,27 @@ def let_c(params, envs):
                     recur_name = b
         for r in result[1:]:
             f_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
-        f_code += f'\n  return {recur_name};'
+        return_val = recur_name
     else:
-        f_code += f'  return {result["code"]};'
+        return_val = result['code']
+        f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (return_val, return_val)
+
+    if local_env['post']:
+        f_code += '\n'.join(local_env['post']) + '\n'
+
+    f_code += f'  return {return_val};'
 
     f_name = _get_generated_name(base='let', envs=envs)
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n  %s\n}' % (f_name, f_params, f_code)
 
+    result_name = _get_generated_name('let_result', envs=envs)
+
     envs.pop()
 
-    return {'code': f'{f_name}({f_args})'}
+    envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({f_args});')
+    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+
+    return {'code': result_name}
 
 
 def loop_c(params, envs):
