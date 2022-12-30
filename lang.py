@@ -1373,7 +1373,12 @@ def compile_form(node, envs):
     if isinstance(node, Symbol):
         if node.name in envs[0]['user_globals']:
             if envs[0]['user_globals'][node.name]['type'] == 'var':
-                return {'code': f'map_get(user_globals, OBJ_VAL(copyString("{node.name}", (size_t) {len(node.name)})), NIL_VAL)'}
+                name = _get_generated_name('user_global_lookup', envs=envs)
+                code = f'  Value {name} = OBJ_VAL(copyString("{node.name}", (size_t) {len(node.name)}));'
+                code += f'  inc_ref(AS_OBJ({name}));'
+                envs[-1]['pre'].append(code)
+                envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+                return {'code': f'map_get(user_globals, {name}, NIL_VAL)'}
             else:
                 return {'code': envs[0]['user_globals'][node.name]['c_name']}
         else:
@@ -2209,11 +2214,12 @@ def _compile(source):
     c_code += '\n\n' + '\n\n'.join([f for f in env['functions'].values()])
     c_code += '\n\nint main(void)\n{'
     c_code += '\n  ObjMap* user_globals = allocate_map();\n'
-    c_code += '\n' + '\n'.join(env['pre'])
 
     for name, value in env['user_globals'].items():
         if value['type'] == 'var':
-            c_code += f'  map_set(user_globals, OBJ_VAL(copyString("{name}", (size_t) {len(name)})), {value["code"]});\n'
+            c_code += f'\n  map_set(user_globals, OBJ_VAL(copyString("{name}", (size_t) {len(name)})), {value["code"]});\n'
+
+    c_code += '\n' + '\n'.join(env['pre'])
 
     if compiled_forms:
         c_code += '\n' + '\n'.join(compiled_forms)
