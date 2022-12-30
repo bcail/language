@@ -992,9 +992,14 @@ def loop_c(params, envs):
     f_name = _get_generated_name(base='loop', envs=envs)
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, c_loop_params_str, f_code)
 
+    result_name = _get_generated_name('loop_result', envs=envs)
+
     envs.pop()
 
-    return {'code': f'{f_name}({c_initial_args})'}
+    envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({c_initial_args});')
+    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+
+    return {'code': result_name}
 
 
 def str_c(params, envs):
@@ -1116,16 +1121,16 @@ def print_c(params, envs):
     name = _get_generated_name('print_result', envs=envs)
     envs[-1]['temps'].add(name)
     envs[-1]['pre'].append(f'  Value {name} = print({param_name});')
-    # c_code = f'  Value r = {param};\n'
-    # c_code = f'Value p = print(r);'
     return {'code': name}
 
 
 def println_c(params, envs):
     result = compile_form(params[0], envs=envs)
-    param = result['code']
-    c_code = f'println({param})'
-    return {'code': c_code}
+    param_name = result['code']
+    name = _get_generated_name('println_result', envs=envs)
+    envs[-1]['temps'].add(name)
+    envs[-1]['pre'].append(f'  Value {name} = println({param_name});')
+    return {'code': name}
 
 
 def fn_c(params, envs):
