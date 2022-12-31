@@ -755,9 +755,14 @@ def less_equal_c(params, envs):
 
 def def_c(params, envs):
     name = params[0].name
+    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+    envs.append(local_env)
+    result = compile_form(params[1], envs=envs)
     c_name = _get_generated_name(base=f'u_{name}', envs=envs)
-    value = compile_form(params[1], envs=envs)['code']
-    envs[0]['user_globals'][name] = {'type': 'var', 'c_name': c_name, 'code': value}
+    envs[0]['user_globals'][name] = {'type': 'var', 'c_name': c_name, 'code': result['code']}
+    if local_env['pre']:
+        envs[0]['user_globals'][name]['init'] = local_env['pre']
+    envs.pop()
     return {'code': ''}
 
 
@@ -2217,6 +2222,8 @@ def _compile(source):
 
     for name, value in env['user_globals'].items():
         if value['type'] == 'var':
+            if value.get('init'):
+                c_code += '\n'.join(value['init'])
             c_code += f'\n  map_set(user_globals, OBJ_VAL(copyString("{name}", (size_t) {len(name)})), {value["code"]});\n'
 
     c_code += '\n' + '\n'.join(env['pre'])
