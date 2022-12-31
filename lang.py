@@ -1149,7 +1149,10 @@ def fn_c(params, envs):
 
     result = compile_form(*body, envs=envs)
 
-    f_code = f'  return {result["code"]};'
+    f_code = ''
+    if local_env['pre']:
+        f_code += '\n'.join(local_env['pre'])
+    f_code += f'  return {result["code"]};'
 
     f_params = ', '.join([f'Value {binding.name}' for binding in bindings])
     if f_params:
@@ -1182,9 +1185,10 @@ def defn_c(params, envs):
 
     result = compile_form(*body, envs=envs)
     f_code = '\n'.join(local_env['pre'])
-    f_code += f'  Value result = {result["code"]};'
+    f_code += f'\n  Value result = {result["code"]};'
+    f_code += '\n  if (IS_OBJ(result)) {\n    inc_ref(AS_OBJ(result));\n  }'
     f_code += '\n' + '\n'.join(local_env['post'])
-    f_code += '  return result;'
+    f_code += '\n  return result;'
 
     c_name = _get_generated_name(base=f'u_{name}', envs=envs)
     envs[0]['user_globals'][name] = {'type': 'function', 'c_name': c_name}
@@ -1317,7 +1321,10 @@ def compile_form(node, envs):
                 args = 'user_globals'
                 if results:
                     args += ', ' + ', '.join([r['code'] for r in results])
-                return {'code': f'{f_name}({args})'}
+                result_name = _get_generated_name('u_f_result', envs=envs)
+                envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({args});')
+                envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+                return {'code': result_name}
             elif first.name == 'do':
                 env_vars = []
                 for env in envs[::-1]:
@@ -1379,6 +1386,7 @@ def compile_form(node, envs):
         if node.name in envs[0]['user_globals']:
             if envs[0]['user_globals'][node.name]['type'] == 'var':
                 name = _get_generated_name('user_global_lookup', envs=envs)
+                envs[0]['temps'].add(name)
                 code = f'  Value {name} = OBJ_VAL(copyString("{node.name}", (size_t) {len(node.name)}));'
                 code += f'  inc_ref(AS_OBJ({name}));'
                 envs[-1]['pre'].append(code)
