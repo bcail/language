@@ -950,23 +950,33 @@ def loop_c(params, envs):
     local_env['pre'].append(f'  Value {recur_name} = OBJ_VAL(&{recur_name}_1);')
     local_env['bindings'][recur_name] = None
 
+    f_code = '\n'.join(local_env['pre'])
+
+    loop_post = []
+
     for index, loop_param in enumerate(loop_params):
+        param_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+        envs.append(param_env)
         c_name = _get_generated_name(base=loop_param.name, envs=envs)
+        result = compile_form(initial_args[index], envs=envs)
         local_env['bindings'][loop_param.name] = {
-            'code': compile_form(initial_args[index], envs=envs)['code'],
+            'code': result['code'],
             'c_name': c_name,
         }
+        if param_env['pre']:
+            f_code += '\n' + '\n'.join(param_env['pre'])
+        if param_env['post']:
+            loop_post.extend(param_env['post'])
+        f_code += f'\n Value {c_name} = {result["code"]};'
+        envs.pop()
 
     c_loop_params = [f'Value {pb}' for pb in previous_bindings]
-    for lp in loop_params:
-        c_loop_params.append(f'Value {local_env["bindings"][lp.name]["c_name"]}')
     c_loop_params_str = ', '.join(c_loop_params)
     if c_loop_params_str:
         c_loop_params_str = f'ObjMap* user_globals, {c_loop_params_str}'
     else:
         c_loop_params_str = 'ObjMap* user_globals'
 
-    f_code = '\n'.join(local_env['pre'])
     f_code += '\n  bool continueFlag = false;'
     f_code += '\n  do {\n'
     for form in body:
@@ -982,13 +992,15 @@ def loop_c(params, envs):
             f_code += f'\n      {loop_param_value["c_name"]} = recur_get(result, NUMBER_VAL({index}));'
         f_code += f'\n    continueFlag = true;'
         f_code += f'\n    recur_free(&{recur_name}_1);'
-        f_code +=  '\n  }\n  else {'
+        f_code +=  '\n  }\n  else {\n'
+        if loop_post:
+            f_code += '\n'.join(loop_post)
         f_code +=  '\n    return result;\n  }'
         envs.pop()
     f_code += '\n  } while (continueFlag);'
     f_code += '\n  return NIL_VAL;'
 
-    c_initial_args = ','.join([pb for pb in previous_bindings] + [compile_form(arg, envs=envs)['code'] for arg in initial_args])
+    c_initial_args = ','.join([pb for pb in previous_bindings])
     if c_initial_args:
         c_initial_args = f'user_globals, {c_initial_args}'
     else:
