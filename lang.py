@@ -1081,16 +1081,9 @@ def map_assoc_c(params, envs):
     m = compile_form(params[0], envs=envs)['code']
     key = compile_form(params[1], envs=envs)['code']
     value = compile_form(params[2], envs=envs)['code']
-    return {'code': f'  map_set(AS_MAP({m}), {key}, {value})'}
-
-
-    result = compile_form(params[0], envs=envs)
-    param_name = result['code']
-    name = _get_generated_name('str_split_', envs=envs)
-    envs[-1]['pre'].append(f'  Value {name} = str_split({param_name});')
-    envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
-    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
-    return {'code': name}
+    result_name = _get_generated_name('map_assoc', envs=envs)
+    envs[-1]['pre'].append(f'  Value {result_name} = map_set(AS_MAP({m}), {key}, {value});')
+    return {'code': result_name}
 
 
 def map_keys_c(params, envs):
@@ -1200,7 +1193,11 @@ def defn_c(params, envs):
 
 
 def readline_c(params, envs):
-    return {'code': 'readline()'}
+    result_name = _get_generated_name('readline_result', envs=envs)
+    envs[-1]['pre'].append(f'  Value {result_name} = readline();')
+    envs[-1]['pre'].append('  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (result_name, result_name))
+    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+    return {'code': result_name}
 
 
 global_compile_env = {
