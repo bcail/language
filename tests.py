@@ -502,6 +502,7 @@ class CompileTests(unittest.TestCase):
         tests = [
             {'src': '(print (if true true))', 'output': 'true'},
             {'src': '(print (if true true false))', 'output': 'true'},
+            {'src': '(print (if true "True" false))', 'output': 'True'},
             {'src': '(print (if false true))', 'output': 'nil'},
             {'src': '(print (if false true false))', 'output': 'false'},
             {'src': '(print (if false true "False"))', 'output': 'False'},
@@ -521,6 +522,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (do (print 1) (if (< 1 2) (print 1) (print 2)) "3"))', 'output': '113'},
             {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
             {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
+            {'src': '(print (do (println "output") "return"))', 'output': 'output\nreturn'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -590,6 +592,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(defn compare [a b] (> (nth a 1) (nth b 1))) (print (sort compare [["a" 1] ["b" 2]]))', 'output': '[[b 2] [a 1]]'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) "done" (recur (read-line)))))', 'input': 'line', 'output': 'done'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) ["done"] (recur (read-line)))))', 'input': 'line', 'output': '[done]'},
+            {'src': '(print (loop [line (read-line)] (if (= nil line) {"a" "b"} (recur (read-line)))))', 'input': 'line', 'output': '{a b}'},
+            {'src': '(print (loop [line (read-line)] (if (= nil line) "done" (do (print line) (recur (read-line))))))', 'input': 'line1\nline2\n', 'output': 'line1line2done'},
         ]
         for test in tests:
             with self.subTest(test=test):

@@ -789,10 +789,10 @@ def if_form_c(params, envs):
         true_return_val = recur_name
     else:
         true_return_val = true_result['code']
-        true_code += '\n  if (IS_OBJ(%s)) {\n  inc_ref(AS_OBJ(%s));\n  }\n' % (true_return_val, true_return_val)
+        true_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (true_return_val, true_return_val)
     if true_env['post']:
         true_code += '\n'.join(true_env['post'])
-    true_code += '\n  return %s;' % true_return_val
+    true_code += '\n    return %s;' % true_return_val
     true_code += '\n  }\n'
     envs.pop()
 
@@ -815,7 +815,7 @@ def if_form_c(params, envs):
             false_return_val = recur_name
         else:
             false_return_val = false_result['code']
-            false_code += '\n  if (IS_OBJ(%s)) {\n  inc_ref(AS_OBJ(%s));\n  }\n' % (false_return_val, false_return_val)
+            false_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (false_return_val, false_return_val)
 
         if false_env['post']:
             false_code += '\n'.join(false_env['post'])
@@ -853,7 +853,7 @@ def if_form_c(params, envs):
 
     envs.pop()
     envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({f_args});')
-    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n}' % (result_name, result_name))
+    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
 
     return {'code': result_name}
 
@@ -1014,7 +1014,7 @@ def loop_c(params, envs):
     envs.pop()
 
     envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({c_initial_args});')
-    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
 
     return {'code': result_name}
 
@@ -1131,6 +1131,7 @@ def print_c(params, envs):
     name = _get_generated_name('print_result', envs=envs)
     envs[-1]['temps'].add(name)
     envs[-1]['pre'].append(f'  Value {name} = print({param_name});')
+    # print always returns NIL_VAL, so don't need to dec_ref_and_free at the end
     return {'code': name}
 
 
@@ -1356,8 +1357,6 @@ def compile_form(node, envs):
                 f_code = ''
                 if local_env['pre']:
                     f_code += '\n'.join(local_env['pre'])
-                # for d in do_exprs[:-1]:
-                #     f_code += f'\n  {d["code"]};'
                 if isinstance(do_exprs[-1], tuple) and isinstance(do_exprs[-1][0], Symbol) and do_exprs[-1][0].name == 'recur':
                     for e in envs:
                         for b in e.get('bindings', {}).keys():
@@ -1770,6 +1769,12 @@ void recur_init(ObjRecur* recur) {
 }
 
 void recur_free(ObjRecur* recur) {
+  for (size_t i = 0; i < recur->count; i++) {
+    Value v = recur->values[i];
+    if (IS_OBJ(v)) {
+      dec_ref_and_free(AS_OBJ(v));
+    }
+  }
   FREE_ARRAY(Value, recur->values);
   recur_init(recur);
 }
@@ -1783,6 +1788,9 @@ void recur_add(ObjRecur* recur, Value item) {
 
   recur->values[recur->count] = item;
   recur->count++;
+  if (IS_OBJ(item)) {
+    inc_ref(AS_OBJ(item));
+  }
 }
 
 Value recur_get(Value recur, Value index) {
@@ -2161,6 +2169,7 @@ void free_object(Obj* object) {
       break;
     }
     case OBJ_RECUR: {
+      // freed by recur_free
       break;
     }
     case OBJ_LIST: {
