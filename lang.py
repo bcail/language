@@ -945,9 +945,9 @@ def loop_c(params, envs):
 
     recur_name = _get_generated_name('recur', envs=envs)
     local_env['temps'].add(recur_name)
-    local_env['pre'].append(f'  ObjRecur {recur_name}_1;')
+    local_env['pre'].append(f'  Recur {recur_name}_1;')
     local_env['pre'].append(f'  recur_init(&{recur_name}_1);')
-    local_env['pre'].append(f'  Value {recur_name} = OBJ_VAL(&{recur_name}_1);')
+    local_env['pre'].append(f'  Value {recur_name} = RECUR_VAL(&{recur_name}_1);')
     local_env['bindings'][recur_name] = None
 
     f_code = '\n'.join(local_env['pre'])
@@ -1208,7 +1208,6 @@ def defn_c(params, envs):
 def readline_c(params, envs):
     result_name = _get_generated_name('readline_result', envs=envs)
     envs[-1]['pre'].append(f'  Value {result_name} = readline();')
-    envs[-1]['pre'].append('  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (result_name, result_name))
     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
     return {'code': result_name}
 
@@ -1363,12 +1362,15 @@ def compile_form(node, envs):
                             if b.startswith('recur'):
                                 recur_name = b
                     for r in do_exprs[-1][1:]:
-                        f_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
+                        f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
+                    if local_env['post']:
+                        f_code += '\n' + '\n'.join(local_env['post'])
                     f_code += f'\n  return {recur_name};'
                 else:
                     f_code += f'\n  Value result = {do_exprs[-1]["code"]};'
                     f_code += '\n  if (IS_OBJ(result)) {\n    inc_ref(AS_OBJ(result));\n  }'
-                    f_code += '\n' + '\n'.join(local_env['post'])
+                    if local_env['post']:
+                        f_code += '\n' + '\n'.join(local_env['post'])
                     f_code += '\n  return result;'
 
                 f_name = _get_generated_name('do_f', envs)
@@ -1498,11 +1500,12 @@ c_types = '''
 #define NIL_VAL  ((Value){NIL, {.number = 0}})
 #define BOOL_VAL(value)  ((Value){BOOL, {.boolean = value}})
 #define NUMBER_VAL(value)  ((Value){NUMBER, {.number = value}})
+#define RECUR_VAL(value)  ((Value){RECUR, {.recur = value}})
 #define OBJ_VAL(object)   ((Value){OBJ, {.obj = (Obj*)object}})
 #define AS_BOOL(value)  ((value).data.boolean)
 #define AS_NUMBER(value)  ((value).data.number)
 #define AS_OBJ(value)  ((value).data.obj)
-#define AS_RECUR(value)       ((ObjRecur*)AS_OBJ(value))
+#define AS_RECUR(value)       ((value).data.recur)
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
 #define AS_LIST(value)       ((ObjList*)AS_OBJ(value))
@@ -1510,8 +1513,8 @@ c_types = '''
 #define IS_NIL(value)  ((value).type == NIL)
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
+#define IS_RECUR(value)  ((value).type == RECUR)
 #define IS_OBJ(value)  ((value).type == OBJ)
-#define IS_RECUR(value)  isObjType(value, OBJ_RECUR)
 #define IS_STRING(value)  isObjType(value, OBJ_STRING)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
 #define IS_MAP(value)  isObjType(value, OBJ_MAP)
@@ -1530,7 +1533,6 @@ void* reallocate(void* pointer, size_t newSize) {
 }
 
 typedef enum {
-  OBJ_RECUR,
   OBJ_STRING,
   OBJ_LIST,
   OBJ_MAP,
@@ -1548,8 +1550,11 @@ typedef enum {
   NIL,
   BOOL,
   NUMBER,
+  RECUR,
   OBJ,
 } ValueType;
+
+typedef struct Recur Recur;
 
 typedef struct {
   ValueType type;
@@ -1557,6 +1562,7 @@ typedef struct {
     bool boolean;
     double number;
     Obj* obj;
+    Recur* recur;
   } data;
 } Value;
 
@@ -1571,12 +1577,11 @@ typedef struct {
   char* chars;
 } ObjString;
 
-typedef struct {
-  Obj obj;
+struct Recur {
   size_t count;
   size_t capacity;
   Value* values;
-} ObjRecur;
+};
 
 typedef struct {
   Obj obj;
@@ -1761,14 +1766,13 @@ Value list_sort(ObjMap* user_globals, Value list, Value (*compare) (ObjMap*, Val
   return OBJ_VAL(lst);
 }
 
-void recur_init(ObjRecur* recur) {
-  recur->obj = (Obj){.type = OBJ_RECUR};
+void recur_init(Recur* recur) {
   recur->count = 0;
   recur->capacity = 0;
   recur->values = NULL;
 }
 
-void recur_free(ObjRecur* recur) {
+void recur_free(Recur* recur) {
   for (size_t i = 0; i < recur->count; i++) {
     Value v = recur->values[i];
     if (IS_OBJ(v)) {
@@ -1779,7 +1783,7 @@ void recur_free(ObjRecur* recur) {
   recur_init(recur);
 }
 
-void recur_add(ObjRecur* recur, Value item) {
+void recur_add(Recur* recur, Value item) {
   if (recur->capacity < recur->count + 1) {
     size_t oldCapacity = recur->capacity;
     recur->capacity = GROW_CAPACITY(oldCapacity);
@@ -2112,7 +2116,9 @@ Value readline(void) {
   if ((ch == EOF) && (num_chars == 0)) {
     return NIL_VAL;
   }
-  return OBJ_VAL(copyString(buffer, (size_t) num_chars));
+  Value result = OBJ_VAL(copyString(buffer, (size_t) num_chars));
+  inc_ref(AS_OBJ(result));
+  return result;
 }
 
 Value str_lower(Value string) {
@@ -2166,10 +2172,6 @@ void free_object(Obj* object) {
       ObjString* string = (ObjString*)object;
       FREE_ARRAY(char, string->chars);
       FREE(ObjString, object);
-      break;
-    }
-    case OBJ_RECUR: {
-      // freed by recur_free
       break;
     }
     case OBJ_LIST: {
