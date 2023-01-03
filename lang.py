@@ -967,7 +967,8 @@ def loop_c(params, envs):
             f_code += '\n' + '\n'.join(param_env['pre'])
         if param_env['post']:
             loop_post.extend(param_env['post'])
-        f_code += f'\n Value {c_name} = {result["code"]};'
+        f_code += f'\n  Value {c_name} = {result["code"]};'
+        f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (c_name, c_name)
         envs.pop()
 
     c_loop_params = [f'Value {pb}' for pb in previous_bindings]
@@ -989,12 +990,17 @@ def loop_c(params, envs):
         f_code +=  '\n  if (IS_RECUR(result)) {'
         f_code += f'\n    /* grab values from result and update  */'
         for index, loop_param_value in enumerate(list(local_env['bindings'].values())[1:]):
-            f_code += f'\n      {loop_param_value["c_name"]} = recur_get(result, NUMBER_VAL({index}));'
+            c_name = loop_param_value['c_name']
+            f_code += '\n    if (IS_OBJ(%s)) {\n      dec_ref_and_free(AS_OBJ(%s));\n    }' % (c_name, c_name)
+            f_code += f'\n    {c_name} = recur_get(result, NUMBER_VAL({index}));'
+            f_code += '\n    if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (c_name, c_name)
         f_code += f'\n    continueFlag = true;'
         f_code += f'\n    recur_free(&{recur_name}_1);'
         f_code +=  '\n  }\n  else {\n'
         if loop_post:
             f_code += '\n'.join(loop_post)
+        f_code += '\n  if (IS_OBJ(result)) {\n    inc_ref(AS_OBJ(result));\n  }'
+        f_code += f'\n    recur_free(&{recur_name}_1);'
         f_code +=  '\n    return result;\n  }'
         envs.pop()
     f_code += '\n  } while (continueFlag);'
