@@ -456,9 +456,16 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (assoc {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8} "9" 9))',
                 'output': '{1 1, 2 2, 3 3, 4 4, 5 5, 6 6, 7 7, 8 8, 9 9}'},
             {'src': '(print (get {} "a"))', 'output': 'nil'},
+            {'src': '(print (get {} "a" 99))', 'output': '99'},
             {'src': '(print (get {"a" 1} "a"))', 'output': '1'},
             {'src': '(print (get {"a" 1} "b"))', 'output': 'nil'},
             {'src': '(print (get {"a" 1} "b" 99))', 'output': '99'},
+            {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5} "1"))', 'output': '1'},
+            {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6} "1"))', 'output': '1'},
+            {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7} "1"))', 'output': '1'},
+            {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8} "1"))', 'output': '1'},
+            {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8 "9" 9} "1"))', 'output': '1'},
+            {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8 "9" 9} "a"))', 'output': 'nil'},
         ]
         for test in tests:
             with self.subTest(test=test):

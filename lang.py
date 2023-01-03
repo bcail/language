@@ -1933,6 +1933,27 @@ static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t ca
   }
 }
 
+static int32_t find_indices_index_for_get(int32_t* indices, MapEntry* entries, size_t capacity, Value key) {
+  /* This is for retrieving an element from a Map.
+   * hash the key and get an index
+   * - if indices[index] is empty, return it (the element doesn't exist).
+   * - if indices[index] points to an entry in entries whose key equals the input key, return index
+   * Otherwise, keep adding one till we get to the correct key or an empty slot. */
+
+  ObjString* keyString = AS_STRING(key);
+  uint32_t index = keyString->hash % (uint32_t) capacity;
+  for (;;) {
+    if (indices[index] == MAP_EMPTY) {
+      return (int32_t) index;
+    }
+    if (AS_BOOL(equal(entries[indices[index]].key, key))) {
+      return (int32_t) index;
+    }
+
+    index = (index + 1) % (uint32_t)capacity;
+  }
+}
+
 static void adjustCapacity(ObjMap* map, size_t capacity) {
   // allocate new space
   int32_t* indices = ALLOCATE(int32_t, capacity);
@@ -2012,7 +2033,7 @@ Value map_get(ObjMap* map, Value key, Value defaultVal) {
     return defaultVal;
   }
 
-  int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
+  int32_t indices_index = find_indices_index_for_get(map->indices, map->entries, map->indices_capacity, key);
   int32_t entries_index = map->indices[indices_index];
 
   bool isNewKey = (entries_index == MAP_EMPTY);
