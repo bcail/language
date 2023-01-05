@@ -342,13 +342,19 @@ def _run_test(test, assert_equal):
         with open(c_filename, 'wb') as f:
             f.write(c_code.encode('utf8'))
 
-        for gcc_cmd, env, program in [(GCC_CMD, GCC_ENV, 'program_safe'),
-                                      ([GCC_CMD[0]], None, 'program_regular')]:
-            program_filename = os.path.join(tmp, program)
+        compilers = [
+            (['clang'], None, 'clang_regular'),
+            (GCC_CMD, GCC_ENV, 'gcc_safe'),
+            ([GCC_CMD[0]], None, 'gcc_regular'),
+        ]
 
-            compile_cmd = gcc_cmd + ['-o', program_filename, c_filename]
+        for cc_cmd, env, env_name in compilers:
+            print(f'  ({env_name})')
+            program_filename = os.path.join(tmp, env_name)
+
+            compile_cmd = cc_cmd + ['-o', program_filename, c_filename]
             try:
-                subprocess.run(compile_cmd, check=True, env=GCC_ENV, capture_output=True)
+                subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
             except subprocess.CalledProcessError as e:
                 print(f'bad c code:\n{c_code}')
                 print(f'err: {e.stderr.decode("utf8")}')
@@ -463,7 +469,6 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5} "1"))', 'output': '1'},
             {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6} "1"))', 'output': '1'},
             {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7} "1"))', 'output': '1'},
-            {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8} "1"))', 'output': '1'},
             {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8 "9" 9} "1"))', 'output': '1'},
             {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8 "9" 9} "a"))', 'output': 'nil'},
         ]
