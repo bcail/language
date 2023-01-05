@@ -1482,6 +1482,7 @@ c_includes = [
     '<stdlib.h>',
     '<stdbool.h>',
     '<string.h>',
+    '<math.h>',
 ]
 
 
@@ -1843,7 +1844,10 @@ Value equal(Value x, Value y) {
     return BOOL_VAL(AS_BOOL(x) == AS_BOOL(y));
   }
   else if (IS_NUMBER(x)) {
-    return BOOL_VAL(AS_NUMBER(x) == AS_NUMBER(y));
+    double x_double = AS_NUMBER(x);
+    double y_double = AS_NUMBER(y);
+    double diff = fabs(x_double - y_double);
+    return BOOL_VAL(diff < 1e7);
   }
   else if (IS_STRING(x)) {
     ObjString* xString = AS_STRING(x);
@@ -2134,7 +2138,7 @@ Value println(Value value) {
 
 Value readline(void) {
   /* K&R p29 */
-  int ch;
+  int ch = 0;
   char buffer[MAX_LINE];
   int num_chars;
   for (num_chars=0; num_chars<(MAX_LINE-1) && (ch=getchar()) != EOF && ch != '\\n'; num_chars++) {
@@ -2354,6 +2358,61 @@ GCC_CMD = [
 ]
 
 GCC_ENV = {
+    'ASAN_OPTIONS': 'strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_invalid_pointer_pairs=2',
+    'PATH': os.environ.get('PATH', ''),
+}
+
+CLANG_CMD = [
+    'clang',
+    '-O2',
+    '-Werror',
+    '-Walloca',
+    '-Wcast-qual',
+    '-Wconversion',
+    '-Wformat=2',
+    '-Wformat-security',
+    '-Wnull-dereference',
+    '-Wstack-protector',
+    '-Wvla',
+    '-Warray-bounds',
+    '-Warray-bounds-pointer-arithmetic',
+    '-Wassign-enum',
+    '-Wbad-function-cast',
+    '-Wconditional-uninitialized',
+    '-Wconversion',
+    '-Wfloat-equal',
+    '-Wformat-type-confusion',
+    '-Widiomatic-parentheses',
+    '-Wimplicit-fallthrough',
+    '-Wloop-analysis',
+    '-Wpointer-arith',
+    '-Wshift-sign-overflow',
+    '-Wshorten-64-to-32',
+    '-Wswitch-enum',
+    '-Wtautological-constant-in-range-compare',
+    '-Wunreachable-code-aggressive',
+    '-Wthread-safety',
+    '-Wthread-safety-beta',
+    '-Wcomma',
+    '-D_FORTIFY_SOURCE=3',
+    '-fstack-protector-strong',
+    '-fPIE',
+    '-fstack-clash-protection',
+    '-fsanitize=bounds',
+    '-fsanitize-undefined-trap-on-error',
+    '-Wl,-z,relro',
+    '-Wl,-z,now',
+    '-Wl,-z,noexecstack',
+    '-Wl,-z,separate-code',
+    '-fsanitize=address',
+    '-fsanitize=leak',
+    '-fno-omit-frame-pointer',
+    '-fsanitize=undefined',
+    '-fsanitize=float-divide-by-zero',
+    '-fsanitize=float-cast-overflow',
+    '-fsanitize=integer',
+]
+CLANG_ENV = {
     'ASAN_OPTIONS': 'strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_invalid_pointer_pairs=2',
     'PATH': os.environ.get('PATH', ''),
 }

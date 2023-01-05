@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from lang import (TokenType, scan_tokens, parse, evaluate,
-        Keyword, Symbol, Var, Vector, run, GCC_CMD, GCC_ENV, _compile)
+        Keyword, Symbol, Var, Vector, run, GCC_CMD, GCC_ENV, CLANG_CMD, CLANG_ENV, _compile)
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
@@ -344,8 +344,9 @@ def _run_test(test, assert_equal):
 
         compilers = [
             (['clang'], None, 'clang_regular'),
-            (GCC_CMD, GCC_ENV, 'gcc_safe'),
+            (CLANG_CMD, CLANG_ENV, 'clang_checks'),
             ([GCC_CMD[0]], None, 'gcc_regular'),
+            (GCC_CMD, GCC_ENV, 'gcc_checks'),
         ]
 
         for cc_cmd, env, env_name in compilers:
