@@ -789,7 +789,8 @@ def if_form_c(params, envs):
         true_return_val = recur_name
     else:
         true_return_val = true_result['code']
-        true_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (true_return_val, true_return_val)
+        if true_return_val not in ['BOOL_VAL(true)', 'BOOL_VAL(false)']:
+            true_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (true_return_val, true_return_val)
     if true_env['post']:
         true_code += '\n'.join(true_env['post'])
     true_code += '\n    return %s;' % true_return_val
@@ -815,7 +816,8 @@ def if_form_c(params, envs):
             false_return_val = recur_name
         else:
             false_return_val = false_result['code']
-            false_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (false_return_val, false_return_val)
+            if false_return_val not in ['BOOL_VAL(true)', 'BOOL_VAL(false)']:
+                false_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (false_return_val, false_return_val)
 
         if false_env['post']:
             false_code += '\n'.join(false_env['post'])
@@ -1711,6 +1713,9 @@ void list_add(Value list_value, Value item) {
 }
 
 Value list_get(Value list, Value index) {
+  if (AS_NUMBER(index) < 0) {
+    return NIL_VAL;
+  }
   /* size_t is the unsigned integer type returned by the sizeof operator */
   size_t num_index = (size_t) AS_NUMBER(index);
   if (num_index < AS_LIST(list)->count) {
@@ -1847,7 +1852,7 @@ Value equal(Value x, Value y) {
     double x_double = AS_NUMBER(x);
     double y_double = AS_NUMBER(y);
     double diff = fabs(x_double - y_double);
-    return BOOL_VAL(diff < 1e7);
+    return BOOL_VAL(diff < 1e-7);
   }
   else if (IS_STRING(x)) {
     ObjString* xString = AS_STRING(x);

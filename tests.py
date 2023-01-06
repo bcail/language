@@ -486,6 +486,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (= nil true))', 'output': 'false'},
             {'src': '(print (= false true))', 'output': 'false'},
             {'src': '(print (= 1 1))', 'output': 'true'},
+            {'src': '(print (= 1 2))', 'output': 'false'},
             {'src': '(print (= 1 "1"))', 'output': 'false'},
             {'src': '(print (= 1 1.0))', 'output': 'true'}, #different from clojure
             {'src': '(print (= "abc" "abc"))', 'output': 'true'},
