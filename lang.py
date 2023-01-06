@@ -1630,19 +1630,16 @@ typedef struct {
   MapEntry* entries;
 } ObjMap;
 
-// Obj* gc_objects = NULL;
-
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, size);
   object->type = type;
   object->ref_cnt = 0;
-  // object->next = (Obj*) gc_objects;
-  // gc_objects = object;
   return object;
 }
 
 void free_object(Obj* object);
 
+// http://www.toccata.io/2019/02/RefCounting.html
 void inc_ref(Obj* object) {
   object->ref_cnt++;
 }
@@ -2245,15 +2242,6 @@ void free_object(Obj* object) {
     }
   }
 }
-
-/* void free_objects(void) {
-  Obj* object = gc_objects;
-  while (object != NULL) {
-    Obj* next = (Obj*) object->next;
-    free_object(object);
-    object = next;
-  }
-} */
     '''
 
 
