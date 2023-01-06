@@ -583,6 +583,7 @@ class CompileTests(unittest.TestCase):
         tests = [
             {'src': '(def a 1) (print a)', 'output': '1'},
             {'src': '(def some-thing 1) (print some-thing)', 'output': '1'},
+            {'src': '(def some-thing "1") (print some-thing)', 'output': '1'},
             {'src': '(def some-thing {"a" "b"}) (print some-thing)', 'output': '{a b}'},
         ]
         for test in tests:

@@ -762,6 +762,8 @@ def def_c(params, envs):
     envs[0]['user_globals'][name] = {'type': 'var', 'c_name': c_name, 'code': result['code']}
     if local_env['pre']:
         envs[0]['user_globals'][name]['init'] = local_env['pre']
+    if local_env['post']:
+        envs[0]['post'].extend(local_env['post'])
     envs.pop()
     return {'code': ''}
 
@@ -1406,7 +1408,7 @@ def compile_form(node, envs):
                 name = _get_generated_name('user_global_lookup', envs=envs)
                 envs[0]['temps'].add(name)
                 code = f'  Value {name} = OBJ_VAL(copyString("{node.name}", (size_t) {len(node.name)}));'
-                code += f'  inc_ref(AS_OBJ({name}));'
+                code += f'\n  inc_ref(AS_OBJ({name}));'
                 envs[-1]['pre'].append(code)
                 envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
                 return {'code': f'map_get(user_globals, {name}, NIL_VAL)'}
