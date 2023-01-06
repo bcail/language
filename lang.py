@@ -1651,20 +1651,6 @@ void dec_ref_and_free(Obj* object) {
   }
 }
 
-static ObjString* allocateString(char* chars, size_t length) {
-  ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
-  string->length = length;
-  string->chars = chars;
-  return string;
-}
-
-ObjString* copyString(const char* chars, size_t length) {
-  char* heapChars = ALLOCATE(char, length + 1);
-  memcpy(heapChars, chars, length);
-  heapChars[length] = 0; /* terminate it w/ NULL, so we can pass c-string to functions that need it */
-  return allocateString(heapChars, length);
-}
-
 static uint32_t hashString(const char* key, size_t length) {
   uint32_t hash = 2166136261u;
   for (size_t i = 0; i < length; i++) {
@@ -1674,18 +1660,19 @@ static uint32_t hashString(const char* key, size_t length) {
   return hash;
 }
 
-void string_set(ObjString* string, const char* chars, size_t length) {
+static ObjString* allocateString(char* chars, size_t length) {
+  ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
+  string->length = length;
+  string->hash = hashString(chars, length);
+  string->chars = chars;
+  return string;
+}
+
+ObjString* copyString(const char* chars, size_t length) {
   char* heapChars = ALLOCATE(char, length + 1);
   memcpy(heapChars, chars, length);
   heapChars[length] = 0; /* terminate it w/ NULL, so we can pass c-string to functions that need it */
-  string->length = length;
-  string->hash = hashString(chars, length);
-  string->chars = heapChars;
-}
-
-void string_free(ObjString* string) {
-  FREE_ARRAY(char, string->chars);
-  /* string_init(string); */
+  return allocateString(heapChars, length);
 }
 
 ObjList* allocate_list(void) {
@@ -1904,19 +1891,6 @@ Value equal(Value x, Value y) {
   }
 }
 
-/* static MapEntry* findEntry(MapEntry* entries, size_t capacity, Value key) {
-  ObjString* keyString = AS_STRING(key);
-  uint32_t index = keyString->hash % (uint32_t) capacity;
-  for (;;) {
-    MapEntry* entry = &entries[index];
-    if (AS_BOOL(equal(entry->key, key)) || AS_BOOL(equal(entry->key, NIL_VAL))) {
-      return entry;
-    }
-
-    index = (index + 1) % (uint32_t)capacity;
-  }
-} */
-
 static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t capacity, Value key) {
   /* hash the key and get an index
    * - if indices[index] is empty, return it
@@ -1924,31 +1898,7 @@ static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t ca
    * Otherwise, keep adding one till we get to the correct key or an empty slot. */
 
   ObjString* keyString = AS_STRING(key);
-  uint32_t index = keyString->hash % (uint32_t) capacity;
-  for (;;) {
-    if (indices[index] == MAP_EMPTY) {
-      return (int32_t) index;
-    }
-    if (AS_BOOL(equal(entries[indices[index]].key, key))) {
-      return (int32_t) index;
-    }
-    // MapEntry* entry = &entries[index];
-    /* if (AS_BOOL(equal(entry->key, key)) || AS_BOOL(equal(entry->key, NIL_VAL))) {
-      return entry;
-    } */
 
-    index = (index + 1) % (uint32_t)capacity;
-  }
-}
-
-static int32_t find_indices_index_for_get(int32_t* indices, MapEntry* entries, size_t capacity, Value key) {
-  /* This is for retrieving an element from a Map.
-   * hash the key and get an index
-   * - if indices[index] is empty, return it (the element doesn't exist).
-   * - if indices[index] points to an entry in entries whose key equals the input key, return index
-   * Otherwise, keep adding one till we get to the correct key or an empty slot. */
-
-  ObjString* keyString = AS_STRING(key);
   uint32_t index = keyString->hash % (uint32_t) capacity;
   for (;;) {
     if (indices[index] == MAP_EMPTY) {
@@ -1972,7 +1922,7 @@ static void adjustCapacity(ObjMap* map, size_t capacity) {
     indices[i] = MAP_EMPTY;
   }
 
-  // copy entries over to new space
+  // copy entries over to new space, filling in indices slots as well
   size_t num_entries = map->num_entries;
   size_t entries_index = 0;
   for (; entries_index < num_entries; entries_index++) {
@@ -1982,6 +1932,7 @@ static void adjustCapacity(ObjMap* map, size_t capacity) {
     entries[entries_index] = map->entries[entries_index];
   }
 
+  // fill in remaining entries with nil values
   for (; entries_index < capacity; entries_index++) {
     entries[entries_index].hash = 0;
     entries[entries_index].key = NIL_VAL;
@@ -2041,7 +1992,7 @@ Value map_get(ObjMap* map, Value key, Value defaultVal) {
     return defaultVal;
   }
 
-  int32_t indices_index = find_indices_index_for_get(map->indices, map->entries, map->indices_capacity, key);
+  int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
   int32_t entries_index = map->indices[indices_index];
 
   bool isNewKey = (entries_index == MAP_EMPTY);
@@ -2049,8 +2000,7 @@ Value map_get(ObjMap* map, Value key, Value defaultVal) {
     return defaultVal;
   }
   else {
-    MapEntry* entry = &(map->entries[entries_index]);
-    return entry->value;
+    return map->entries[entries_index].value;
   }
 }
 
@@ -2241,8 +2191,7 @@ void free_object(Obj* object) {
       break;
     }
   }
-}
-    '''
+}'''
 
 
 def _compile(source):
@@ -2270,7 +2219,10 @@ def _compile(source):
     c_code = '\n'.join([f'#include {i}' for i in c_includes])
     c_code += '\n\n'
     c_code += c_types
-    c_code += '\n\n' + '\n\n'.join([f for f in env['functions'].values()])
+
+    if env['functions']:
+        c_code += '\n\n' + '\n\n'.join([f for f in env['functions'].values()])
+
     c_code += '\n\nint main(void)\n{'
     c_code += '\n  ObjMap* user_globals = allocate_map();\n'
 

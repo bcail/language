@@ -454,6 +454,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(print {"a" 1})', 'output': '{a 1}'},
             {'src': '(print {"a" 1 "b" 2})', 'output': '{a 1, b 2}'},
             {'src': '(print {"a" [1] "b" [2]})', 'output': '{a [1], b [2]}'},
+            {'src': '(print {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7})',
+                 'output': '{1 1, 2 2, 3 3, 4 4, 5 5, 6 6, 7 7}'},
             {'src': '(print (keys {"a" 2 "b" 3}))', 'output': '[a b]'},
             {'src': '(print (vals {"a" 2 "b" 3}))', 'output': '[2 3]'},
             {'src': '(print (pairs {"a" 2 "b" 3}))', 'output': '[[a 2] [b 3]]'},
