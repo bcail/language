@@ -3,6 +3,7 @@ import platform
 import subprocess
 import tempfile
 import unittest
+import sys
 from unittest.mock import patch
 from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector, run, _compile
 from lang import (
@@ -355,12 +356,12 @@ def _run_test(test, assert_equal):
                 ([gcc_cmd], None, 'gcc_regular'),
             ]
         elif platform.system() == 'Windows':
-            vs_dir = os.environ['VSDIR']
-            print(f'{vs_dir=}')
-            print(os.listdir(vs_dir))
-            sys.exit(0)
+            # vs_dir = os.environ['VSDIR']
+            # print(f'{vs_dir=}')
+            # print(os.listdir(vs_dir))
+            # sys.exit(0)
             compilers = [
-                ([os.environ['VSDIR']], None, 'vscc_regular'),
+                ([os.environ['VSCC']], None, 'vscc_regular'),
             ]
         else:
             compilers = [
