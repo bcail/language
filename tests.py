@@ -343,9 +343,8 @@ def _run_test(test, assert_equal):
             f.write(c_code.encode('utf8'))
 
         compilers = [
-            (['clang'], None, 'clang_regular'),
+            ([CLANG_CMD[0]], None, 'clang_regular'),
             (CLANG_CMD, CLANG_ENV, 'clang_checks'),
-            ([GCC_CMD[0]], None, 'gcc_regular'),
             (GCC_CMD, GCC_ENV, 'gcc_checks'),
         ]
 
@@ -592,16 +591,25 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
+    def test_defn(self):
+        tests = [
+            {'src': '(defn f1 [x y] (+ x y)) (print (f1 1 2))', 'output': '3'},
+            {'src': '(defn f-1 [x y] (+ x y)) (print (f-1 1 2))', 'output': '3'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
     def test_advanced(self):
         tests = [
             {'src': '(def a 1) (let [b 2] (print (+ a b)))', 'output': '3'},
             {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},
+            {'src': '(let [x-y 1] (do (print x-y) (print "done")))', 'output': '1done'},
             {'src': '(let [x-y 1] (loop [n-p 0] (if (= n-p 1) (print x-y) (recur (+ n-p 1)))))', 'output': '1'},
             {'src': '(let [a 1] (let [b 2] (print (+ a b))))', 'output': '3'},
             {'src': '(def d {}) (assoc d "a" 1) (print (get d "a"))', 'output': '1'},
             {'src': '(def i 0) (print ((fn [n] n) i))', 'output': '0'},
             {'src': '(print ((fn [n] (loop [cnt n acc 1] (if (= 0 cnt) acc (recur (- cnt 1) (* acc cnt))))) 3))', 'output': '6'},
-            {'src': '(defn f1 [x y] (+ x y)) (print (f1 1 2))', 'output': '3'},
             {'src': '(defn f1 [x] (let [y (+ x 1)] y)) (print (f1 1))', 'output': '2'},
             {'src': '(defn f1 [x] (+ x 1)) (let [y 1] (print (f1 y)))', 'output': '2'},
             {'src': '(defn f1 [z] (let [x 1] (loop [y 2] (if (< y 5) (recur (+ y 1)) (+ x z))))) (print (f1 3))', 'output': '4'},

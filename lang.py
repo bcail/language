@@ -1347,7 +1347,11 @@ def compile_form(node, envs):
             elif first.name == 'do':
                 env_vars = []
                 for env in envs[::-1]:
-                    env_vars.extend(list(env.get('bindings', {}).keys()))
+                    for key, info in env.get('bindings', {}).items():
+                        if info and 'c_name' in info:
+                            env_vars.append(info['c_name'])
+                        else:
+                            env_vars.append(key)
                 do_params = ', '.join([f'Value {v}' for v in env_vars])
                 do_args = ', '.join([v for v in env_vars])
                 if do_params:
