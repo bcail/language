@@ -2366,15 +2366,18 @@ CLANG_ENV = {
 
 
 def build_executable(file_name, output_file_name):
+    if os.path.exists(output_file_name):
+        print(f'{output_file_name} already exists')
+        sys.exit(1)
+
     if os.environ.get('CC'):
-        compiler = [os.environ['CC']]
-        env = None
+        compiler = [os.environ['CC'], '-O2']
     else:
-        compiler = GCC_CMD
-        env = GCC_ENV
+        compiler = ['clang', '-O2']
+
     compile_cmd = compiler + ['-o', output_file_name, file_name]
     try:
-        subprocess.run(compile_cmd, check=True, env=env)
+        subprocess.run(compile_cmd, check=True)
     except subprocess.CalledProcessError as e:
         if os.path.exists(file_name):
             with open(file_name, 'rb') as f:
