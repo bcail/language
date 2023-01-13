@@ -356,7 +356,7 @@ def _run_test(test, assert_equal):
             ]
         elif platform.system() == 'Windows':
             compilers = [
-                (os.environ['VSCC'], None, 'vscc_regular'),
+                ([os.environ['VSCC']], None, 'vscc_regular'),
             ]
         else:
             compilers = [
