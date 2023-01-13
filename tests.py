@@ -1,4 +1,5 @@
 import os
+import platform
 import subprocess
 import tempfile
 import unittest
@@ -347,11 +348,18 @@ def _run_test(test, assert_equal):
 
         gcc_cmd = os.environ.get('GCC', GCC_CMD)
         clang_cmd = os.environ.get('CLANG', CLANG_CMD)
-        compilers = [
-            ([clang_cmd], None, 'clang_regular'),
-            ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
-            ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
-        ]
+
+        if platform.system() == 'Darwin':
+            compilers = [
+                ([clang_cmd], None, 'clang_regular'),
+                ([gcc_cmd], None, 'gcc_regular'),
+            ]
+        else:
+            compilers = [
+                ([clang_cmd], None, 'clang_regular'),
+                ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
+                ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
+            ]
 
         for cc_cmd, env, env_name in compilers:
             print(f'  ({env_name})')
