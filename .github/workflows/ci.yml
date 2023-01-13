@@ -30,3 +30,17 @@ jobs:
           python-version: '3.11'
           architecture: x64
       - run: python tests.py
+
+  windows:
+    runs-on: windows-2022
+    name: Windows tests
+    env:
+      VSCC: C:\Program Files\Microsoft Visual Studio\2022\Enterprise\cl
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.11'
+          architecture: x64
+      - run: python tests.py

@@ -7,7 +7,7 @@ from unittest.mock import patch
 from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector, run, _compile
 from lang import (
         GCC_CMD, GCC_CHECK_OPTIONS, GCC_CHECK_ENV,
-        CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV
+        CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV,
     )
 
 
@@ -353,6 +353,10 @@ def _run_test(test, assert_equal):
             compilers = [
                 ([clang_cmd], None, 'clang_regular'),
                 ([gcc_cmd], None, 'gcc_regular'),
+            ]
+        elif platform.system() == 'Windows':
+            compilers = [
+                (os.environ['VSCC'], None, 'vscc_regular'),
             ]
         else:
             compilers = [
