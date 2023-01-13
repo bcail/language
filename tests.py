@@ -3,8 +3,11 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
-from lang import (TokenType, scan_tokens, parse, evaluate,
-        Keyword, Symbol, Var, Vector, run, GCC_CMD, GCC_ENV, CLANG_CMD, CLANG_ENV, _compile)
+from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector, run, _compile
+from lang import (
+        GCC_CMD, GCC_CHECK_OPTIONS, GCC_CHECK_ENV,
+        CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV
+    )
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
@@ -342,10 +345,12 @@ def _run_test(test, assert_equal):
         with open(c_filename, 'wb') as f:
             f.write(c_code.encode('utf8'))
 
+        gcc_cmd = os.environ.get('GCC', GCC_CMD)
+        clang_cmd = os.environ.get('CLANG', CLANG_CMD)
         compilers = [
-            ([CLANG_CMD[0]], None, 'clang_regular'),
-            (CLANG_CMD, CLANG_ENV, 'clang_checks'),
-            (GCC_CMD, GCC_ENV, 'gcc_checks'),
+            ([clang_cmd], None, 'clang_regular'),
+            ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
+            ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
         ]
 
         for cc_cmd, env, env_name in compilers:

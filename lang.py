@@ -2237,8 +2237,8 @@ def _compile(source):
 
 
 # See https://github.com/airbus-seclab/c-compiler-security
-GCC_CMD = [
-    'gcc',
+GCC_CMD = 'gcc'
+GCC_CHECK_OPTIONS = [
     '-O2',
     '-Werror',
     '-Wall',
@@ -2296,13 +2296,13 @@ GCC_CMD = [
     '-fsanitize=float-cast-overflow',
 ]
 
-GCC_ENV = {
+GCC_CHECK_ENV = {
     'ASAN_OPTIONS': 'strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_invalid_pointer_pairs=2',
     'PATH': os.environ.get('PATH', ''),
 }
 
-CLANG_CMD = [
-    'clang',
+CLANG_CMD = 'clang'
+CLANG_CHECK_OPTIONS = [
     '-O2',
     '-Werror',
     '-Walloca',
@@ -2351,7 +2351,7 @@ CLANG_CMD = [
     '-fsanitize=float-cast-overflow',
     '-fsanitize=integer',
 ]
-CLANG_ENV = {
+CLANG_CHECK_ENV = {
     'ASAN_OPTIONS': 'strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_invalid_pointer_pairs=2',
     'PATH': os.environ.get('PATH', ''),
 }
@@ -2365,7 +2365,7 @@ def build_executable(file_name, output_file_name):
     if os.environ.get('CC'):
         compiler = [os.environ['CC'], '-O2']
     else:
-        compiler = ['clang', '-O2']
+        compiler = [CLANG_CMD, '-O2']
 
     compile_cmd = compiler + ['-o', output_file_name, file_name]
     try:
