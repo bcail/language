@@ -551,6 +551,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(let [x 1] (print x))', 'output': '1'},
             {'src': '(let [x {}] (print x))', 'output': '{}'},
             {'src': '(let [x-y {}] (print x-y))', 'output': '{}'},
+            {'src': '(let [x-y {}] (let [z-a 1] (print x-y)))', 'output': '{}'},
         ]
         for test in tests:
             with self.subTest(test=test):

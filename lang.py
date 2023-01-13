@@ -768,6 +768,17 @@ def def_c(params, envs):
     return {'code': ''}
 
 
+def _get_previous_bindings(envs):
+    bindings = []
+    for e in envs[1:]:
+        for name, value in e.get('bindings', {}).items():
+            if value and 'c_name' in value:
+                bindings.append(value['c_name'])
+            else:
+                bindings.append(name)
+    return list(set(bindings))
+
+
 def if_form_c(params, envs):
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
@@ -833,16 +844,9 @@ def if_form_c(params, envs):
     f_args = 'user_globals'
     f_code = ''
 
-    bindings = []
-    for e in envs[1:]:
-        for name, value in e.get('bindings', {}).items():
-            if value and 'c_name' in value:
-                bindings.append(value['c_name'])
-            else:
-                bindings.append(name)
-    bindings = list(set(bindings))
-    if bindings:
-        for binding in bindings:
+    previous_bindings = _get_previous_bindings(envs)
+    if previous_bindings:
+        for binding in previous_bindings:
             f_params += f', Value {binding}'
             f_args += f', {binding}'
     f_code += '\n' + '\n'.join(envs[-1].get('pre', []))
@@ -873,10 +877,7 @@ def let_c(params, envs):
     f_params = 'ObjMap* user_globals'
     f_args = 'user_globals'
 
-    previous_bindings = []
-    for e in envs[1:]:
-        previous_bindings.extend(list(e.get('bindings', {}).keys()))
-    previous_bindings = list(set(previous_bindings))
+    previous_bindings = _get_previous_bindings(envs)
     if previous_bindings:
         for previous_binding in previous_bindings:
             f_params += f', Value {previous_binding}'
@@ -935,14 +936,7 @@ def loop_c(params, envs):
     loop_params = bindings.items[::2]
     initial_args = bindings.items[1::2]
 
-    previous_bindings = []
-    for e in envs[1:]:
-        for name, value in e.get('bindings', {}).items():
-            if value and 'c_name' in value:
-                previous_bindings.append(value['c_name'])
-            else:
-                previous_bindings.append(name)
-    previous_bindings = list(set(previous_bindings))
+    previous_bindings = _get_previous_bindings(envs)
 
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
@@ -1345,15 +1339,9 @@ def compile_form(node, envs):
                 envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
                 return {'code': result_name}
             elif first.name == 'do':
-                env_vars = []
-                for env in envs[::-1]:
-                    for key, info in env.get('bindings', {}).items():
-                        if info and 'c_name' in info:
-                            env_vars.append(info['c_name'])
-                        else:
-                            env_vars.append(key)
-                do_params = ', '.join([f'Value {v}' for v in env_vars])
-                do_args = ', '.join([v for v in env_vars])
+                previous_bindings = _get_previous_bindings(envs)
+                do_params = ', '.join([f'Value {v}' for v in previous_bindings])
+                do_args = ', '.join([v for v in previous_bindings])
                 if do_params:
                     do_params = f'ObjMap* user_globals, {do_params}'
                 else:
