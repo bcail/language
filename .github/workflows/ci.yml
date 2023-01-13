@@ -35,7 +35,7 @@ jobs:
     runs-on: windows-2022
     name: Windows tests
     env:
-      VSCC: C:\Program Files\Microsoft Visual Studio\2022\Enterprise\cl
+      VSDIR: C:\Program Files\Microsoft Visual Studio\2022\Enterprise
     steps:
       - uses: actions/checkout@v3
       - name: Setup python
