@@ -357,20 +357,20 @@ def _run_test(test, assert_equal):
             ]
         elif platform.system() == 'Windows':
             vs_dir = os.environ['VSDIR']
-            print(f'{vs_dir=}')
-            print(os.listdir(vs_dir))
-            print(os.listdir(os.path.join(vs_dir, 'MSBuild')))
-            print(os.listdir(os.path.join(vs_dir, 'VC')))
-            print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools')))
-            print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC')))
-            print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933')))
-            print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64')))
-            print(os.listdir(os.path.join(vs_dir, 'SDK')))
-            print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
-            sys.exit(0)
-            # compilers = [
-            #     ([os.environ['VSCC']], None, 'vscc_regular'),
-            # ]
+            # print(f'{vs_dir=}')
+            # print(os.listdir(vs_dir))
+            # print(os.listdir(os.path.join(vs_dir, 'MSBuild')))
+            # print(os.listdir(os.path.join(vs_dir, 'VC')))
+            # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools')))
+            # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC')))
+            # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933')))
+            cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64', 'cl.exe')
+            # print(os.listdir(os.path.join(vs_dir, 'SDK')))
+            # print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
+            # sys.exit(0)
+            compilers = [
+                ([cc_path], None, 'vscc_regular'),
+            ]
         else:
             compilers = [
                 ([clang_cmd], None, 'clang_regular'),
