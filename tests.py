@@ -340,6 +340,7 @@ counts'''
 
 gcc_cmd = os.environ.get('GCC', GCC_CMD)
 clang_cmd = os.environ.get('CLANG', CLANG_CMD)
+IS_WINDOWS = False
 
 if platform.system() == 'Darwin':
     compilers = [
@@ -347,6 +348,7 @@ if platform.system() == 'Darwin':
         ([gcc_cmd], None, 'gcc_regular'),
     ]
 elif platform.system() == 'Windows':
+    IS_WINDOWS = True
     vs_dir = os.environ['VSDIR']
     # print(f'{vs_dir=}')
     # print(os.listdir(vs_dir))
@@ -362,16 +364,16 @@ elif platform.system() == 'Windows':
     compilers = [
         ([cc_path], None, 'vscc_regular'),
     ]
-    compile_cmd = [cc_path, '/h']
-    try:
-        result = subprocess.run(compile_cmd, check=True, env=None, capture_output=True)
-        print(f'err: {result.stderr.decode("utf8")}')
-        print(f'out: {result.stdout.decode("utf8")}')
-        sys.exit(0)
-    except subprocess.CalledProcessError as e:
-        print(f'err: {e.stderr.decode("utf8")}')
-        print(f'out: {e.stdout.decode("utf8")}')
-        raise
+    # compile_cmd = [cc_path, '/h']
+    # try:
+    #     result = subprocess.run(compile_cmd, check=True, env=None, capture_output=True)
+    #     print(f'err: {result.stderr.decode("utf8")}')
+    #     print(f'out: {result.stdout.decode("utf8")}')
+    #     sys.exit(0)
+    # except subprocess.CalledProcessError as e:
+    #     print(f'err: {e.stderr.decode("utf8")}')
+    #     print(f'out: {e.stdout.decode("utf8")}')
+    #     raise
 else:
     compilers = [
         ([clang_cmd], None, 'clang_regular'),
@@ -393,11 +395,16 @@ def _run_test(test, assert_equal):
             print(f'  ({env_name})')
             program_filename = os.path.join(tmp, env_name)
 
-            compile_cmd = cc_cmd + ['-o', program_filename, c_filename]
+            if IS_WINDOWS:
+                compile_cmd = cc_cmd + [f'/OUT:"{program_filename}"', c_filename]
+                print(f'{compile_cmd=}')
+            else:
+                compile_cmd = cc_cmd + ['-o', program_filename, c_filename]
             try:
                 subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
             except subprocess.CalledProcessError as e:
-                print(f'bad c code:\n{c_code}')
+                if not IS_WINDOWS:
+                    print(f'bad c code:\n{c_code}')
                 print(f'err: {e.stderr.decode("utf8")}')
                 raise
 
@@ -410,7 +417,8 @@ def _run_test(test, assert_equal):
             try:
                 result = subprocess.run(program_cmd, check=True, input=input_, capture_output=True)
             except subprocess.CalledProcessError as e:
-                print(f'bad c code:\n{c_code}')
+                if not IS_WINDOWS:
+                    print(f'bad c code:\n{c_code}')
                 print(f'err: {e.stderr.decode("utf8")}')
                 print(f'out: {e.stdout.decode("utf8")}')
                 raise
@@ -418,7 +426,8 @@ def _run_test(test, assert_equal):
             try:
                 assert_equal(result.stdout.decode('utf8'), test['output'])
             except AssertionError:
-                print(f'bad c code:\n{c_code}')
+                if not IS_WINDOWS:
+                    print(f'bad c code:\n{c_code}')
                 raise
 
 
