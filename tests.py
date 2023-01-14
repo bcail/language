@@ -362,6 +362,7 @@ def _run_test(test, assert_equal):
             print(os.listdir(os.path.join(vs_dir, 'MSBuild')))
             print(os.listdir(os.path.join(vs_dir, 'VC')))
             print(os.listdir(os.path.join(vs_dir, 'SDK')))
+            print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
             sys.exit(0)
             # compilers = [
             #     ([os.environ['VSCC']], None, 'vscc_regular'),
