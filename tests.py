@@ -396,7 +396,7 @@ def _run_test(test, assert_equal):
             program_filename = os.path.join(tmp, env_name)
 
             if IS_WINDOWS:
-                compile_cmd = cc_cmd + [f'/OUT"{program_filename}"', c_filename]
+                compile_cmd = cc_cmd + [f'/Fe"{program_filename}"', c_filename]
                 print(f'{compile_cmd=}')
             else:
                 compile_cmd = cc_cmd + ['-o', program_filename, c_filename]
