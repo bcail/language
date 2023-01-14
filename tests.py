@@ -363,6 +363,8 @@ def _run_test(test, assert_equal):
             print(os.listdir(os.path.join(vs_dir, 'VC')))
             print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools')))
             print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC')))
+            print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933')))
+            print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64')))
             print(os.listdir(os.path.join(vs_dir, 'SDK')))
             print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
             sys.exit(0)
