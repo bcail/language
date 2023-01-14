@@ -338,6 +338,48 @@ counts'''
         self.assertEqual(result[3], {'the': 0})
 
 
+gcc_cmd = os.environ.get('GCC', GCC_CMD)
+clang_cmd = os.environ.get('CLANG', CLANG_CMD)
+
+if platform.system() == 'Darwin':
+    compilers = [
+        ([clang_cmd], None, 'clang_regular'),
+        ([gcc_cmd], None, 'gcc_regular'),
+    ]
+elif platform.system() == 'Windows':
+    vs_dir = os.environ['VSDIR']
+    # print(f'{vs_dir=}')
+    # print(os.listdir(vs_dir))
+    # print(os.listdir(os.path.join(vs_dir, 'MSBuild')))
+    # print(os.listdir(os.path.join(vs_dir, 'VC')))
+    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools')))
+    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC')))
+    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933')))
+    cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64', 'cl.exe')
+    # print(os.listdir(os.path.join(vs_dir, 'SDK')))
+    # print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
+    # sys.exit(0)
+    compilers = [
+        ([cc_path], None, 'vscc_regular'),
+    ]
+    compile_cmd = [cc_path, '/h']
+    try:
+        result = subprocess.run(compile_cmd, check=True, env=None, capture_output=True)
+        print(f'err: {result.stderr.decode("utf8")}')
+        print(f'out: {result.stdout.decode("utf8")}')
+        sys.exit(0)
+    except subprocess.CalledProcessError as e:
+        print(f'err: {e.stderr.decode("utf8")}')
+        print(f'out: {e.stdout.decode("utf8")}')
+        raise
+else:
+    compilers = [
+        ([clang_cmd], None, 'clang_regular'),
+        ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
+        ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
+    ]
+
+
 def _run_test(test, assert_equal):
     print(f'*** c test: {test["src"]}')
     c_code = _compile(test['src'])
@@ -346,37 +388,6 @@ def _run_test(test, assert_equal):
         c_filename = os.path.join(tmp, 'code.c')
         with open(c_filename, 'wb') as f:
             f.write(c_code.encode('utf8'))
-
-        gcc_cmd = os.environ.get('GCC', GCC_CMD)
-        clang_cmd = os.environ.get('CLANG', CLANG_CMD)
-
-        if platform.system() == 'Darwin':
-            compilers = [
-                ([clang_cmd], None, 'clang_regular'),
-                ([gcc_cmd], None, 'gcc_regular'),
-            ]
-        elif platform.system() == 'Windows':
-            vs_dir = os.environ['VSDIR']
-            # print(f'{vs_dir=}')
-            # print(os.listdir(vs_dir))
-            # print(os.listdir(os.path.join(vs_dir, 'MSBuild')))
-            # print(os.listdir(os.path.join(vs_dir, 'VC')))
-            # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools')))
-            # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC')))
-            # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933')))
-            cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64', 'cl.exe')
-            # print(os.listdir(os.path.join(vs_dir, 'SDK')))
-            # print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
-            # sys.exit(0)
-            compilers = [
-                ([cc_path], None, 'vscc_regular'),
-            ]
-        else:
-            compilers = [
-                ([clang_cmd], None, 'clang_regular'),
-                ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
-                ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
-            ]
 
         for cc_cmd, env, env_name in compilers:
             print(f'  ({env_name})')
