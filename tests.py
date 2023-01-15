@@ -360,6 +360,8 @@ elif platform.system() == 'Windows':
     print(os.listdir(os.path.join('C:', 'msys64', 'mingw64')))
     print(os.listdir(os.path.join('C:', 'msys64', 'mingw64', 'bin')))
     print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm')))
+    print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'bin')))
+    print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'x64')))
     cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64', 'cl.exe')
     # print(os.listdir(os.path.join(vs_dir, 'SDK')))
     # print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
