@@ -356,7 +356,7 @@ elif platform.system() == 'Windows':
     # print(os.listdir(os.path.join(vs_dir, 'VC')))
     # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools')))
     # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC')))
-    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933')))
+    print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64')))
     cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64', 'cl.exe')
     # print(os.listdir(os.path.join(vs_dir, 'SDK')))
     # print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
