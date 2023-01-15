@@ -356,7 +356,8 @@ elif platform.system() == 'Windows':
     # print(os.listdir(os.path.join(vs_dir, 'VC')))
     # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools')))
     # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC')))
-    print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64')))
+    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64')))
+    print(os.listdir(os.path.join('C:', 'msys64', 'mingw64', 'bin')))
     cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64', 'cl.exe')
     # print(os.listdir(os.path.join(vs_dir, 'SDK')))
     # print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
@@ -369,7 +370,7 @@ elif platform.system() == 'Windows':
     #     result = subprocess.run(compile_cmd, check=True, env=None, capture_output=True)
     #     print(f'err: {result.stderr.decode("utf8")}')
     #     print(f'out: {result.stdout.decode("utf8")}')
-    #     sys.exit(0)
+    sys.exit(0)
     # except subprocess.CalledProcessError as e:
     #     print(f'err: {e.stderr.decode("utf8")}')
     #     print(f'out: {e.stdout.decode("utf8")}')
