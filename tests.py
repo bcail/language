@@ -363,7 +363,7 @@ elif platform.system() == 'Windows':
     # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'bin')))
     # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'x64')))
     # cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64', 'cl.exe')
-    cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'bin', 'clang.exe')))
+    cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'bin', 'clang.exe')
     # print(os.listdir(os.path.join(vs_dir, 'SDK')))
     # print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
     # sys.exit(0)
