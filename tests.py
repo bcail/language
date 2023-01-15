@@ -357,24 +357,25 @@ elif platform.system() == 'Windows':
     # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools')))
     # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC')))
     # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64')))
-    print(os.listdir(os.path.join('C:', 'msys64', 'mingw64')))
-    print(os.listdir(os.path.join('C:', 'msys64', 'mingw64', 'bin')))
-    print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm')))
-    print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'bin')))
-    print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'x64')))
-    cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64', 'cl.exe')
+    # print(os.listdir(os.path.join('C:', 'msys64', 'mingw64')))
+    # print(os.listdir(os.path.join('C:', 'msys64', 'mingw64', 'bin')))
+    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm')))
+    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'bin')))
+    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'x64')))
+    # cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64', 'cl.exe')
+    cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'bin', 'clang.exe')))
     # print(os.listdir(os.path.join(vs_dir, 'SDK')))
     # print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
     # sys.exit(0)
     compilers = [
-        ([cc_path], None, 'vscc_regular'),
+        ([cc_path], None, 'clang_regular'),
     ]
     # compile_cmd = [cc_path, '/h']
     # try:
     #     result = subprocess.run(compile_cmd, check=True, env=None, capture_output=True)
     #     print(f'err: {result.stderr.decode("utf8")}')
     #     print(f'out: {result.stdout.decode("utf8")}')
-    sys.exit(0)
+    #     sys.exit(0)
     # except subprocess.CalledProcessError as e:
     #     print(f'err: {e.stderr.decode("utf8")}')
     #     print(f'out: {e.stdout.decode("utf8")}')
@@ -400,12 +401,12 @@ def _run_test(test, assert_equal):
             print(f'  ({env_name})')
             program_filename = os.path.join(tmp, env_name)
 
-            if IS_WINDOWS:
-                # compile_cmd = cc_cmd + [f'/Fe"{program_filename}"', c_filename]
-                compile_cmd = cc_cmd + [c_filename]
-                print(f'{compile_cmd=}')
-            else:
-                compile_cmd = cc_cmd + ['-o', program_filename, c_filename]
+            # if IS_WINDOWS:
+            #     # compile_cmd = cc_cmd + [f'/Fe"{program_filename}"', c_filename]
+            #     compile_cmd = cc_cmd + [c_filename]
+            #     print(f'{compile_cmd=}')
+            # else:
+            compile_cmd = cc_cmd + ['-o', program_filename, c_filename]
             try:
                 subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
             except subprocess.CalledProcessError as e:
