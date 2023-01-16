@@ -1,13 +1,15 @@
 import os
+from os import linesep as LSEP
 import platform
 import subprocess
 import tempfile
 import unittest
+import sys
 from unittest.mock import patch
 from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector, run, _compile
 from lang import (
         GCC_CMD, GCC_CHECK_OPTIONS, GCC_CHECK_ENV,
-        CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV
+        CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV,
     )
 
 
@@ -272,10 +274,11 @@ class EvalTests(unittest.TestCase):
         print_mock.assert_called_with('1')
         self.assertEqual(result, 2)
 
-        with tempfile.NamedTemporaryFile(mode='w+b') as f:
-            f.write('asdf'.encode('utf8'))
-            f.flush()
-            result = parse(scan_tokens(f'(let [f (file/open "{f.name}"), data (file/read f)] (do (file/close f) data))')).evaluate()
+        with tempfile.TemporaryDirectory() as tmp:
+            file_name = os.path.join(tmp, 'file')
+            with open(file_name, 'wb') as f:
+                f.write('asdf'.encode('utf8'))
+            result = parse(scan_tokens(f'(let [f (file/open "{file_name}"), data (file/read f)] (do (file/close f) data))')).evaluate()
         self.assertEqual(result, 'asdf'.encode('utf8'))
 
     def test_exceptions(self):
@@ -337,6 +340,27 @@ counts'''
         self.assertEqual(result[3], {'the': 0})
 
 
+gcc_cmd = os.environ.get('GCC', GCC_CMD)
+clang_cmd = os.environ.get('CLANG', CLANG_CMD)
+
+if platform.system() == 'Darwin':
+    compilers = [
+        ([clang_cmd], None, 'clang_regular'),
+        ([gcc_cmd], None, 'gcc_regular'),
+    ]
+elif platform.system() == 'Windows':
+    cc_path = 'clang.exe'
+    compilers = [
+        ([cc_path], None, 'clang_regular'),
+    ]
+else:
+    compilers = [
+        ([clang_cmd], None, 'clang_regular'),
+        ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
+        ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
+    ]
+
+
 def _run_test(test, assert_equal):
     print(f'*** c test: {test["src"]}')
     c_code = _compile(test['src'])
@@ -345,21 +369,6 @@ def _run_test(test, assert_equal):
         c_filename = os.path.join(tmp, 'code.c')
         with open(c_filename, 'wb') as f:
             f.write(c_code.encode('utf8'))
-
-        gcc_cmd = os.environ.get('GCC', GCC_CMD)
-        clang_cmd = os.environ.get('CLANG', CLANG_CMD)
-
-        if platform.system() == 'Darwin':
-            compilers = [
-                ([clang_cmd], None, 'clang_regular'),
-                ([gcc_cmd], None, 'gcc_regular'),
-            ]
-        else:
-            compilers = [
-                ([clang_cmd], None, 'clang_regular'),
-                ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
-                ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
-            ]
 
         for cc_cmd, env, env_name in compilers:
             print(f'  ({env_name})')
@@ -548,9 +557,9 @@ class CompileTests(unittest.TestCase):
             {'src': '(do (print 1) (print 2))', 'output': '12'},
             {'src': '(do (print 1) (if (< 1 2) (print 1) (print 2)))', 'output': '11'},
             {'src': '(print (do (print 1) (if (< 1 2) (print 1) (print 2)) "3"))', 'output': '113'},
-            {'src': '(do (println "line1") (println "line2"))', 'output': 'line1\nline2\n'},
-            {'src': '(print (do (println "output") 2))', 'output': 'output\n2'},
-            {'src': '(print (do (println "output") "return"))', 'output': 'output\nreturn'},
+            {'src': '(do (println "line1") (println "line2"))', 'output': f'line1{LSEP}line2{LSEP}'},
+            {'src': '(print (do (println "output") 2))', 'output': f'output{LSEP}2'},
+            {'src': '(print (do (println "output") "return"))', 'output': f'output{LSEP}return'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -579,7 +588,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(loop [n 0] (if (> n 2) (print n) (let [y 1] (recur (+ n y)))))', 'output': '3'},
             {'src': '(let [b 2] (loop [n 0] (if (> n b) (print n) (let [y 1] (recur (+ n y))))))', 'output': '3'},
             {'src': '(loop [n 0] (if (> n 2) (print "done") (do (print n) (recur (+ n 1)))))', 'output': '012done'},
-            {'src': '(loop [n 0] (do (print n) (print "    ") (println (/ (* 5 (- n 32)) 9)) (if (< n 70) (recur (+ 20 n)))))', 'output': '0    -17.7778\n20    -6.66667\n40    4.44444\n60    15.5556\n80    26.6667\n'},
+            {'src': '(loop [n 0] (do (print n) (print "    ") (println (/ (* 5 (- n 32)) 9)) (if (< n 70) (recur (+ 20 n)))))', 'output': f'0    -17.7778{LSEP}20    -6.66667{LSEP}40    4.44444{LSEP}60    15.5556{LSEP}80    26.6667{LSEP}'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -632,7 +641,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (loop [line (read-line)] (if (= nil line) "done" (recur (read-line)))))', 'input': 'line', 'output': 'done'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) ["done"] (recur (read-line)))))', 'input': 'line', 'output': '[done]'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) {"a" "b"} (recur (read-line)))))', 'input': 'line', 'output': '{a b}'},
-            {'src': '(print (loop [line (read-line)] (if (= nil line) "done" (do (print line) (recur (read-line))))))', 'input': 'line1\nline2\n', 'output': 'line1line2done'},
+            {'src': '(print (loop [line (read-line)] (if (= nil line) "done" (do (print line) (recur (read-line))))))', 'input': f'line1{LSEP}line2{LSEP}', 'output': 'line1line2done'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -640,9 +649,9 @@ class CompileTests(unittest.TestCase):
 
     def test_other(self):
         tests = [
-            {'src': '(println "hello")', 'output': 'hello\n'},
-            {'src': '(print (read-line))', 'input': 'line\n', 'output': 'line'},
-            {'src': '(print (read-line))', 'input': '\n', 'output': ''},
+            {'src': '(println "hello")', 'output': f'hello{LSEP}'},
+            {'src': '(print (read-line))', 'input': f'line{LSEP}', 'output': 'line'},
+            {'src': '(print (read-line))', 'input': LSEP, 'output': ''},
             {'src': '(print (read-line))', 'input': '', 'output': 'nil'},
         ]
         for test in tests:

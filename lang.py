@@ -2236,8 +2236,10 @@ def _compile(source):
     return c_code
 
 
-# See https://github.com/airbus-seclab/c-compiler-security
 GCC_CMD = 'gcc'
+CLANG_CMD = 'clang'
+
+# See https://github.com/airbus-seclab/c-compiler-security
 GCC_CHECK_OPTIONS = [
     '-O2',
     '-Werror',
@@ -2295,13 +2297,11 @@ GCC_CHECK_OPTIONS = [
     '-fsanitize=float-divide-by-zero',
     '-fsanitize=float-cast-overflow',
 ]
-
 GCC_CHECK_ENV = {
     'ASAN_OPTIONS': 'strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_invalid_pointer_pairs=2',
     'PATH': os.environ.get('PATH', ''),
 }
 
-CLANG_CMD = 'clang'
 CLANG_CHECK_OPTIONS = [
     '-O2',
     '-Werror',
