@@ -349,8 +349,7 @@ if platform.system() == 'Darwin':
         ([gcc_cmd], None, 'gcc_regular'),
     ]
 elif platform.system() == 'Windows':
-    vs_dir = os.environ['VSDIR']
-    cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'bin', 'clang.exe')
+    cc_path = 'clang.exe'
     compilers = [
         ([cc_path], None, 'clang_regular'),
     ]
