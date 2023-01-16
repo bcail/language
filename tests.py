@@ -342,7 +342,6 @@ counts'''
 
 gcc_cmd = os.environ.get('GCC', GCC_CMD)
 clang_cmd = os.environ.get('CLANG', CLANG_CMD)
-IS_WINDOWS = False
 
 if platform.system() == 'Darwin':
     compilers = [
@@ -350,38 +349,11 @@ if platform.system() == 'Darwin':
         ([gcc_cmd], None, 'gcc_regular'),
     ]
 elif platform.system() == 'Windows':
-    IS_WINDOWS = True
     vs_dir = os.environ['VSDIR']
-    # print(f'{vs_dir=}')
-    # print(os.listdir(vs_dir))
-    # print(os.listdir(os.path.join(vs_dir, 'MSBuild')))
-    # print(os.listdir(os.path.join(vs_dir, 'VC')))
-    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools')))
-    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC')))
-    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64')))
-    # print(os.listdir(os.path.join('C:', 'msys64', 'mingw64')))
-    # print(os.listdir(os.path.join('C:', 'msys64', 'mingw64', 'bin')))
-    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm')))
-    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'bin')))
-    # print(os.listdir(os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'x64')))
-    # cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'MSVC', '14.34.31933', 'bin', 'Hostx64', 'x64', 'cl.exe')
     cc_path = os.path.join(vs_dir, 'VC', 'Tools', 'Llvm', 'bin', 'clang.exe')
-    # print(os.listdir(os.path.join(vs_dir, 'SDK')))
-    # print(os.listdir(os.path.join(vs_dir, 'VSSDK')))
-    # sys.exit(0)
     compilers = [
         ([cc_path], None, 'clang_regular'),
     ]
-    # compile_cmd = [cc_path, '/h']
-    # try:
-    #     result = subprocess.run(compile_cmd, check=True, env=None, capture_output=True)
-    #     print(f'err: {result.stderr.decode("utf8")}')
-    #     print(f'out: {result.stdout.decode("utf8")}')
-    #     sys.exit(0)
-    # except subprocess.CalledProcessError as e:
-    #     print(f'err: {e.stderr.decode("utf8")}')
-    #     print(f'out: {e.stdout.decode("utf8")}')
-    #     raise
 else:
     compilers = [
         ([clang_cmd], None, 'clang_regular'),
@@ -403,17 +375,11 @@ def _run_test(test, assert_equal):
             print(f'  ({env_name})')
             program_filename = os.path.join(tmp, env_name)
 
-            # if IS_WINDOWS:
-            #     # compile_cmd = cc_cmd + [f'/Fe"{program_filename}"', c_filename]
-            #     compile_cmd = cc_cmd + [c_filename]
-            #     print(f'{compile_cmd=}')
-            # else:
             compile_cmd = cc_cmd + ['-o', program_filename, c_filename]
             try:
                 subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
             except subprocess.CalledProcessError as e:
-                if not IS_WINDOWS:
-                    print(f'bad c code:\n{c_code}')
+                print(f'bad c code:\n{c_code}')
                 print(f'err: {e.stderr.decode("utf8")}')
                 raise
 
@@ -426,8 +392,7 @@ def _run_test(test, assert_equal):
             try:
                 result = subprocess.run(program_cmd, check=True, input=input_, capture_output=True)
             except subprocess.CalledProcessError as e:
-                if not IS_WINDOWS:
-                    print(f'bad c code:\n{c_code}')
+                print(f'bad c code:\n{c_code}')
                 print(f'err: {e.stderr.decode("utf8")}')
                 print(f'out: {e.stdout.decode("utf8")}')
                 raise
@@ -435,8 +400,7 @@ def _run_test(test, assert_equal):
             try:
                 assert_equal(result.stdout.decode('utf8'), test['output'])
             except AssertionError:
-                if not IS_WINDOWS:
-                    print(f'bad c code:\n{c_code}')
+                print(f'bad c code:\n{c_code}')
                 raise
 
 
