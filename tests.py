@@ -274,10 +274,11 @@ class EvalTests(unittest.TestCase):
         print_mock.assert_called_with('1')
         self.assertEqual(result, 2)
 
-        with tempfile.NamedTemporaryFile(mode='w+b') as f:
-            f.write('asdf'.encode('utf8'))
-            f.flush()
-            result = parse(scan_tokens(f'(let [f (file/open "{f.name}"), data (file/read f)] (do (file/close f) data))')).evaluate()
+        with tempfile.TemporaryDirectory() as tmp:
+            file_name = os.path.join(tmp, 'file')
+            with open(file_name, 'wb') as f:
+                f.write('asdf'.encode('utf8'))
+            result = parse(scan_tokens(f'(let [f (file/open "{file_name}"), data (file/read f)] (do (file/close f) data))')).evaluate()
         self.assertEqual(result, 'asdf'.encode('utf8'))
 
     def test_exceptions(self):
