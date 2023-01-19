@@ -598,7 +598,11 @@ class CompileTests(unittest.TestCase):
     def test_fn(self):
         tests = [
             {'src': '(print ((fn [x] x) 1))', 'output': '1'},
+            {'src': '(print ((fn [x] x) "string"))', 'output': 'string'},
+            {'src': '((fn [] (print "function")))', 'output': 'function'},
+            {'src': '((fn [x] (print x)) "string")', 'output': 'string'},
             {'src': '(print ((fn [x y] (+ x y)) 1 2))', 'output': '3'},
+            {'src': '((fn [x] (print x) (print "done")) 1)', 'output': '1done'},
         ]
         for test in tests:
             with self.subTest(test=test):

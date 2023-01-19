@@ -1152,19 +1152,25 @@ def println_c(params, envs):
 
 def fn_c(params, envs):
     bindings = params[0]
-    body = params[1:]
+    exprs = params[1:]
 
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
     for binding in bindings:
         local_env['bindings'][binding.name] = None
 
-    result = compile_form(*body, envs=envs)
+    expr_results = [compile_form(expr, envs=envs) for expr in exprs]
+    final_result = expr_results[-1]['code']
 
     f_code = ''
     if local_env['pre']:
         f_code += '\n'.join(local_env['pre'])
-    f_code += f'  return {result["code"]};'
+
+    if local_env['post']:
+        f_code += '\n'.join(local_env['post'])
+
+    f_code += '  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (final_result, final_result)
+    f_code += f'  return {final_result};'
 
     f_params = ', '.join([f'Value {binding.name}' for binding in bindings])
     if f_params:
@@ -1319,8 +1325,12 @@ def compile_form(node, envs):
         if isinstance(first, list):
             results = [compile_form(n, envs=envs) for n in node]
             args = 'user_globals'
-            args += ', ' + ', '.join([r['code'] for r in results[1:]])
-            return {'code': f'{results[0]["code"]}({args})'}
+            if len(results) > 1:
+                args += ', ' + ', '.join([r['code'] for r in results[1:]])
+            result_name = _get_generated_name('fn_result', envs=envs)
+            envs[-1]['pre'].append(f'  Value {result_name} = {results[0]["code"]}({args});')
+            envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+            return {'code': result_name}
         elif isinstance(first, Symbol):
             if first.name in envs[0]['global']:
                 if isinstance(envs[0]['global'][first.name]['function'], Var) and isinstance(envs[0]['global'][first.name]['function'].value, Function):
