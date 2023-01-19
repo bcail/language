@@ -892,23 +892,25 @@ def let_c(params, envs):
         local_env['bindings'][binding[0].name] = result
         local_env['pre'].append(f'  Value {binding_name} = {result["code"]};\n')
 
-    result = compile_form(*body, envs=envs)
-
     f_code = ''
+
+    expr_results = [compile_form(form, envs=envs) for form in body]
+    final_result = expr_results[-1]
+
     if local_env['pre']:
         f_code += '\n'.join(local_env['pre']) + '\n'
 
     return_val = ''
-    if isinstance(result, tuple) and isinstance(result[0], Symbol) and result[0].name == 'recur':
+    if isinstance(final_result, tuple) and isinstance(final_result[0], Symbol) and final_result[0].name == 'recur':
         for e in envs:
             for b in e.get('bindings', {}).keys():
                 if b.startswith('recur'):
                     recur_name = b
-        for r in result[1:]:
+        for r in final_result[1:]:
             f_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
         return_val = recur_name
     else:
-        return_val = result['code']
+        return_val = final_result['code']
         f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (return_val, return_val)
 
     if local_env['post']:
