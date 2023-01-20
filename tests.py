@@ -622,6 +622,8 @@ class CompileTests(unittest.TestCase):
     def test_defn(self):
         tests = [
             {'src': '(defn f1 [x y] (+ x y)) (print (f1 1 2))', 'output': '3'},
+            {'src': '(defn f1 [x y] (print "function")) (f1 1 2)', 'output': 'function'},
+            {'src': '(defn f1 [x y] (print "function") (print "done")) (f1 1 2)', 'output': 'functiondone'},
             {'src': '(defn f-1 [x y] (+ x y)) (print (f-1 1 2))', 'output': '3'},
         ]
         for test in tests:

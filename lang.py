@@ -1189,30 +1189,9 @@ def fn_c(params, envs):
 def defn_c(params, envs):
     name = params[0].name
 
-    bindings = params[1]
-    body = params[2:]
+    fn_result = fn_c(params[1:], envs)
 
-    c_params = 'ObjMap* user_globals'
-    if bindings:
-        c_params += ', ' + ', '.join([f'Value {b.name}' for b in bindings])
-
-    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
-    envs.append(local_env)
-    for binding in bindings:
-        local_env['bindings'][binding.name] = None
-
-    result = compile_form(*body, envs=envs)
-    f_code = '\n'.join(local_env['pre'])
-    f_code += f'\n  Value result = {result["code"]};'
-    f_code += '\n  if (IS_OBJ(result)) {\n    inc_ref(AS_OBJ(result));\n  }'
-    f_code += '\n' + '\n'.join(local_env['post'])
-    f_code += '\n  return result;'
-
-    c_name = _get_generated_name(base=f'u_{name}', envs=envs)
-    envs[0]['user_globals'][name] = {'type': 'function', 'c_name': c_name}
-    envs[0]['functions'][c_name] = 'Value %s(%s) {\n  %s\n}' % (c_name, c_params, f_code)
-
-    envs.pop()
+    envs[0]['user_globals'][name] = {'type': 'function', 'c_name': fn_result['code']}
 
     return {'code': ''}
 
