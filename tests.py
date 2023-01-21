@@ -355,8 +355,8 @@ elif platform.system() == 'Windows':
     ]
 else:
     compilers = [
-        ([clang_cmd], None, 'clang_regular'),
         ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
+        ([clang_cmd], None, 'clang_regular'),
         ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
     ]
 

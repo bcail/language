@@ -1166,10 +1166,11 @@ def fn_c(params, envs):
     if local_env['pre']:
         f_code += '\n'.join(local_env['pre'])
 
+    f_code += '  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (final_result, final_result)
+
     if local_env['post']:
         f_code += '\n'.join(local_env['post'])
 
-    f_code += '  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (final_result, final_result)
     f_code += f'  return {final_result};'
 
     f_params = ', '.join([f'Value {binding.name}' for binding in bindings])
