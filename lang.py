@@ -2203,10 +2203,12 @@ def _compile(source):
     c_code += '\n\n'
     c_code += c_types
 
-    if env['functions']:
-        c_code += '\n\n' + '\n\n'.join([f for f in env['functions'].values()])
+    c_code += '\n\n/* CUSTOM CODE */\n\n'
 
-    c_code += '\n\nint main(void)\n{'
+    if env['functions']:
+        c_code += '\n\n'.join([f for f in env['functions'].values()]) + '\n\n'
+
+    c_code += 'int main(void)\n{'
     c_code += '\n  ObjMap* user_globals = allocate_map();\n'
 
     for name, value in env['user_globals'].items():

@@ -370,6 +370,8 @@ def _run_test(test, assert_equal):
         with open(c_filename, 'wb') as f:
             f.write(c_code.encode('utf8'))
 
+        custom_code = c_code.split('/* CUSTOM CODE */\n\n')[-1]
+
         for cc_cmd, env, env_name in compilers:
             print(f'  ({env_name})')
             program_filename = os.path.join(tmp, env_name)
@@ -378,7 +380,7 @@ def _run_test(test, assert_equal):
             try:
                 subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
             except subprocess.CalledProcessError as e:
-                print(f'bad c code:\n{c_code}')
+                print(f'bad c code:\n{custom_code}')
                 print(f'err: {e.stderr.decode("utf8")}')
                 raise
 
@@ -391,7 +393,7 @@ def _run_test(test, assert_equal):
             try:
                 result = subprocess.run(program_cmd, check=True, input=input_, capture_output=True)
             except subprocess.CalledProcessError as e:
-                print(f'bad c code:\n{c_code}')
+                print(f'bad c code:\n{custom_code}')
                 print(f'err: {e.stderr.decode("utf8")}')
                 print(f'out: {e.stdout.decode("utf8")}')
                 raise
@@ -399,7 +401,7 @@ def _run_test(test, assert_equal):
             try:
                 assert_equal(result.stdout.decode('utf8'), test['output'])
             except AssertionError:
-                print(f'bad c code:\n{c_code}')
+                print(f'bad c code:\n{custom_code}')
                 raise
 
 
