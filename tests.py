@@ -606,6 +606,7 @@ class CompileTests(unittest.TestCase):
             {'src': '((fn [x] (print x)) "string")', 'output': 'string'},
             {'src': '(print ((fn [x y] (+ x y)) 1 2))', 'output': '3'},
             {'src': '((fn [x] (print x) (print "done")) 1)', 'output': '1done'},
+            {'src': '(print ((fn [cnt acc] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc 1)))) 3 0))', 'output': '3'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -628,6 +629,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(defn f1 [x y] (print "function")) (f1 1 2)', 'output': 'function'},
             {'src': '(defn f1 [x y] (print "function") (print "done")) (f1 1 2)', 'output': 'functiondone'},
             {'src': '(defn f-1 [x y] (+ x y)) (print (f-1 1 2))', 'output': '3'},
+            {'src': '(defn f-1 [cnt acc] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc 1)))) (print (f-1 3 0))', 'output': '3'},
         ]
         for test in tests:
             with self.subTest(test=test):
