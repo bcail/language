@@ -547,8 +547,11 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (if false true "False"))', 'output': 'False'},
             {'src': '(print (if true ["True"] false))', 'output': '[True]'},
             {'src': '(print (if true {"True" "1"} false))', 'output': '{True 1}'},
+            {'src': '(print (if 0 {"True" "1"} false))', 'output': '{True 1}'},
+            {'src': '(print (if {} {"True" "1"} false))', 'output': '{True 1}'},
             {'src': '(print (if false true ["False"]))', 'output': '[False]'},
             {'src': '(print (if false true {"False" "1"}))', 'output': '{False 1}'},
+            {'src': '(print (if nil true {"False" "1"}))', 'output': '{False 1}'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -637,6 +640,7 @@ class CompileTests(unittest.TestCase):
 
     def test_advanced(self):
         tests = [
+            {'src': '(print (if (str/blank? "Hello World") "blank" "not blank"))', 'output': 'not blank'},
             {'src': '(def a 1) (let [b 2] (print (+ a b)))', 'output': '3'},
             {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},
             {'src': '(let [x-y 1] (do (print x-y) (print "done")))', 'output': '1done'},

@@ -784,11 +784,11 @@ def if_form_c(params, envs):
     envs.append(local_env)
 
     test_code = compile_form(params[0], envs=envs)['code']
-    true_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+    true_env = {'temps': local_env['temps'], 'pre': [], 'post': [], 'bindings': {}}
     envs.append(true_env)
     true_result = compile_form(params[1], envs=envs)
 
-    true_code = '  if (AS_BOOL(%s)) {\n' % test_code
+    true_code = '\n  if (is_truthy(%s)) {\n' % test_code
     if true_env['pre']:
         true_code += '\n'.join(true_env['pre'])
     true_return_val = ''
@@ -804,6 +804,8 @@ def if_form_c(params, envs):
         true_return_val = true_result['code']
         if true_return_val not in ['BOOL_VAL(true)', 'BOOL_VAL(false)']:
             true_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (true_return_val, true_return_val)
+    if local_env['post']:
+        true_code += '\n'.join(local_env['post'])
     if true_env['post']:
         true_code += '\n'.join(true_env['post'])
     true_code += '\n    return %s;' % true_return_val
@@ -812,7 +814,7 @@ def if_form_c(params, envs):
 
     false_code = ''
     if len(params) > 2:
-        false_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+        false_env = {'temps': local_env['temps'], 'pre': [], 'post': [], 'bindings': {}}
         envs.append(false_env)
         false_code += '  else {\n'
         false_result = compile_form(params[2], envs=envs)
@@ -832,6 +834,8 @@ def if_form_c(params, envs):
             if false_return_val not in ['BOOL_VAL(true)', 'BOOL_VAL(false)']:
                 false_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (false_return_val, false_return_val)
 
+        if local_env['post']:
+            false_code += '\n'.join(local_env['post'])
         if false_env['post']:
             false_code += '\n'.join(false_env['post'])
         false_code += '\n    return %s;' % false_return_val
@@ -1856,6 +1860,18 @@ ObjMap* allocate_map(void) {
 
 Value map_count(Value map) {
   return NUMBER_VAL((int) AS_MAP(map)->num_entries);
+}
+
+bool is_truthy(Value value) {
+  if (IS_NIL(value)) {
+    return false;
+  }
+  if (IS_BOOL(value)) {
+    if (AS_BOOL(value) == false) {
+      return false;
+    }
+  }
+  return true;
 }
 
 Value equal(Value x, Value y) {
