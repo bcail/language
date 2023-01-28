@@ -1060,6 +1060,8 @@ def str_lower_c(params, envs):
     param_name = result['code']
     name = _get_generated_name('str_lower_', envs=envs)
     envs[-1]['pre'].append(f'  Value {name} = str_lower({param_name});')
+    envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
     return {'code': name}
 
 
@@ -2168,10 +2170,11 @@ Value readline(void) {
 
 Value str_lower(Value string) {
   ObjString* s = AS_STRING(string);
-  for (int i=0; s->chars[i] != '\\0'; i++) {
-    s->chars[i] = (char) tolower((int) s->chars[i]);
+  ObjString* s_lower = copyString(s->chars, s->length);
+  for (int i=0; s_lower->chars[i] != '\\0'; i++) {
+    s_lower->chars[i] = (char) tolower((int) s_lower->chars[i]);
   }
-  return string;
+  return OBJ_VAL(s_lower);
 }
 
 Value str_blank(Value string) {
