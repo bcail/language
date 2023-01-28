@@ -708,6 +708,11 @@ def evaluate(node, env=None):
     return node
 
 
+def nil_c(params, envs):
+    param = compile_form(params[0], envs=envs)
+    return {'code': f'nil_Q_({param["code"]})'}
+
+
 def add_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
     return {'code': f'add({c_params[0]}, {c_params[1]})'}
@@ -1259,6 +1264,7 @@ def readline_c(params, envs):
 
 
 global_compile_env = {
+    'nil?': {'function': nil_c},
     '+': {'function': add_c},
     '-': {'function': subtract_c},
     '*': {'function': multiply_c},
@@ -1761,6 +1767,10 @@ void swap(Value v[], size_t i, size_t j) {
   Value temp = v[i];
   v[i] = v[j];
   v[j] = temp;
+}
+
+Value nil_Q_(Value value) {
+  return BOOL_VAL(IS_NIL(value));
 }
 
 Value add(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y)); }

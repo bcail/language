@@ -413,6 +413,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(print false)', 'output': 'false'},
             {'src': '(print 1)', 'output': '1'},
             {'src': '(print 1.2)', 'output': '1.2'},
+            {'src': '(print (nil? 0))', 'output': 'false'},
+            {'src': '(print (nil? nil))', 'output': 'true'},
         ]
         for test in tests:
             with self.subTest(test=test):
