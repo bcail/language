@@ -438,13 +438,16 @@ class CompileTests(unittest.TestCase):
     def test_strings(self):
         tests = [
             {'src': '(print "abc")', 'output': 'abc'},
-            {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},
             {'src': '(print (str/blank? "Hello World"))', 'output': 'false'},
             {'src': '(print (str/blank? ""))', 'output': 'true'},
             {'src': '(print (str/blank? nil))', 'output': 'true'},
             {'src': '(print (str/blank? "\\n"))', 'output': 'true'},
+            {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},
             {'src': '(print (str/split "hello world"))', 'output': '[hello world]'},
-            # {'src': '(str)', 'output': ''},
+            {'src': '(print (str))', 'output': ''},
+            {'src': '(print (str nil))', 'output': ''},
+            {'src': '(print (str true))', 'output': 'true'},
+            {'src': '(print (str false))', 'output': 'false'},
             # {'src': '(print (str 1))', 'output': '1'},
         ]
         for test in tests:

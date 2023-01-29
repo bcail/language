@@ -1044,15 +1044,16 @@ def loop_c(params, envs):
 
 def str_c(params, envs):
     if not params:
-        return {'code': ''}
-    if len(params) == 1:
-        return {
-            'code': '"%s"' % str(compile_form(params[0], envs=envs)['code'])
-        }
-    else:
-        return {
-            'code': 'strcat(%s, %s)' % (compile_form(params[0], envs=envs)['code'], compile_form(params[1], envs=envs)['code'])
-        }
+        param_name = 'NIL_VAL'
+    elif len(params) == 1:
+        result = compile_form(params[0], envs=envs)
+        param_name = result['code']
+
+    name = _get_generated_name('str', envs=envs)
+    envs[-1]['pre'].append(f'  Value {name} = str_str({param_name});')
+    envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+    return {'code': name}
 
 
 def str_lower_c(params, envs):
@@ -2168,15 +2169,6 @@ Value readline(void) {
   return result;
 }
 
-Value str_lower(Value string) {
-  ObjString* s = AS_STRING(string);
-  ObjString* s_lower = copyString(s->chars, s->length);
-  for (int i=0; s_lower->chars[i] != '\\0'; i++) {
-    s_lower->chars[i] = (char) tolower((int) s_lower->chars[i]);
-  }
-  return OBJ_VAL(s_lower);
-}
-
 Value str_blank(Value string) {
   if (IS_NIL(string)) {
     return BOOL_VAL(true);
@@ -2191,6 +2183,15 @@ Value str_blank(Value string) {
     }
   }
   return BOOL_VAL(true);
+}
+
+Value str_lower(Value string) {
+  ObjString* s = AS_STRING(string);
+  ObjString* s_lower = copyString(s->chars, s->length);
+  for (int i=0; s_lower->chars[i] != '\\0'; i++) {
+    s_lower->chars[i] = (char) tolower((int) s_lower->chars[i]);
+  }
+  return OBJ_VAL(s_lower);
 }
 
 Value str_split(Value string) {
@@ -2212,6 +2213,18 @@ Value str_split(Value string) {
   ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
   list_add(OBJ_VAL(splits), OBJ_VAL(split));
   return OBJ_VAL(splits);
+}
+
+Value str_str(Value v) {
+    if (IS_BOOL(v)) {
+      if (AS_BOOL(v)) {
+        return OBJ_VAL(copyString("true", (size_t)4));
+      }
+      else {
+        return OBJ_VAL(copyString("false", (size_t)5));
+      }
+    }
+    return OBJ_VAL(copyString("", (size_t)0));
 }
 
 void free_object(Obj* object) {
