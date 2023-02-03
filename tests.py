@@ -448,7 +448,9 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (str nil))', 'output': ''},
             {'src': '(print (str true))', 'output': 'true'},
             {'src': '(print (str false))', 'output': 'false'},
-            # {'src': '(print (str 1))', 'output': '1'},
+            {'src': '(print (str 1))', 'output': '1'},
+            {'src': '(print (str "abc"))', 'output': 'abc'},
+            {'src': '(print (str "abc" "def"))', 'output': 'abcdef'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -645,6 +647,8 @@ class CompileTests(unittest.TestCase):
 
     def test_advanced(self):
         tests = [
+            {'src': '(print (str []))', 'output': '[]'},
+            {'src': '(print (str {}))', 'output': '{}'},
             {'src': '(print (if (str/blank? "Hello World") "blank" "not blank"))', 'output': 'not blank'},
             {'src': '(def a 1) (let [b 2] (print (+ a b)))', 'output': '3'},
             {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},

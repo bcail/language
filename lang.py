@@ -1044,13 +1044,21 @@ def loop_c(params, envs):
 
 def str_c(params, envs):
     if not params:
-        param_name = 'NIL_VAL'
+        arg_name = 'NIL_VAL'
     elif len(params) == 1:
         result = compile_form(params[0], envs=envs)
-        param_name = result['code']
+        arg_name = result['code']
+    else:
+        arg_name = _get_generated_name('str_arg', envs=envs)
+        envs[-1]['temps'].add(arg_name)
+        envs[-1]['pre'].append(f'  Value {arg_name} = OBJ_VAL(allocate_list());\n  inc_ref(AS_OBJ({arg_name}));')
+        for param in params:
+            result = compile_form(param, envs=envs)
+            envs[-1]['pre'].append(f'  list_add({arg_name}, {result["code"]});')
+        envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({arg_name}));')
 
     name = _get_generated_name('str', envs=envs)
-    envs[-1]['pre'].append(f'  Value {name} = str_str({param_name});')
+    envs[-1]['pre'].append(f'  Value {name} = str_str({arg_name});')
     envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
     return {'code': name}
@@ -2223,6 +2231,20 @@ Value str_str(Value v) {
       else {
         return OBJ_VAL(copyString("false", (size_t)5));
       }
+    }
+    if (IS_NUMBER(v)) {
+      char str[100];
+      int num_chars = sprintf(str, "%g", AS_NUMBER(v));
+      return OBJ_VAL(copyString(str, (size_t)num_chars));
+    }
+    if (IS_STRING(v)) {
+      return v;
+    }
+    if (IS_LIST(v)) {
+      return OBJ_VAL(copyString("[]", (size_t)2));
+    }
+    if (IS_MAP(v)) {
+      return OBJ_VAL(copyString("{}", (size_t)2));
     }
     return OBJ_VAL(copyString("", (size_t)0));
 }
