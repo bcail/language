@@ -1049,13 +1049,17 @@ def str_c(params, envs):
         result = compile_form(params[0], envs=envs)
         arg_name = result['code']
     else:
-        arg_name = _get_generated_name('str_arg', envs=envs)
-        envs[-1]['temps'].add(arg_name)
-        envs[-1]['pre'].append(f'  Value {arg_name} = OBJ_VAL(allocate_list());\n  inc_ref(AS_OBJ({arg_name}));')
+        tmp_list_name = _get_generated_name('str_arg_tmp_list', envs=envs)
+        name = _get_generated_name('str', envs=envs)
+        envs[-1]['temps'].add(name)
+        envs[-1]['pre'].append(f'  Value {tmp_list_name} = OBJ_VAL(allocate_list());\n  inc_ref(AS_OBJ({tmp_list_name}));')
         for param in params:
             result = compile_form(param, envs=envs)
-            envs[-1]['pre'].append(f'  list_add({arg_name}, {result["code"]});')
-        envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({arg_name}));')
+            envs[-1]['pre'].append(f'  list_add({tmp_list_name}, {result["code"]});')
+        envs[-1]['pre'].append(f'  Value {name} = str_join({tmp_list_name});\n  inc_ref(AS_OBJ({name}));')
+        envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({tmp_list_name}));')
+        envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+        return {'code': name}
 
     name = _get_generated_name('str', envs=envs)
     envs[-1]['pre'].append(f'  Value {name} = str_str({arg_name});')
@@ -1715,7 +1719,7 @@ static uint32_t hashString(const char* key, size_t length) {
   return hash;
 }
 
-static ObjString* allocateString(char* chars, size_t length) {
+static ObjString* allocate_string(char* chars, size_t length) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->hash = hashString(chars, length);
@@ -1727,7 +1731,7 @@ ObjString* copyString(const char* chars, size_t length) {
   char* heapChars = ALLOCATE(char, length + 1);
   memcpy(heapChars, chars, length);
   heapChars[length] = 0; /* terminate it w/ NULL, so we can pass c-string to functions that need it */
-  return allocateString(heapChars, length);
+  return allocate_string(heapChars, length);
 }
 
 ObjList* allocate_list(void) {
@@ -2247,6 +2251,32 @@ Value str_str(Value v) {
       return OBJ_VAL(copyString("{}", (size_t)2));
     }
     return OBJ_VAL(copyString("", (size_t)0));
+}
+
+Value str_join(Value list_val) {
+  ObjList* list = AS_LIST(list_val);
+
+  size_t num_bytes = 0;
+
+  for (size_t i = 0; i < list->count; i++) {
+    Value v = list_get(list_val, NUMBER_VAL((double)i));
+    Value v_str = str_str(v);
+    num_bytes = num_bytes + AS_STRING(v_str)->length;
+  }
+
+  char* heapChars = ALLOCATE(char, num_bytes+1);
+  char* start_char = heapChars;
+
+  for (size_t i = 0; i < list->count; i++) {
+    Value v = list_get(list_val, NUMBER_VAL((double)i));
+    ObjString* s = AS_STRING(str_str(v));
+    memcpy(start_char, s->chars, s->length);
+    start_char = start_char + s->length;
+  }
+  heapChars[num_bytes] = 0;
+  Value str = OBJ_VAL(allocate_string(heapChars, num_bytes));
+  inc_ref(AS_OBJ(str));
+  return str;
 }
 
 void free_object(Obj* object) {
