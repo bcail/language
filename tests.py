@@ -503,7 +503,9 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6} "1"))', 'output': '1'},
             {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7} "1"))', 'output': '1'},
             {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8 "9" 9} "1"))', 'output': '1'},
+            {'src': '(print (get {"1" {}} "1"))', 'output': '{}'},
             {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8 "9" 9} "a"))', 'output': 'nil'},
+            {'src': '(print (contains? {} "a"))', 'output': 'false'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -651,6 +653,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (str {}))', 'output': '{}'},
             {'src': '(print (if (str/blank? "Hello World") "blank" "not blank"))', 'output': 'not blank'},
             {'src': '(def a 1) (let [b 2] (print (+ a b)))', 'output': '3'},
+            {'src': '(print (let [b {"key" (get {"z" 2} "z")}] (+ 1 (get b "key"))))', 'output': '3'},
             {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},
             {'src': '(let [x-y 1] (do (print x-y) (print "done")))', 'output': '1done'},
             {'src': '(let [x-y 1] (loop [n-p 0] (if (= n-p 1) (print x-y) (recur (+ n-p 1)))))', 'output': '1'},

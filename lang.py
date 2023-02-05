@@ -708,6 +708,8 @@ def evaluate(node, env=None):
     return node
 
 
+####### COMPILE TO C ##############
+
 def nil_c(params, envs):
     param = compile_form(params[0], envs=envs)
     return {'code': f'nil_Q_({param["code"]})'}
@@ -716,6 +718,14 @@ def nil_c(params, envs):
 def add_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
     return {'code': f'add({c_params[0]}, {c_params[1]})'}
+
+    # TODO - probably need to use this style for all functions?
+    #   even functions that could only return nil/true/false could still take time to run,
+    #   and I don't want them to be run multiple times for conditional IS_OBJ ref-counting checks?
+    # name = _get_generated_name('add_result', envs=envs)
+    # envs[-1]['pre'].append(f'  Value {name} = add({c_params[0]}, {c_params[1]});')
+    # envs[-1]['temps'].add(name)
+    # return {'code': name}
 
 
 def subtract_c(params, envs):
@@ -935,7 +945,7 @@ def let_c(params, envs):
     envs.pop()
 
     envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({f_args});')
-    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
 
     return {'code': result_name}
 
@@ -1110,7 +1120,6 @@ def sort_c(params, envs):
         compare = compile_form(params[0], envs=envs)
         lst = compile_form(params[1], envs=envs)
         return {'code': f'list_sort(user_globals, {lst["code"]}, {compare["code"]})'}
-        # return {'code': f'list_sort({lst["code"]}, *less)'}
 
 
 def count_c(params, envs):
@@ -1121,10 +1130,21 @@ def count_c(params, envs):
 def map_get_c(params, envs):
     m = compile_form(params[0], envs=envs)['code']
     key = compile_form(params[1], envs=envs)['code']
+    default = 'NIL_VAL'
     if len(params) > 2:
         default = compile_form(params[2], envs=envs)['code']
-        return {'code': f'map_get(AS_MAP({m}), {key}, {default})'}
-    return {'code': f'map_get(AS_MAP({m}), {key}, NIL_VAL)'}
+    name = _get_generated_name('map_get_', envs=envs)
+    envs[-1]['pre'].append(f'  Value {name} = map_get(AS_MAP({m}), {key}, {default});')
+    envs[-1]['pre'].append('  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (name, name))
+    envs[-1]['temps'].add(name)
+    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (name, name))
+    return {'code': name}
+
+
+def map_contains_c(params, envs):
+    m = compile_form(params[0], envs=envs)['code']
+    key = compile_form(params[1], envs=envs)['code']
+    return {'code': f'map_contains(AS_MAP({m}), {key})'}
 
 
 def map_assoc_c(params, envs):
@@ -1295,6 +1315,7 @@ global_compile_env = {
     'nth': {'function': nth_c},
     'sort': {'function': sort_c},
     'get': {'function': map_get_c},
+    'contains?': {'function': map_contains_c},
     'assoc': {'function': map_assoc_c},
     'keys': {'function': map_keys_c},
     'vals': {'function': map_vals_c},
@@ -2060,6 +2081,10 @@ Value map_set(ObjMap* map, Value key, Value value) {
   entry->key = key;
   entry->value = value;
   return OBJ_VAL(map);
+}
+
+Value map_contains(ObjMap* map, Value key) {
+  return BOOL_VAL(false);
 }
 
 Value map_get(ObjMap* map, Value key, Value defaultVal) {
