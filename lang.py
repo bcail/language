@@ -2084,7 +2084,21 @@ Value map_set(ObjMap* map, Value key, Value value) {
 }
 
 Value map_contains(ObjMap* map, Value key) {
-  return BOOL_VAL(false);
+  if (map->num_entries == 0) {
+    return BOOL_VAL(false);
+  }
+  if (!IS_STRING(key)) {
+    return BOOL_VAL(false);
+  }
+  int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
+  int32_t entries_index = map->indices[indices_index];
+  bool isNewKey = (entries_index == MAP_EMPTY);
+  if (isNewKey) {
+    return BOOL_VAL(false);
+  }
+  else {
+    return BOOL_VAL(true);
+  }
 }
 
 Value map_get(ObjMap* map, Value key, Value defaultVal) {

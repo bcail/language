@@ -506,6 +506,9 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (get {"1" {}} "1"))', 'output': '{}'},
             {'src': '(print (get {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8 "9" 9} "a"))', 'output': 'nil'},
             {'src': '(print (contains? {} "a"))', 'output': 'false'},
+            {'src': '(print (contains? {"a" 1} 1))', 'output': 'false'},
+            {'src': '(print (contains? {"a" 1} "a"))', 'output': 'true'},
+            {'src': '(print (contains? {"a" 1} "z"))', 'output': 'false'},
         ]
         for test in tests:
             with self.subTest(test=test):
