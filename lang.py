@@ -2559,13 +2559,14 @@ def build_executable(file_name, output_file_name):
 
     compile_cmd = compiler + ['-o', output_file_name, file_name]
     try:
-        subprocess.run(compile_cmd, check=True)
+        subprocess.run(compile_cmd, check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
         if os.path.exists(file_name):
             with open(file_name, 'rb') as f:
                 data = f.read().decode('utf8')
                 print(data)
         print(e)
+        print(e.stderr.decode('utf8'))
         sys.exit(1)
 
 
