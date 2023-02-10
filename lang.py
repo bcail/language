@@ -2327,9 +2327,7 @@ Value str_join(Value list_val) {
     start_char = start_char + s->length;
   }
   heapChars[num_bytes] = 0;
-  Value str = OBJ_VAL(allocate_string(heapChars, num_bytes));
-  inc_ref(AS_OBJ(str));
-  return str;
+  return OBJ_VAL(allocate_string(heapChars, num_bytes));
 }
 
 void free_object(Obj* object) {
