@@ -650,6 +650,14 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
+    def test_for(self):
+        tests = [
+            {'src': '(for [w ["one" "two"]] (print w))', 'output': 'onetwo'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
     def test_advanced(self):
         tests = [
             {'src': '(print (str []))', 'output': '[]'},

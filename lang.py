@@ -1426,6 +1426,20 @@ def compile_form(node, envs):
                 envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({args});')
                 envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
                 return {'code': result_name}
+            elif first.name == 'for':
+                bindings = rest[0]
+                binding_name = bindings[0].name
+                c_name = _get_generated_name(f'u_{binding_name}', envs=envs)
+                envs[-1]['bindings'][bindings[0].name] = {'c_name': c_name}
+                lst = compile_form(bindings[1], envs=envs)
+                lst_name = _get_generated_name('tmp_lst', envs=envs)
+                lst_count = _get_generated_name('tmp_lst_count', envs=envs)
+                envs[-1]['pre'].append(f'  int {lst_count} = (int) AS_NUMBER(list_count({lst["code"]}));')
+                envs[-1]['pre'].append('  for(int i=0; i<%s; i++) {\n' % lst_count)
+                envs[-1]['pre'].append(f'    Value {c_name} = list_get({lst["code"]}, NUMBER_VAL(i));')
+                statement = compile_form(rest[1], envs=envs)
+                envs[-1]['pre'].append('  }')
+                return {'code': ''}
             elif first.name == 'do':
                 previous_bindings = _get_previous_bindings(envs)
                 do_params = ', '.join([f'Value {v}' for v in previous_bindings])
@@ -1503,7 +1517,7 @@ def compile_form(node, envs):
                         return {'code': node.name}
         if node.name in envs[0]['global']:
             return {'code': envs[0]['global'][node.name]['c_name']}
-            # return {'code': f'map_get(user_globals, OBJ_VAL({node.name}))'}
+        print(f'{envs[-1]=}')
         raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
         name = new_vector_c(node, envs=envs)
@@ -2373,6 +2387,7 @@ def _compile(source):
         'temps': set(),
         'pre': [],
         'post': [],
+        'bindings': {},
     }
     for f in ast.forms:
         result = compile_form(f, envs=[env])
