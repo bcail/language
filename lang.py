@@ -1439,7 +1439,7 @@ def compile_form(node, envs):
                 envs[-1]['pre'].append(f'    Value {c_name} = list_get({lst["code"]}, NUMBER_VAL(i));')
                 statement = compile_form(rest[1], envs=envs)
                 envs[-1]['pre'].append('  }')
-                return {'code': ''}
+                return {'code': 'NIL_VAL'}
             elif first.name == 'do':
                 previous_bindings = _get_previous_bindings(envs)
                 do_params = ', '.join([f'Value {v}' for v in previous_bindings])

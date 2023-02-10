@@ -653,6 +653,7 @@ class CompileTests(unittest.TestCase):
     def test_for(self):
         tests = [
             {'src': '(for [w ["one" "two"]] (print w))', 'output': 'onetwo'},
+            {'src': '(print (for [w ["one" "two"]] (print w)))', 'output': 'onetwonil'},
         ]
         for test in tests:
             with self.subTest(test=test):
