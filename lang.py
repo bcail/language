@@ -930,7 +930,8 @@ def let_c(params, envs):
         return_val = recur_name
     else:
         return_val = final_result['code']
-        f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (return_val, return_val)
+        if return_val not in ['NIL_VAL', 'BOOL_VAL(true)', 'BOOL_VAL(false)']:
+            f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (return_val, return_val)
 
     if local_env['post']:
         f_code += '\n'.join(local_env['post']) + '\n'
@@ -1434,10 +1435,22 @@ def compile_form(node, envs):
                 lst = compile_form(bindings[1], envs=envs)
                 lst_name = _get_generated_name('tmp_lst', envs=envs)
                 lst_count = _get_generated_name('tmp_lst_count', envs=envs)
+                envs[-1]['temps'].add(lst_name)
+                envs[-1]['temps'].add(lst_count)
                 envs[-1]['pre'].append(f'  int {lst_count} = (int) AS_NUMBER(list_count({lst["code"]}));')
                 envs[-1]['pre'].append('  for(int i=0; i<%s; i++) {\n' % lst_count)
                 envs[-1]['pre'].append(f'    Value {c_name} = list_get({lst["code"]}, NUMBER_VAL(i));')
+                local_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
+                envs.append(local_env)
                 statement = compile_form(rest[1], envs=envs)
+                code_lines = []
+                if local_env['pre']:
+                    code_lines.extend(local_env['pre'])
+                if local_env['post']:
+                    code_lines.extend(local_env['post'])
+                envs.pop()
+                for code_line in code_lines:
+                    envs[-1]['pre'].append(code_line)
                 envs[-1]['pre'].append('  }')
                 return {'code': 'NIL_VAL'}
             elif first.name == 'do':
