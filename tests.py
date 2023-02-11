@@ -656,7 +656,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (for [w ["one" "two"]] (print w)))', 'output': 'onetwonil'},
             {'src': '(let [a "1"] (for [w ["one" "two"]] (print w)))', 'output': 'onetwo'},
             {'src': '(let [a "1"] (for [w ["one" "two"]] (print [w a])))', 'output': '[one 1][two 1]'},
-            {'src': '(for [w ["one" "two"]] (print "item ") (println w))', 'output': 'item one{LSEP}item two{LSEP}'},
+            {'src': '(for [w ["one" "two"]] (print "item ") (println w))', 'output': f'item one{LSEP}item two{LSEP}'},
         ]
         for test in tests:
             with self.subTest(test=test):
