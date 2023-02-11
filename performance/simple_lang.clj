@@ -1,5 +1,3 @@
-(def counts {})
-
 (defn process-words
   [counts words]
   (let [numwords (count words)]
@@ -21,18 +19,17 @@
   [a b]
   (> (nth a 1) (nth b 1)))
 
-(loop [line (read-line)]
-  (if (nil? line)
-    nil
-    (do
-      (if (= false (str/blank? line))
-        (process-line counts line))
-      (recur (read-line)))))
-
-(let [sortedlist (sort compare (pairs counts))
-      numitems (count sortedlist)]
-  (loop [index 0]
-    (if (< index numitems)
-      (let [entry (nth sortedlist index)]
-        (println (str (nth entry 0) " " (nth entry 1)))
-        (recur (+ index 1))))))
+(let [counts {}]
+  (loop [line (read-line)]
+    (if (nil? line)
+      nil
+      (do
+        (if (= false (str/blank? line))
+          (process-line counts line))
+        (recur (read-line)))))
+  (let [sortedlist (sort compare (pairs counts))
+        space " "]
+    (for [entry sortedlist]
+      (print (nth entry 0))
+      (print space)
+      (println (nth entry 1))))

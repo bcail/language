@@ -514,6 +514,24 @@ Value map_set(ObjMap* map, Value key, Value value) {
   return OBJ_VAL(map);
 }
 
+Value map_contains(ObjMap* map, Value key) {
+  if (map->num_entries == 0) {
+    return BOOL_VAL(false);
+  }
+  if (!IS_STRING(key)) {
+    return BOOL_VAL(false);
+  }
+  int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
+  int32_t entries_index = map->indices[indices_index];
+  bool isNewKey = (entries_index == MAP_EMPTY);
+  if (isNewKey) {
+    return BOOL_VAL(false);
+  }
+  else {
+    return BOOL_VAL(true);
+  }
+}
+
 Value map_get(ObjMap* map, Value key, Value defaultVal) {
   if (map->num_entries == 0) {
     return defaultVal;
@@ -726,9 +744,7 @@ Value str_join(Value list_val) {
     start_char = start_char + s->length;
   }
   heapChars[num_bytes] = 0;
-  Value str = OBJ_VAL(allocate_string(heapChars, num_bytes));
-  inc_ref(AS_OBJ(str));
-  return str;
+  return OBJ_VAL(allocate_string(heapChars, num_bytes));
 }
 
 void free_object(Obj* object) {
@@ -775,33 +791,34 @@ void free_object(Obj* object) {
 
 /* CUSTOM CODE */
 
-Value let(ObjMap* user_globals, Value i, Value words, Value numwords, Value counts, Value recur, Value recur_1, Value word) {
-    Value user_global_lookup_1 = OBJ_VAL(copyString("counts", (size_t) 6));
-  inc_ref(AS_OBJ(user_global_lookup_1));
-  Value curcount = map_get(AS_MAP(map_get(user_globals, user_global_lookup_1, NIL_VAL)), word, NUMBER_VAL(0));
+Value let(ObjMap* user_globals, Value numwords, Value recur_1, Value word, Value recur, Value words, Value i, Value counts) {
+    Value map_get_ = map_get(AS_MAP(counts), word, NUMBER_VAL(0));
+  if (IS_OBJ(map_get_)) {
+    inc_ref(AS_OBJ(map_get_));
+  }
+  Value curcount = map_get_;
 
-  Value user_global_lookup_2 = OBJ_VAL(copyString("counts", (size_t) 6));
-  inc_ref(AS_OBJ(user_global_lookup_2));
-  Value map_assoc = map_set(AS_MAP(map_get(user_globals, user_global_lookup_2, NIL_VAL)), word, add(curcount, NUMBER_VAL(1)));
+  Value map_assoc = map_set(AS_MAP(counts), word, add(curcount, NUMBER_VAL(1)));
 
   if (IS_OBJ(map_assoc)) {
     inc_ref(AS_OBJ(map_assoc));
   }
-  dec_ref_and_free(AS_OBJ(user_global_lookup_1));
-  dec_ref_and_free(AS_OBJ(user_global_lookup_2));
+  if (IS_OBJ(map_get_)) {
+    dec_ref_and_free(AS_OBJ(map_get_));
+  }
   return map_assoc;
 }
 
-Value if_form(ObjMap* user_globals, Value i, Value words, Value numwords, Value counts, Value recur, Value recur_1, Value word) {
+Value if_form(ObjMap* user_globals, Value numwords, Value recur_1, Value word, Value recur, Value words, Value i, Value counts) {
 
   Value str_blank_ = str_blank(word);
   if (is_truthy(equal(BOOL_VAL(false), str_blank_))) {
-  Value let_result = let(user_globals, i, words, numwords, counts, recur, recur_1, word);
+  Value let_result = let(user_globals, numwords, recur_1, word, recur, words, i, counts);
   if (IS_OBJ(let_result)) {
     inc_ref(AS_OBJ(let_result));
   }
   if (IS_OBJ(let_result)) {
-  dec_ref_and_free(AS_OBJ(let_result));
+    dec_ref_and_free(AS_OBJ(let_result));
   }
     return let_result;
   }
@@ -811,10 +828,10 @@ Value if_form(ObjMap* user_globals, Value i, Value words, Value numwords, Value 
   }
 }
 
-Value let_1(ObjMap* user_globals, Value i, Value words, Value numwords, Value counts, Value recur, Value recur_1) {
+Value let_1(ObjMap* user_globals, Value numwords, Value recur_1, Value recur, Value words, Value i, Value counts) {
     Value word = list_get(words, i);
 
-  Value if_form_result = if_form(user_globals, i, words, numwords, counts, recur, recur_1, word);
+  Value if_form_result = if_form(user_globals, numwords, recur_1, word, recur, words, i, counts);
 
     recur_add(AS_RECUR(recur_1), add(i, NUMBER_VAL(1)));  if (IS_OBJ(if_form_result)) {
     dec_ref_and_free(AS_OBJ(if_form_result));
@@ -822,31 +839,30 @@ Value let_1(ObjMap* user_globals, Value i, Value words, Value numwords, Value co
   return recur_1;
 }
 
-Value if_form_1(ObjMap* user_globals, Value i, Value words, Value numwords, Value counts, Value recur, Value recur_1) {
+Value if_form_1(ObjMap* user_globals, Value numwords, Value recur_1, Value recur, Value words, Value i, Value counts) {
 
 
   if (is_truthy(equal(i, numwords))) {
-  Value user_global_lookup = OBJ_VAL(copyString("counts", (size_t) 6));
-  inc_ref(AS_OBJ(user_global_lookup));
-  if (IS_OBJ(map_get(user_globals, user_global_lookup, NIL_VAL))) {
-    inc_ref(AS_OBJ(map_get(user_globals, user_global_lookup, NIL_VAL)));
+
+  if (IS_OBJ(counts)) {
+    inc_ref(AS_OBJ(counts));
   }
-  dec_ref_and_free(AS_OBJ(user_global_lookup));
-    return map_get(user_globals, user_global_lookup, NIL_VAL);
+
+    return counts;
   }
   else {
-  Value let_result = let_1(user_globals, i, words, numwords, counts, recur, recur_1);
+  Value let_result = let_1(user_globals, numwords, recur_1, recur, words, i, counts);
   if (IS_OBJ(let_result)) {
     inc_ref(AS_OBJ(let_result));
   }
   if (IS_OBJ(let_result)) {
-  dec_ref_and_free(AS_OBJ(let_result));
+    dec_ref_and_free(AS_OBJ(let_result));
   }
     return let_result;
   }
 }
 
-Value loop(ObjMap* user_globals, Value numwords, Value counts, Value recur, Value words) {
+Value loop(ObjMap* user_globals, Value numwords, Value words, Value counts, Value recur) {
   Recur recur_1_1;
   recur_init(&recur_1_1);
   Value recur_1 = RECUR_VAL(&recur_1_1);
@@ -856,7 +872,7 @@ Value loop(ObjMap* user_globals, Value numwords, Value counts, Value recur, Valu
   }
   bool continueFlag = false;
   do {
-  Value if_form_result = if_form_1(user_globals, i, words, numwords, counts, recur, recur_1);
+  Value if_form_result = if_form_1(user_globals, numwords, recur_1, recur, words, i, counts);
   Value result = if_form_result;
   if (IS_RECUR(result)) {
     /* grab values from result and update  */
@@ -882,10 +898,10 @@ Value loop(ObjMap* user_globals, Value numwords, Value counts, Value recur, Valu
   return NIL_VAL;
 }
 
-Value let_2(ObjMap* user_globals, Value counts, Value recur, Value words) {
+Value let_2(ObjMap* user_globals, Value words, Value counts, Value recur) {
     Value numwords = list_count(words);
 
-  Value loop_result = loop(user_globals, numwords,counts,recur,words);
+  Value loop_result = loop(user_globals, numwords,words,counts,recur);
 
   if (IS_OBJ(loop_result)) {
     inc_ref(AS_OBJ(loop_result));
@@ -903,7 +919,7 @@ Value fn(ObjMap* user_globals, Value counts, Value words) {
   bool continueFlag = false;
   do {
 
-  Value let_result = let_2(user_globals, counts, recur, words);
+  Value let_result = let_2(user_globals, words, counts, recur);
   Value result = let_result;
   if (IS_RECUR(result)) {
     if (IS_OBJ(counts)) {
@@ -928,7 +944,7 @@ Value fn(ObjMap* user_globals, Value counts, Value words) {
   if (IS_OBJ(result)) {
     inc_ref(AS_OBJ(result));
   }  if (IS_OBJ(let_result)) {
-  dec_ref_and_free(AS_OBJ(let_result));
+    dec_ref_and_free(AS_OBJ(let_result));
   }
     recur_free(&recur_1);
     return result;
@@ -937,23 +953,20 @@ Value fn(ObjMap* user_globals, Value counts, Value words) {
   return NIL_VAL;
 }
 
-Value let_3(ObjMap* user_globals, Value counts, Value recur, Value line) {
+Value let_3(ObjMap* user_globals, Value line, Value counts, Value recur) {
     Value str_lower_ = str_lower(line);
   inc_ref(AS_OBJ(str_lower_));
   Value str_split_ = str_split(str_lower_);
   inc_ref(AS_OBJ(str_split_));
   Value words = str_split_;
 
-  Value user_global_lookup_3 = OBJ_VAL(copyString("counts", (size_t) 6));
-  inc_ref(AS_OBJ(user_global_lookup_3));
-  Value u_f_result = fn(user_globals, map_get(user_globals, user_global_lookup_3, NIL_VAL), words);
+  Value u_f_result = fn(user_globals, counts, words);
 
   if (IS_OBJ(u_f_result)) {
     inc_ref(AS_OBJ(u_f_result));
   }
   dec_ref_and_free(AS_OBJ(str_lower_));
   dec_ref_and_free(AS_OBJ(str_split_));
-  dec_ref_and_free(AS_OBJ(user_global_lookup_3));
   if (IS_OBJ(u_f_result)) {
     dec_ref_and_free(AS_OBJ(u_f_result));
   }
@@ -967,7 +980,7 @@ Value fn_1(ObjMap* user_globals, Value counts, Value line) {
   bool continueFlag = false;
   do {
 
-  Value let_result = let_3(user_globals, counts, recur, line);
+  Value let_result = let_3(user_globals, line, counts, recur);
   Value result = let_result;
   if (IS_RECUR(result)) {
     if (IS_OBJ(counts)) {
@@ -992,7 +1005,7 @@ Value fn_1(ObjMap* user_globals, Value counts, Value line) {
   if (IS_OBJ(result)) {
     inc_ref(AS_OBJ(result));
   }  if (IS_OBJ(let_result)) {
-  dec_ref_and_free(AS_OBJ(let_result));
+    dec_ref_and_free(AS_OBJ(let_result));
   }
     recur_free(&recur_1);
     return result;
@@ -1039,17 +1052,14 @@ Value fn_2(ObjMap* user_globals, Value a, Value b) {
   return NIL_VAL;
 }
 
-Value if_form_2(ObjMap* user_globals, Value recur, Value line) {
+Value if_form_2(ObjMap* user_globals, Value line, Value counts, Value recur) {
 
   Value str_blank_ = str_blank(line);
   if (is_truthy(equal(BOOL_VAL(false), str_blank_))) {
-  Value user_global_lookup_4 = OBJ_VAL(copyString("counts", (size_t) 6));
-  inc_ref(AS_OBJ(user_global_lookup_4));
-  Value u_f_result = fn_1(user_globals, map_get(user_globals, user_global_lookup_4, NIL_VAL), line);
+  Value u_f_result = fn_1(user_globals, counts, line);
   if (IS_OBJ(u_f_result)) {
     inc_ref(AS_OBJ(u_f_result));
   }
-  dec_ref_and_free(AS_OBJ(user_global_lookup_4));
   if (IS_OBJ(u_f_result)) {
     dec_ref_and_free(AS_OBJ(u_f_result));
   }
@@ -1061,8 +1071,8 @@ Value if_form_2(ObjMap* user_globals, Value recur, Value line) {
   }
 }
 
-Value do_f(ObjMap* user_globals, Value recur, Value line) {
-  Value if_form_result = if_form_2(user_globals, recur, line);
+Value do_f(ObjMap* user_globals, Value line, Value counts, Value recur) {
+  Value if_form_result = if_form_2(user_globals, line, counts, recur);
   Value readline_result = readline();
   recur_add(AS_RECUR(recur), readline_result);
   if (IS_OBJ(if_form_result)) {
@@ -1074,7 +1084,7 @@ Value do_f(ObjMap* user_globals, Value recur, Value line) {
   return recur;
 }
 
-Value if_form_3(ObjMap* user_globals, Value recur, Value line) {
+Value if_form_3(ObjMap* user_globals, Value line, Value counts, Value recur) {
 
 
   if (is_truthy(nil_Q_(line))) {
@@ -1086,7 +1096,7 @@ Value if_form_3(ObjMap* user_globals, Value recur, Value line) {
     return NIL_VAL;
   }
   else {
-  Value do_result = do_f(user_globals, recur, line);
+  Value do_result = do_f(user_globals, line, counts, recur);
   if (IS_OBJ(do_result)) {
     inc_ref(AS_OBJ(do_result));
   }
@@ -1097,7 +1107,7 @@ Value if_form_3(ObjMap* user_globals, Value recur, Value line) {
   }
 }
 
-Value loop_1(ObjMap* user_globals) {
+Value loop_1(ObjMap* user_globals, Value counts) {
   Recur recur_1;
   recur_init(&recur_1);
   Value recur = RECUR_VAL(&recur_1);
@@ -1108,7 +1118,7 @@ Value loop_1(ObjMap* user_globals) {
   }
   bool continueFlag = false;
   do {
-  Value if_form_result = if_form_3(user_globals, recur, line);
+  Value if_form_result = if_form_3(user_globals, line, counts, recur);
   Value result = if_form_result;
   if (IS_RECUR(result)) {
     /* grab values from result and update  */
@@ -1136,119 +1146,57 @@ Value loop_1(ObjMap* user_globals) {
   return NIL_VAL;
 }
 
-Value let_4(ObjMap* user_globals, Value numitems, Value sortedlist, Value recur, Value index) {
-    Value entry = list_get(sortedlist, index);
+Value let_4(ObjMap* user_globals, Value counts) {
+    Value map_pairs_ = map_pairs(AS_MAP(counts));
+  inc_ref(AS_OBJ(map_pairs_));
+  Value sortedlist = list_sort(user_globals, map_pairs_, fn_2);
 
-  Value str_arg_tmp_list = OBJ_VAL(allocate_list());
-  inc_ref(AS_OBJ(str_arg_tmp_list));
-  list_add(str_arg_tmp_list, list_get(entry, NUMBER_VAL(0)));
-  Value str_1 = OBJ_VAL(copyString(" ", (size_t) 1));
-  inc_ref(AS_OBJ(str_1));
-  list_add(str_arg_tmp_list, str_1);
-  list_add(str_arg_tmp_list, list_get(entry, NUMBER_VAL(1)));
-  Value str = str_join(str_arg_tmp_list);
+  Value str = OBJ_VAL(copyString(" ", (size_t) 1));
   inc_ref(AS_OBJ(str));
-  Value println_result = println(str);
+  Value space = str;
 
-    recur_add(AS_RECUR(recur), add(index, NUMBER_VAL(1)));  dec_ref_and_free(AS_OBJ(str_1));
-  dec_ref_and_free(AS_OBJ(str_arg_tmp_list));
+  ObjList* tmp_lst = AS_LIST(sortedlist);
+  for(size_t i=0; i<tmp_lst->count; i++) {
+
+    Value u_entry = tmp_lst->values[i];
+  Value print_result = print(list_get(u_entry, NUMBER_VAL(0)));
+  Value print_result_1 = print(space);
+  Value println_result = println(list_get(u_entry, NUMBER_VAL(1)));
+  }
+  dec_ref_and_free(AS_OBJ(map_pairs_));
   dec_ref_and_free(AS_OBJ(str));
-  return recur;
-}
-
-Value if_form_4(ObjMap* user_globals, Value numitems, Value sortedlist, Value recur, Value index) {
-
-
-  if (is_truthy(less(user_globals, index, numitems))) {
-  Value let_result = let_4(user_globals, numitems, sortedlist, recur, index);
-  if (IS_OBJ(let_result)) {
-    inc_ref(AS_OBJ(let_result));
-  }
-  if (IS_OBJ(let_result)) {
-  dec_ref_and_free(AS_OBJ(let_result));
-  }
-    return let_result;
-  }
-
-  else {
-    return NIL_VAL;
-  }
-}
-
-Value loop_2(ObjMap* user_globals, Value numitems, Value sortedlist) {
-  Recur recur_1;
-  recur_init(&recur_1);
-  Value recur = RECUR_VAL(&recur_1);
-  Value index = NUMBER_VAL(0);
-  if (IS_OBJ(index)) {
-    inc_ref(AS_OBJ(index));
-  }
-  bool continueFlag = false;
-  do {
-  Value if_form_result = if_form_4(user_globals, numitems, sortedlist, recur, index);
-  Value result = if_form_result;
-  if (IS_RECUR(result)) {
-    /* grab values from result and update  */
-    if (IS_OBJ(index)) {
-      dec_ref_and_free(AS_OBJ(index));
-    }
-    index = recur_get(result, NUMBER_VAL(0));
-    if (IS_OBJ(index)) {
-      inc_ref(AS_OBJ(index));
-    }
-    continueFlag = true;
-    recur_free(&recur_1);
-  }
-  else {
-
-  if (IS_OBJ(result)) {
-    inc_ref(AS_OBJ(result));
-  }
-    recur_free(&recur_1);
-    return result;
-  }
-  } while (continueFlag);
   return NIL_VAL;
 }
 
 Value let_5(ObjMap* user_globals) {
-    Value user_global_lookup_5 = OBJ_VAL(copyString("counts", (size_t) 6));
-  inc_ref(AS_OBJ(user_global_lookup_5));
-  Value map_pairs_ = map_pairs(AS_MAP(map_get(user_globals, user_global_lookup_5, NIL_VAL)));
-  inc_ref(AS_OBJ(map_pairs_));
-  Value sortedlist = list_sort(user_globals, map_pairs_, fn_2);
-
-  Value numitems = list_count(sortedlist);
-
-  Value loop_result = loop_2(user_globals, numitems,sortedlist);
-
-  if (IS_OBJ(loop_result)) {
-    inc_ref(AS_OBJ(loop_result));
-  }
-  dec_ref_and_free(AS_OBJ(user_global_lookup_5));
-  dec_ref_and_free(AS_OBJ(map_pairs_));
-  if (IS_OBJ(loop_result)) {
-    dec_ref_and_free(AS_OBJ(loop_result));
-  }
-  return loop_result;
-}
-
-int main(void)
-{
-  ObjMap* user_globals = allocate_map();
-  Value map = OBJ_VAL(allocate_map());
+    Value map = OBJ_VAL(allocate_map());
   inc_ref(AS_OBJ(map));
 
-  map_set(user_globals, OBJ_VAL(copyString("counts", (size_t) 6)), map);
+  Value counts = map;
 
-  Value loop_result = loop_1(user_globals);
-  Value let_result = let_5(user_globals);
+  Value loop_result = loop_1(user_globals, counts);
+  Value let_result = let_4(user_globals, counts);
+
+  if (IS_OBJ(let_result)) {
+    inc_ref(AS_OBJ(let_result));
+  }
   dec_ref_and_free(AS_OBJ(map));
   if (IS_OBJ(loop_result)) {
     dec_ref_and_free(AS_OBJ(loop_result));
   }
   if (IS_OBJ(let_result)) {
-  dec_ref_and_free(AS_OBJ(let_result));
+    dec_ref_and_free(AS_OBJ(let_result));
+  }
+  return let_result;
+}
+
+int main(void)
+{
+  ObjMap* user_globals = allocate_map();
+
+  Value let_result = let_5(user_globals);
+  if (IS_OBJ(let_result)) {
+    dec_ref_and_free(AS_OBJ(let_result));
   }
   free_object((Obj*)user_globals);
   return 0;
