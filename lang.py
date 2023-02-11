@@ -1437,9 +1437,9 @@ def compile_form(node, envs):
                 lst_count = _get_generated_name('tmp_lst_count', envs=envs)
                 envs[-1]['temps'].add(lst_name)
                 envs[-1]['temps'].add(lst_count)
-                envs[-1]['pre'].append(f'  int {lst_count} = (int) AS_NUMBER(list_count({lst["code"]}));')
-                envs[-1]['pre'].append('  for(int i=0; i<%s; i++) {\n' % lst_count)
-                envs[-1]['pre'].append(f'    Value {c_name} = list_get({lst["code"]}, NUMBER_VAL(i));')
+                envs[-1]['pre'].append(f'  ObjList* {lst_name} = AS_LIST({lst["code"]});')
+                envs[-1]['pre'].append('  for(size_t i=0; i<%s->count; i++) {\n' % lst_name)
+                envs[-1]['pre'].append(f'    Value {c_name} = {lst_name}->values[i];')
                 local_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
                 envs.append(local_env)
                 statement = compile_form(rest[1], envs=envs)
