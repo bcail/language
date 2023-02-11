@@ -3,7 +3,7 @@
   (let [numwords (count words)]
     (loop [i 0]
       (if (= i numwords)
-        counts
+        nil 
         (let [word (nth words i)]
           (if (= false (str/blank? word))
             (let [curcount (get counts word 0)]
