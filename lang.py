@@ -1442,7 +1442,8 @@ def compile_form(node, envs):
                 envs[-1]['pre'].append(f'    Value {c_name} = {lst_name}->values[i];')
                 local_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
                 envs.append(local_env)
-                statement = compile_form(rest[1], envs=envs)
+                for expr in rest[1:]:
+                    compile_form(expr, envs=envs)
                 code_lines = []
                 if local_env['pre']:
                     code_lines.extend(local_env['pre'])
