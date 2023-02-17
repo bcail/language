@@ -1745,6 +1745,7 @@ static Obj* allocateObject(size_t size, ObjType type) {
   return object;
 }
 
+ObjMap* interned_strings;
 void free_object(Obj* object);
 
 // http://www.toccata.io/2019/02/RefCounting.html
@@ -1768,19 +1769,49 @@ static uint32_t hashString(const char* key, size_t length) {
   return hash;
 }
 
-static ObjString* allocate_string(char* chars, size_t length) {
+Value map_set(ObjMap* map, Value key, Value value);
+
+static ObjString* allocate_string(char* chars, size_t length, uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
-  string->hash = hashString(chars, length);
+  string->hash = hash;
   string->chars = chars;
+  map_set(interned_strings, OBJ_VAL(string), NIL_VAL);
   return string;
 }
 
+ObjString* find_interned_string(const char* chars, size_t length, uint32_t hash) {
+  if (interned_strings->num_entries == 0) { return NULL; }
+  uint32_t index = hash % (uint32_t)interned_strings->indices_capacity;
+  for (;;) {
+    MapEntry entry = interned_strings->entries[index];
+    if (IS_NIL(entry.key)) {
+      return NULL;
+    }
+    ObjString* key_string = AS_STRING(entry.key);
+    if (key_string->length == length &&
+        key_string->hash == hash &&
+        memcmp(key_string->chars, chars, length) == 0) {
+      // We found it.
+      return key_string;
+    }
+
+    index = (index + 1) % (uint32_t)interned_strings->indices_capacity;
+  }
+
+  return NULL;
+}
+
 ObjString* copyString(const char* chars, size_t length) {
+  uint32_t hash = hashString(chars, length);
+  ObjString* interned = find_interned_string(chars, length, hash);
+  if (interned != NULL) {
+    return interned;
+  }
   char* heapChars = ALLOCATE(char, length + 1);
   memcpy(heapChars, chars, length);
   heapChars[length] = 0; /* terminate it w/ NULL, so we can pass c-string to functions that need it */
-  return allocate_string(heapChars, length);
+  return allocate_string(heapChars, length, hash);
 }
 
 ObjList* allocate_list(void) {
@@ -2341,7 +2372,8 @@ Value str_join(Value list_val) {
     start_char = start_char + s->length;
   }
   heapChars[num_bytes] = 0;
-  return OBJ_VAL(allocate_string(heapChars, num_bytes));
+  uint32_t hash = hashString(heapChars, num_bytes);
+  return OBJ_VAL(allocate_string(heapChars, num_bytes, hash));
 }
 
 void free_object(Obj* object) {
@@ -2420,6 +2452,7 @@ def _compile(source):
         c_code += '\n\n'.join([f for f in env['functions'].values()]) + '\n\n'
 
     c_code += 'int main(void)\n{'
+    c_code += '\n  interned_strings = allocate_map();'
     c_code += '\n  ObjMap* user_globals = allocate_map();\n'
 
     for name, value in env['user_globals'].items():
@@ -2435,6 +2468,7 @@ def _compile(source):
     if env['post']:
         c_code += '\n' + '\n'.join(env['post'])
     c_code += '\n  free_object((Obj*)user_globals);'
+    c_code += '\n  free_object((Obj*)interned_strings);'
     c_code += '\n  return 0;\n}'
 
     return c_code
