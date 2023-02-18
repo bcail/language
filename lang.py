@@ -1784,10 +1784,10 @@ ObjString* find_interned_string(const char* chars, size_t length, uint32_t hash)
   if (interned_strings->num_entries == 0) { return NULL; }
   uint32_t index = hash % (uint32_t)interned_strings->indices_capacity;
   for (;;) {
-    MapEntry entry = interned_strings->entries[index];
-    if (IS_NIL(entry.key)) {
+    if (interned_strings->indices[index] == MAP_EMPTY) {
       return NULL;
     }
+    MapEntry entry = interned_strings->entries[interned_strings->indices[index]];
     ObjString* key_string = AS_STRING(entry.key);
     if (key_string->length == length &&
         key_string->hash == hash &&

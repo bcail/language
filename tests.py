@@ -451,6 +451,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (str 1))', 'output': '1'},
             {'src': '(print (str "abc"))', 'output': 'abc'},
             {'src': '(print (str "abc" "def"))', 'output': 'abcdef'},
+            {'src': '(print (str "abc" "abc"))', 'output': 'abcabc'},
         ]
         for test in tests:
             with self.subTest(test=test):
