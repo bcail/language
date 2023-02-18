@@ -1776,7 +1776,9 @@ static ObjString* allocate_string(char* chars, size_t length, uint32_t hash) {
   string->length = length;
   string->hash = hash;
   string->chars = chars;
-  map_set(interned_strings, OBJ_VAL(string), NIL_VAL);
+  if (length < 4) {
+    map_set(interned_strings, OBJ_VAL(string), NIL_VAL);
+  }
   return string;
 }
 
@@ -1804,9 +1806,11 @@ ObjString* find_interned_string(const char* chars, size_t length, uint32_t hash)
 
 ObjString* copyString(const char* chars, size_t length) {
   uint32_t hash = hashString(chars, length);
-  ObjString* interned = find_interned_string(chars, length, hash);
-  if (interned != NULL) {
-    return interned;
+  if (length < 4) {
+    ObjString* interned = find_interned_string(chars, length, hash);
+    if (interned != NULL) {
+      return interned;
+    }
   }
   char* heapChars = ALLOCATE(char, length + 1);
   memcpy(heapChars, chars, length);
