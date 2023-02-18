@@ -459,14 +459,17 @@ static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t ca
    * - if indices[index] points to an entry in entries with a hash that matches our hash, return index
    * Otherwise, keep adding one till we get to the correct key or an empty slot. */
 
-  ObjString* keyString = AS_STRING(key);
+  ObjString* key_string = AS_STRING(key);
 
-  uint32_t index = keyString->hash % (uint32_t) capacity;
+  uint32_t index = key_string->hash % (uint32_t) capacity;
   for (;;) {
     if (indices[index] == MAP_EMPTY) {
       return (int32_t) index;
     }
-    if (AS_BOOL(equal(entries[indices[index]].key, key))) {
+    ObjString* entry_key_string = AS_STRING(entries[indices[index]].key);
+    if (key_string->length == entry_key_string->length &&
+        key_string->hash == entry_key_string->hash &&
+        memcmp(key_string->chars, entry_key_string->chars, key_string->length) == 0) {
       return (int32_t) index;
     }
 
@@ -827,7 +830,7 @@ void free_object(Obj* object) {
 
 /* CUSTOM CODE */
 
-Value let(ObjMap* user_globals, Value recur, Value word, Value counts, Value numwords, Value recur_1, Value i, Value words) {
+Value let(ObjMap* user_globals, Value recur, Value numwords, Value word, Value recur_1, Value counts, Value words, Value i) {
     Value map_get_ = map_get(AS_MAP(counts), word, NUMBER_VAL(0));
   if (IS_OBJ(map_get_)) {
     inc_ref(AS_OBJ(map_get_));
@@ -845,11 +848,11 @@ Value let(ObjMap* user_globals, Value recur, Value word, Value counts, Value num
   return map_assoc;
 }
 
-Value if_form(ObjMap* user_globals, Value recur, Value word, Value counts, Value numwords, Value recur_1, Value i, Value words) {
+Value if_form(ObjMap* user_globals, Value recur, Value numwords, Value word, Value recur_1, Value counts, Value words, Value i) {
 
   Value str_blank_ = str_blank(word);
   if (is_truthy(equal(BOOL_VAL(false), str_blank_))) {
-  Value let_result = let(user_globals, recur, word, counts, numwords, recur_1, i, words);
+  Value let_result = let(user_globals, recur, numwords, word, recur_1, counts, words, i);
   if (IS_OBJ(let_result)) {
     inc_ref(AS_OBJ(let_result));
   }
@@ -864,10 +867,10 @@ Value if_form(ObjMap* user_globals, Value recur, Value word, Value counts, Value
   }
 }
 
-Value let_1(ObjMap* user_globals, Value recur, Value counts, Value numwords, Value recur_1, Value i, Value words) {
+Value let_1(ObjMap* user_globals, Value recur, Value numwords, Value recur_1, Value counts, Value words, Value i) {
     Value word = list_get(words, i);
 
-  Value if_form_result = if_form(user_globals, recur, word, counts, numwords, recur_1, i, words);
+  Value if_form_result = if_form(user_globals, recur, numwords, word, recur_1, counts, words, i);
 
     recur_add(AS_RECUR(recur_1), add(i, NUMBER_VAL(1)));  if (IS_OBJ(if_form_result)) {
     dec_ref_and_free(AS_OBJ(if_form_result));
@@ -875,7 +878,7 @@ Value let_1(ObjMap* user_globals, Value recur, Value counts, Value numwords, Val
   return recur_1;
 }
 
-Value if_form_1(ObjMap* user_globals, Value recur, Value counts, Value numwords, Value recur_1, Value i, Value words) {
+Value if_form_1(ObjMap* user_globals, Value recur, Value numwords, Value recur_1, Value counts, Value words, Value i) {
 
 
   if (is_truthy(equal(i, numwords))) {
@@ -887,7 +890,7 @@ Value if_form_1(ObjMap* user_globals, Value recur, Value counts, Value numwords,
     return NIL_VAL;
   }
   else {
-  Value let_result = let_1(user_globals, recur, counts, numwords, recur_1, i, words);
+  Value let_result = let_1(user_globals, recur, numwords, recur_1, counts, words, i);
   if (IS_OBJ(let_result)) {
     inc_ref(AS_OBJ(let_result));
   }
@@ -908,7 +911,7 @@ Value loop(ObjMap* user_globals, Value counts, Value numwords, Value words, Valu
   }
   bool continueFlag = false;
   do {
-  Value if_form_result = if_form_1(user_globals, recur, counts, numwords, recur_1, i, words);
+  Value if_form_result = if_form_1(user_globals, recur, numwords, recur_1, counts, words, i);
   Value result = if_form_result;
   if (IS_RECUR(result)) {
     /* grab values from result and update  */
