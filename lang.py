@@ -798,6 +798,9 @@ def if_form_c(params, envs):
     local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
 
+    result_name = _get_generated_name('if_result', envs=envs)
+    local_env['temps'].add(result_name)
+
     test_code = compile_form(params[0], envs=envs)['code']
     true_env = {'temps': local_env['temps'], 'pre': [], 'post': [], 'bindings': {}}
     envs.append(true_env)
@@ -823,7 +826,7 @@ def if_form_c(params, envs):
         true_code += '\n'.join(local_env['post'])
     if true_env['post']:
         true_code += '\n'.join(true_env['post'])
-    true_code += '\n    return %s;' % true_return_val
+    true_code += f'\n    {result_name} = {true_return_val};'
     true_code += '\n  }\n'
     envs.pop()
 
@@ -853,33 +856,17 @@ def if_form_c(params, envs):
             false_code += '\n'.join(local_env['post'])
         if false_env['post']:
             false_code += '\n'.join(false_env['post'])
-        false_code += '\n    return %s;' % false_return_val
+        false_code += f'\n    {result_name} = {false_return_val};'
         false_code += '\n  }'
         envs.pop()
-    else:
-        false_code += '\n  else {\n    return NIL_VAL;\n  }'
 
-    f_params = 'ObjMap* user_globals'
-    f_args = 'user_globals'
-    f_code = ''
-
-    previous_bindings = _get_previous_bindings(envs)
-    if previous_bindings:
-        for binding in previous_bindings:
-            f_params += f', Value {binding}'
-            f_args += f', {binding}'
+    f_code = f'  Value {result_name} = NIL_VAL;'
     f_code += '\n' + '\n'.join(envs[-1].get('pre', []))
-
     f_code += true_code
     f_code += false_code
 
-    f_name = _get_generated_name(base='if_form', envs=envs)
-    envs[0]['functions'][f_name] = 'Value %s(%s) {\n%s\n}' % (f_name, f_params, f_code)
-
-    result_name = _get_generated_name('if_form_result', envs=envs)
-
     envs.pop()
-    envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({f_args});')
+    envs[-1]['pre'].append(f_code)
     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
 
     return {'code': result_name}
