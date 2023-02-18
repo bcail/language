@@ -795,7 +795,7 @@ def _get_previous_bindings(envs):
 
 
 def if_form_c(params, envs):
-    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
 
     result_name = _get_generated_name('if_result', envs=envs)
