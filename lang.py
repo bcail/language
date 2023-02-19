@@ -770,7 +770,7 @@ def less_equal_c(params, envs):
 
 def def_c(params, envs):
     name = params[0].name
-    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
     result = compile_form(params[1], envs=envs)
     c_name = _get_generated_name(base=f'u_{name}', envs=envs)
@@ -889,7 +889,7 @@ def let_c(params, envs):
             f_params += f', Value {previous_binding}'
             f_args += f', {previous_binding}'
 
-    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
     for binding in paired_bindings:
         result = compile_form(binding[1], envs=envs)
@@ -947,7 +947,7 @@ def loop_c(params, envs):
 
     previous_bindings = _get_previous_bindings(envs)
 
-    local_env = {'temps': set(previous_bindings), 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': set(previous_bindings).union(envs[-1]['temps']), 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
 
     recur_name = _get_generated_name('recur', envs=envs)
@@ -962,7 +962,7 @@ def loop_c(params, envs):
     loop_post = []
 
     for index, loop_param in enumerate(loop_params):
-        param_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+        param_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
         envs.append(param_env)
         c_name = _get_generated_name(base=loop_param.name, envs=envs)
         result = compile_form(initial_args[index], envs=envs)
@@ -977,6 +977,7 @@ def loop_c(params, envs):
         f_code += f'\n  Value {c_name} = {result["code"]};'
         f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (c_name, c_name)
         envs.pop()
+        envs[-1]['temps'] = param_env['temps']
 
     c_loop_params = [f'Value {pb}' for pb in previous_bindings]
     c_loop_params_str = ', '.join(c_loop_params)
@@ -988,14 +989,14 @@ def loop_c(params, envs):
     f_code += '\n  bool continueFlag = false;'
     f_code += '\n  do {\n'
     for form in exprs[:-1]:
-        form_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+        form_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
         envs.append(form_env)
         compiled = compile_form(form, envs=envs)
         if form_env['pre']:
             f_code += '\n'.join(form_env['pre'])
         envs.pop()
 
-    form_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+    form_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
     envs.append(form_env)
     compiled = compile_form(exprs[-1], envs=envs)
     if form_env['pre']:
@@ -1194,7 +1195,7 @@ def fn_c(params, envs):
     bindings = params[0]
     exprs = params[1:]
 
-    local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+    local_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
 
     recur_name = _get_generated_name('recur', envs=envs)
@@ -1281,6 +1282,7 @@ def defn_c(params, envs):
 
 def readline_c(params, envs):
     result_name = _get_generated_name('readline_result', envs=envs)
+    envs[-1]['temps'].add(result_name)
     envs[-1]['pre'].append(f'  Value {result_name} = readline();')
     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
     return {'code': result_name}
@@ -1454,7 +1456,7 @@ def compile_form(node, envs):
                 else:
                     do_args = 'user_globals'
 
-                local_env = {'temps': set(), 'pre': [], 'post': [], 'bindings': {}}
+                local_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
                 envs.append(local_env)
                 do_exprs = [compile_form(n, envs=envs) for n in rest]
 
