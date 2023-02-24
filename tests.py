@@ -631,9 +631,11 @@ class CompileTests(unittest.TestCase):
     def test_def(self):
         tests = [
             {'src': '(def a 1) (print a)', 'output': '1'},
+            {'src': '(def a "1") (print a)', 'output': '1'},
             {'src': '(def some-thing 1) (print some-thing)', 'output': '1'},
             {'src': '(def some-thing "1") (print some-thing)', 'output': '1'},
             {'src': '(def some-thing {"a" "b"}) (print some-thing)', 'output': '{a b}'},
+            {'src': '(def a "1") (def a "2") (print a)', 'output': '2'},
         ]
         for test in tests:
             with self.subTest(test=test):

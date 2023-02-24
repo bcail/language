@@ -776,7 +776,7 @@ def def_c(params, envs):
     c_name = _get_generated_name(base=f'u_{name}', envs=envs)
     envs[0]['user_globals'][name] = {'type': 'var', 'c_name': c_name, 'code': result['code']}
     if local_env['pre']:
-        envs[0]['user_globals'][name]['init'] = local_env['pre']
+        envs[0]['init'].extend(local_env['pre'])
     if local_env['post']:
         envs[0]['post'].extend(local_env['post'])
     envs.pop()
@@ -2425,6 +2425,7 @@ def _compile(source):
         'functions': {},
         'user_globals': {},
         'temps': set(),
+        'init': [],
         'pre': [],
         'post': [],
         'bindings': {},
@@ -2451,10 +2452,11 @@ def _compile(source):
     c_code += '\n  interned_strings = allocate_map();'
     c_code += '\n  ObjMap* user_globals = allocate_map();\n'
 
+    if env['init']:
+        c_code += '\n'.join(env['init'])
+
     for name, value in env['user_globals'].items():
         if value['type'] == 'var':
-            if value.get('init'):
-                c_code += '\n'.join(value['init'])
             c_code += f'\n  map_set(user_globals, OBJ_VAL(copyString("{name}", (size_t) {len(name)})), {value["code"]});\n'
 
     c_code += '\n' + '\n'.join(env['pre'])
