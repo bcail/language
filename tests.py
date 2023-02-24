@@ -586,10 +586,14 @@ class CompileTests(unittest.TestCase):
     def test_let(self):
         tests = [
             {'src': '(print (let [y 1] y))', 'output': '1'},
+            {'src': '(print (let [y "1"] y))', 'output': '1'},
             {'src': '(print (let [y 1] [y]))', 'output': '[1]'},
-            {'src': '(print (let [y 1] {"a" y}))', 'output': '{a 1}'},
+            {'src': '(print (let [y "1"] [y]))', 'output': '[1]'},
+            {'src': '(print (let [y "1"] {"a" y}))', 'output': '{a 1}'},
             {'src': '(let [x 1] (print x))', 'output': '1'},
+            {'src': '(let [x "1"] (print x))', 'output': '1'},
             {'src': '(let [x {}] (print x))', 'output': '{}'},
+            {'src': '(let [x {"a" "value"}] (print x))', 'output': '{a value}'},
             {'src': '(let [x-y {}] (print x-y))', 'output': '{}'},
             {'src': '(let [x-y {}] (let [z-a 1] (print x-y)))', 'output': '{}'},
             {'src': '(let [x-y {}] (print x-y) (print "done"))', 'output': '{}done'},
@@ -605,6 +609,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (loop [cnt 3 acc 0] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc cnt)))))', 'output': '6'},
             {'src': '(loop [n 0] (do (print n) (if (< n 2) (recur (+ n 1)))))', 'output': '012'},
             {'src': '(loop [n 0] (print n) (if (< n 2) (recur (+ n 1))))', 'output': '012'},
+            {'src': '(loop [n 0] (print (str n)) (if (< n 2) (recur (+ n 1))))', 'output': '01'},
             {'src': '(loop [n 0] (if (> n 2) (print n) (let [y 1] (recur (+ n y)))))', 'output': '3'},
             {'src': '(let [b 2] (loop [n 0] (if (> n b) (print n) (let [y 1] (recur (+ n y))))))', 'output': '3'},
             {'src': '(loop [n 0] (if (> n 2) (print "done") (do (print n) (recur (+ n 1)))))', 'output': '012done'},
@@ -636,6 +641,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(def some-thing "1") (print some-thing)', 'output': '1'},
             {'src': '(def some-thing {"a" "b"}) (print some-thing)', 'output': '{a b}'},
             {'src': '(def a "1") (def a "2") (print a)', 'output': '2'},
+            {'src': '(def some-thing (assoc {} "a" "value")) (print some-thing)', 'output': '{a value}'},
+            {'src': '(def some-thing (let [d {"a" "value"}] (assoc d "b" "another"))) (print some-thing)', 'output': '{a value, b another}'},
         ]
         for test in tests:
             with self.subTest(test=test):

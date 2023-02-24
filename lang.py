@@ -1062,7 +1062,7 @@ def str_c(params, envs):
 
     name = _get_generated_name('str', envs=envs)
     envs[-1]['pre'].append(f'  Value {name} = str_str({arg_name});')
-    envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
+    # envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
     return {'code': name}
 
@@ -2322,29 +2322,37 @@ Value str_split(Value string) {
 }
 
 Value str_str(Value v) {
-    if (IS_BOOL(v)) {
-      if (AS_BOOL(v)) {
-        return OBJ_VAL(copyString("true", (size_t)4));
-      }
-      else {
-        return OBJ_VAL(copyString("false", (size_t)5));
-      }
+  // if we got a string, no need to do any work, just return it
+  if (IS_STRING(v)) {
+    inc_ref(AS_OBJ(v));
+    return v;
+  }
+
+  Value s;
+  if (IS_BOOL(v)) {
+    if (AS_BOOL(v)) {
+      s = OBJ_VAL(copyString("true", (size_t)4));
     }
-    if (IS_NUMBER(v)) {
-      char str[100];
-      int num_chars = sprintf(str, "%g", AS_NUMBER(v));
-      return OBJ_VAL(copyString(str, (size_t)num_chars));
+    else {
+      s = OBJ_VAL(copyString("false", (size_t)5));
     }
-    if (IS_STRING(v)) {
-      return v;
-    }
-    if (IS_LIST(v)) {
-      return OBJ_VAL(copyString("[]", (size_t)2));
-    }
-    if (IS_MAP(v)) {
-      return OBJ_VAL(copyString("{}", (size_t)2));
-    }
-    return OBJ_VAL(copyString("", (size_t)0));
+  }
+  else if (IS_NUMBER(v)) {
+    char str[100];
+    int num_chars = sprintf(str, "%g", AS_NUMBER(v));
+    s = OBJ_VAL(copyString(str, (size_t)num_chars));
+  }
+  else if (IS_LIST(v)) {
+    s = OBJ_VAL(copyString("[]", (size_t)2));
+  }
+  else if (IS_MAP(v)) {
+    s = OBJ_VAL(copyString("{}", (size_t)2));
+  }
+  else {
+    s = OBJ_VAL(copyString("", (size_t)0));
+  }
+  inc_ref(AS_OBJ(s));
+  return s;
 }
 
 Value str_join(Value list_val) {
@@ -2356,6 +2364,10 @@ Value str_join(Value list_val) {
     Value v = list_get(list_val, NUMBER_VAL((double)i));
     Value v_str = str_str(v);
     num_bytes = num_bytes + AS_STRING(v_str)->length;
+    dec_ref_and_free(AS_OBJ(v_str));
+    if (IS_OBJ(v)) {
+      dec_ref_and_free(AS_OBJ(v));
+    }
   }
 
   char* heapChars = ALLOCATE(char, num_bytes+1);
