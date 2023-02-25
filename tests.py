@@ -612,6 +612,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(loop [n 0] (print (str n)) (if (< n 2) (recur (+ n 1))))', 'output': '012'},
             {'src': '(loop [n 0] (if (> n 2) (print n) (let [y 1] (recur (+ n y)))))', 'output': '3'},
             {'src': '(let [b 2] (loop [n 0] (if (> n b) (print n) (let [y 1] (recur (+ n y))))))', 'output': '3'},
+            {'src': '(let [b 2] (loop [n 0] (if (> n b) (print (str n)) (let [y 1] (recur (+ n y))))))', 'output': '3'},
             {'src': '(loop [n 0] (if (> n 2) (print "done") (do (print n) (recur (+ n 1)))))', 'output': '012done'},
             {'src': '(loop [n 0] (do (print n) (print "    ") (println (/ (* 5 (- n 32)) 9)) (if (< n 70) (recur (+ 20 n)))))', 'output': f'0    -17.7778{LSEP}20    -6.66667{LSEP}40    4.44444{LSEP}60    15.5556{LSEP}80    26.6667{LSEP}'},
         ]
@@ -677,6 +678,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (str []))', 'output': '[]'},
             {'src': '(print (str {}))', 'output': '{}'},
             {'src': '(print (if (str/blank? "Hello World") "blank" "not blank"))', 'output': 'not blank'},
+            {'src': '(print (if "Hello World" (read-line) "false"))', 'input': 'line', 'output': 'line'},
             {'src': '(def a 1) (let [b 2] (print (+ a b)))', 'output': '3'},
             {'src': '(print (let [b {"key" (get {"z" 2} "z")}] (+ 1 (get b "key"))))', 'output': '3'},
             {'src': '(let [x 1] (if (= x 1) (print true) (print false)))', 'output': 'true'},

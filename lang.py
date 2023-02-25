@@ -806,64 +806,64 @@ def if_form_c(params, envs):
     envs.append(true_env)
     true_result = compile_form(params[1], envs=envs)
 
-    true_code = '\n  if (is_truthy(%s)) {\n' % test_code
+    true_code = '\n  if (is_truthy(%s)) {\n  ' % test_code
     if true_env['pre']:
-        true_code += '\n'.join(true_env['pre'])
-    true_return_val = ''
+        true_code += '\n  '.join(true_env['pre']) + '\n  '
     if isinstance(true_result, tuple) and isinstance(true_result[0], Symbol) and true_result[0].name == 'recur':
         for e in envs:
             for b in e.get('bindings', {}).keys():
                 if b.startswith('recur'):
                     recur_name = b
         for r in true_result[1:]:
-            true_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
-        true_return_val = recur_name
+            true_code += f'  recur_add(AS_RECUR({recur_name}), {r["code"]});\n'
+        true_code += f'    {result_name} = {recur_name};'
     else:
-        true_return_val = true_result['code']
-        if true_return_val not in ['BOOL_VAL(true)', 'BOOL_VAL(false)']:
-            true_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (true_return_val, true_return_val)
-    if local_env['post']:
-        true_code += '\n'.join(local_env['post'])
+        true_val = true_result['code']
+        true_code += f'    {result_name} = {true_val};'
+        # inc-ref result_name if needed, so object doesn't get freed
+        if true_val not in ['BOOL_VAL(true)', 'BOOL_VAL(false)']:
+            true_code += '\n    if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (result_name, result_name)
     if true_env['post']:
-        true_code += '\n'.join(true_env['post'])
-    true_code += f'\n    {result_name} = {true_return_val};'
-    true_code += '\n  }\n'
+        true_code += '\n  ' + '\n  '.join(true_env['post'])
+    true_code += '\n  } // end true code\n'
     envs.pop()
 
     false_code = ''
     if len(params) > 2:
         false_env = {'temps': local_env['temps'], 'pre': [], 'post': [], 'bindings': {}}
         envs.append(false_env)
-        false_code += '  else {\n'
+        false_code += '  else {\n  '
         false_result = compile_form(params[2], envs=envs)
         if false_env['pre']:
-            false_code += '\n'.join(false_env['pre'])
-        false_return_val = ''
+            false_code += '\n  '.join(false_env['pre']) + '\n  '
         if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
             for e in envs:
                 for b in e.get('bindings', {}).keys():
                     if b.startswith('recur'):
                         recur_name = b
             for r in false_result[1:]:
-                false_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
-            false_return_val = recur_name
+                false_code += f'    recur_add(AS_RECUR({recur_name}), {r["code"]});'
+            false_code += f'    {result_name} = {recur_name};'
         else:
-            false_return_val = false_result['code']
-            if false_return_val not in ['BOOL_VAL(true)', 'BOOL_VAL(false)']:
-                false_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }\n' % (false_return_val, false_return_val)
+            false_val = false_result['code']
+            false_code += f'  {result_name} = {false_val};\n  '
+            # inc-ref result_name if needed, so object doesn't get freed early
+            if false_val not in ['BOOL_VAL(true)', 'BOOL_VAL(false)']:
+                false_code += '  if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }\n  ' % (result_name, result_name)
 
-        if local_env['post']:
-            false_code += '\n'.join(local_env['post'])
         if false_env['post']:
-            false_code += '\n'.join(false_env['post'])
-        false_code += f'\n    {result_name} = {false_return_val};'
-        false_code += '\n  }'
+            false_code += '\n  '.join(false_env['post']) + '\n  '
+        false_code += '} // end false code\n'
         envs.pop()
 
     f_code = f'  Value {result_name} = NIL_VAL;'
-    f_code += '\n' + '\n'.join(envs[-1].get('pre', []))
+    if local_env['pre']:
+        f_code += '\n' + '\n'.join(local_env['pre'])
     f_code += true_code
     f_code += false_code
+
+    if local_env['post']:
+        envs[-2]['post'].extend(local_env['post'])
 
     envs.pop()
     envs[-1]['pre'].append(f_code)
