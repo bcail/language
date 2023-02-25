@@ -609,7 +609,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (loop [cnt 3 acc 0] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc cnt)))))', 'output': '6'},
             {'src': '(loop [n 0] (do (print n) (if (< n 2) (recur (+ n 1)))))', 'output': '012'},
             {'src': '(loop [n 0] (print n) (if (< n 2) (recur (+ n 1))))', 'output': '012'},
-            {'src': '(loop [n 0] (print (str n)) (if (< n 2) (recur (+ n 1))))', 'output': '01'},
+            {'src': '(loop [n 0] (print (str n)) (if (< n 2) (recur (+ n 1))))', 'output': '012'},
             {'src': '(loop [n 0] (if (> n 2) (print n) (let [y 1] (recur (+ n y)))))', 'output': '3'},
             {'src': '(let [b 2] (loop [n 0] (if (> n b) (print n) (let [y 1] (recur (+ n y))))))', 'output': '3'},
             {'src': '(loop [n 0] (if (> n 2) (print "done") (do (print n) (recur (+ n 1)))))', 'output': '012done'},

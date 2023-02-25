@@ -987,36 +987,43 @@ def loop_c(params, envs):
         c_loop_params_str = 'ObjMap* user_globals'
 
     f_code += '\n  bool continueFlag = false;'
-    f_code += '\n  do {\n'
+    f_code += '\n  do {\n  '
     for form in exprs[:-1]:
         form_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
         envs.append(form_env)
         compiled = compile_form(form, envs=envs)
         if form_env['pre']:
-            f_code += '\n'.join(form_env['pre'])
+            f_code += '\n  '.join(form_env['pre'])
+        if form_env['post']:
+            loop_post.extend(form_env['post'])
         envs.pop()
 
     form_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
     envs.append(form_env)
     compiled = compile_form(exprs[-1], envs=envs)
     if form_env['pre']:
-        f_code += '\n'.join(form_env['pre'])
-    f_code += f'\n  Value result = {compiled["code"]};'
-    f_code +=  '\n  if (IS_RECUR(result)) {'
-    f_code += f'\n    /* grab values from result and update  */'
+        f_code += '\n' + '\n  '.join(form_env['pre'])
+    if form_env['post']:
+        loop_post.extend(form_env['post'])
+
+    f_code += f'\n    Value result = {compiled["code"]};'
+    f_code +=  '\n    if (IS_RECUR(result)) {'
+    f_code += f'\n      /* grab values from result and update  */'
     for index, loop_param_value in enumerate(list(local_env['bindings'].values())[1:]):
         c_name = loop_param_value['c_name']
-        f_code += '\n    if (IS_OBJ(%s)) {\n      dec_ref_and_free(AS_OBJ(%s));\n    }' % (c_name, c_name)
-        f_code += f'\n    {c_name} = recur_get(result, NUMBER_VAL({index}));'
-        f_code += '\n    if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (c_name, c_name)
+        f_code += '\n      if (IS_OBJ(%s)) {\n      dec_ref_and_free(AS_OBJ(%s));\n    }' % (c_name, c_name)
+        f_code += f'\n      {c_name} = recur_get(result, NUMBER_VAL({index}));'
+        f_code += '\n      if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (c_name, c_name)
+    if loop_post:
+        f_code += '\n' + '\n'.join(loop_post)
     f_code += f'\n    continueFlag = true;'
     f_code += f'\n    recur_free(&{recur_name}_1);'
-    f_code +=  '\n  }\n  else {\n'
+    f_code +=  '\n  }\n    else {\n'
     if loop_post:
-        f_code += '\n'.join(loop_post)
-    f_code += '\n  if (IS_OBJ(result)) {\n    inc_ref(AS_OBJ(result));\n  }'
-    f_code += f'\n    recur_free(&{recur_name}_1);'
-    f_code +=  '\n    return result;\n  }'
+        f_code += '\n  '.join(loop_post)
+    f_code += '\n    if (IS_OBJ(result)) {\n      inc_ref(AS_OBJ(result));\n    }'
+    f_code += f'\n      recur_free(&{recur_name}_1);'
+    f_code +=  '\n      return result;\n    }'
     envs.pop()
 
     f_code += '\n  } while (continueFlag);'
@@ -1061,6 +1068,7 @@ def str_c(params, envs):
         return {'code': name}
 
     name = _get_generated_name('str', envs=envs)
+    envs[-1]['temps'].add(name)
     envs[-1]['pre'].append(f'  Value {name} = str_str({arg_name});')
     # envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
