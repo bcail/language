@@ -832,33 +832,33 @@ def if_form_c(params, envs):
     if len(params) > 2:
         false_env = {'temps': local_env['temps'], 'pre': [], 'post': [], 'bindings': {}}
         envs.append(false_env)
-        false_code += '  else {\n  '
+        false_code += '  else {'
         false_result = compile_form(params[2], envs=envs)
         if false_env['pre']:
-            false_code += '\n  '.join(false_env['pre']) + '\n  '
+            false_code += '\n' + '\n  '.join(false_env['pre'])
         if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
             for e in envs:
                 for b in e.get('bindings', {}).keys():
                     if b.startswith('recur'):
                         recur_name = b
             for r in false_result[1:]:
-                false_code += f'    recur_add(AS_RECUR({recur_name}), {r["code"]});'
-            false_code += f'    {result_name} = {recur_name};'
+                false_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
+            false_code += f'\n    {result_name} = {recur_name};'
         else:
             false_val = false_result['code']
-            false_code += f'  {result_name} = {false_val};\n  '
+            false_code += f'\n  {result_name} = {false_val};'
             # inc-ref result_name if needed, so object doesn't get freed early
             if false_val not in ['BOOL_VAL(true)', 'BOOL_VAL(false)']:
-                false_code += '  if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }\n  ' % (result_name, result_name)
+                false_code += '\n    if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (result_name, result_name)
 
         if false_env['post']:
-            false_code += '\n  '.join(false_env['post']) + '\n  '
-        false_code += '} // end false code\n'
+            false_code += '\n' + '\n  '.join(false_env['post'])
+        false_code += '\n  } // end false code'
         envs.pop()
 
     f_code = f'  Value {result_name} = NIL_VAL;'
     if local_env['pre']:
-        f_code += '\n' + '\n'.join(local_env['pre'])
+        f_code += '\n' + '\n  '.join(local_env['pre'])
     f_code += true_code
     f_code += false_code
 
@@ -952,14 +952,11 @@ def loop_c(params, envs):
 
     recur_name = _get_generated_name('recur', envs=envs)
     local_env['temps'].add(recur_name)
-    local_env['pre'].append(f'  Recur {recur_name}_1;')
-    local_env['pre'].append(f'  recur_init(&{recur_name}_1);')
-    local_env['pre'].append(f'  Value {recur_name} = RECUR_VAL(&{recur_name}_1);')
     local_env['bindings'][recur_name] = None
 
-    f_code = '\n'.join(local_env['pre'])
-
-    loop_post = []
+    f_code =  f'  Recur {recur_name}_1;'
+    f_code += f'\n  recur_init(&{recur_name}_1);'
+    f_code += f'\n  Value {recur_name} = RECUR_VAL(&{recur_name}_1);'
 
     for index, loop_param in enumerate(loop_params):
         param_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
@@ -972,10 +969,10 @@ def loop_c(params, envs):
         }
         if param_env['pre']:
             f_code += '\n' + '\n'.join(param_env['pre'])
-        if param_env['post']:
-            loop_post.extend(param_env['post'])
         f_code += f'\n  Value {c_name} = {result["code"]};'
         f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (c_name, c_name)
+        if param_env['post']:
+            f_code += '\n' + '\n  '.join(param_env['post'])
         envs.pop()
         envs[-1]['temps'] = param_env['temps']
 
@@ -986,14 +983,19 @@ def loop_c(params, envs):
     else:
         c_loop_params_str = 'ObjMap* user_globals'
 
+    loop_result = _get_generated_name('loop_result', envs=envs)
+    envs[-1]['temps'].add(loop_result)
+
+    loop_post = []
+
     f_code += '\n  bool continueFlag = false;'
-    f_code += '\n  do {\n  '
+    f_code += '\n  do {'
     for form in exprs[:-1]:
         form_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
         envs.append(form_env)
         compiled = compile_form(form, envs=envs)
         if form_env['pre']:
-            f_code += '\n  '.join(form_env['pre'])
+            f_code += '\n' + '\n  '.join(form_env['pre'])
         if form_env['post']:
             loop_post.extend(form_env['post'])
         envs.pop()
@@ -1003,16 +1005,21 @@ def loop_c(params, envs):
     compiled = compile_form(exprs[-1], envs=envs)
     if form_env['pre']:
         f_code += '\n' + '\n  '.join(form_env['pre'])
-    if form_env['post']:
-        loop_post.extend(form_env['post'])
 
-    f_code += f'\n    Value result = {compiled["code"]};'
-    f_code +=  '\n    if (IS_RECUR(result)) {'
+    f_code += f'\n    Value {loop_result} = {compiled["code"]};'
+    f_code += '\n    if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (loop_result, loop_result)
+
+    if form_env['post']:
+        f_code += '\n' + '\n  '.join(form_env['post'])
+
+    envs.pop()
+
+    f_code +=  '\n    if (IS_RECUR(%s)) {' % loop_result
     f_code += f'\n      /* grab values from result and update  */'
     for index, loop_param_value in enumerate(list(local_env['bindings'].values())[1:]):
         c_name = loop_param_value['c_name']
         f_code += '\n      if (IS_OBJ(%s)) {\n      dec_ref_and_free(AS_OBJ(%s));\n    }' % (c_name, c_name)
-        f_code += f'\n      {c_name} = recur_get(result, NUMBER_VAL({index}));'
+        f_code += f'\n      {c_name} = recur_get({loop_result}, NUMBER_VAL({index}));'
         f_code += '\n      if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (c_name, c_name)
     if loop_post:
         f_code += '\n' + '\n'.join(loop_post)
@@ -1021,10 +1028,9 @@ def loop_c(params, envs):
     f_code +=  '\n  }\n    else {\n'
     if loop_post:
         f_code += '\n  '.join(loop_post)
-    f_code += '\n    if (IS_OBJ(result)) {\n      inc_ref(AS_OBJ(result));\n    }'
+    f_code += '\n    if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (loop_result, loop_result)
     f_code += f'\n      recur_free(&{recur_name}_1);'
-    f_code +=  '\n      return result;\n    }'
-    envs.pop()
+    f_code +=  '\n      return %s;\n    }' % loop_result
 
     f_code += '\n  } while (continueFlag);'
     f_code += '\n  return NIL_VAL;'

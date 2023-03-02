@@ -13,6 +13,9 @@ from lang import (
     )
 
 
+SAVE_FAILED = False
+
+
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
 EXPECTED_TOKENS = [
     {'type': TokenType.LEFT_PAREN},
@@ -382,6 +385,9 @@ def _run_test(test, assert_equal):
             except subprocess.CalledProcessError as e:
                 print(f'bad c code:\n{custom_code}')
                 print(f'err: {e.stderr.decode("utf8")}')
+                if SAVE_FAILED:
+                    with tempfile.NamedTemporaryFile(delete=False, dir='.', suffix='.c') as f:
+                        f.write(c_code.encode('utf8'))
                 raise
 
             program_cmd = [program_filename]
@@ -396,12 +402,18 @@ def _run_test(test, assert_equal):
                 print(f'bad c code:\n{custom_code}')
                 print(f'err: {e.stderr.decode("utf8")}')
                 print(f'out: {e.stdout.decode("utf8")}')
+                if SAVE_FAILED:
+                    with tempfile.NamedTemporaryFile(delete=False, dir='.', suffix='.c') as f:
+                        f.write(c_code.encode('utf8'))
                 raise
 
             try:
                 assert_equal(result.stdout.decode('utf8'), test['output'])
             except AssertionError:
                 print(f'bad c code:\n{custom_code}')
+                if SAVE_FAILED:
+                    with tempfile.NamedTemporaryFile(delete=False, dir='.', suffix='.c') as f:
+                        f.write(c_code.encode('utf8'))
                 raise
 
 
@@ -613,7 +625,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(loop [n 0] (if (> n 2) (print n) (let [y 1] (recur (+ n y)))))', 'output': '3'},
             {'src': '(let [b 2] (loop [n 0] (if (> n b) (print n) (let [y 1] (recur (+ n y))))))', 'output': '3'},
             {'src': '(let [b 2] (loop [n 0] (if (> n b) (print (str n)) (let [y 1] (recur (+ n y))))))', 'output': '3'},
-            {'src': '(loop [n 0] (if (> n 2) (print "done") (do (print n) (recur (+ n 1)))))', 'output': '012done'},
+            {'src': '(loop [n 0] (if (> n 2) (print "done") (do (print (str n)) (recur (+ n 1)))))', 'output': '012done'},
             {'src': '(loop [n 0] (do (print n) (print "    ") (println (/ (* 5 (- n 32)) 9)) (if (< n 70) (recur (+ 20 n)))))', 'output': f'0    -17.7778{LSEP}20    -6.66667{LSEP}40    4.44444{LSEP}60    15.5556{LSEP}80    26.6667{LSEP}'},
         ]
         for test in tests:
@@ -693,6 +705,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(defn f1 [z] (let [x 1] (loop [y 2] (if (< y 5) (recur (+ y 1)) (+ x z))))) (print (f1 3))', 'output': '4'},
             {'src': '(defn f1 [] {"key" "value"}) (print (get (f1) "key"))', 'output': 'value'},
             {'src': '(defn compare [a b] (> (nth a 1) (nth b 1))) (print (sort compare [["a" 1] ["b" 2]]))', 'output': '[[b 2] [a 1]]'},
+            {'src': '(print (loop [line (read-line)] (if (= nil line) "done" (recur (read-line)))))', 'input': '', 'output': 'done'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) "done" (recur (read-line)))))', 'input': 'line', 'output': 'done'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) ["done"] (recur (read-line)))))', 'input': 'line', 'output': '[done]'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) {"a" "b"} (recur (read-line)))))', 'input': 'line', 'output': '{a b}'},
