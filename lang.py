@@ -1028,7 +1028,6 @@ def loop_c(params, envs):
     f_code +=  '\n  }\n    else {\n'
     if loop_post:
         f_code += '\n  '.join(loop_post)
-    f_code += '\n    if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (loop_result, loop_result)
     f_code += f'\n      recur_free(&{recur_name}_1);'
     f_code +=  '\n      return %s;\n    }' % loop_result
 
