@@ -1204,7 +1204,7 @@ def println_c(params, envs):
     return {'code': name}
 
 
-def fn_c(params, envs):
+def fn_c(params, envs, f_name=None):
     bindings = params[0]
     exprs = params[1:]
 
@@ -1275,20 +1275,22 @@ def fn_c(params, envs):
     else:
         f_params = 'ObjMap* user_globals'
 
-    f_name = _get_generated_name(base='fn', envs=envs)
+    if not f_name:
+        f_name = _get_generated_name(base='fn', envs=envs)
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n  %s\n}' % (f_name, f_params, f_code)
 
     envs.pop()
 
-    return {'code': f'{f_name}'}
+    return {'code': f_name}
 
 
 def defn_c(params, envs):
     name = params[0].name
+    f_name = _get_generated_name(base=f'u_{name}', envs=envs)
 
-    fn_result = fn_c(params[1:], envs)
+    envs[0]['user_globals'][name] = {'type': 'function', 'c_name': f_name}
 
-    envs[0]['user_globals'][name] = {'type': 'function', 'c_name': fn_result['code']}
+    fn_result = fn_c(params[1:], envs, f_name=f_name)
 
     return {'code': ''}
 
@@ -1426,6 +1428,7 @@ def compile_form(node, envs):
                 if results:
                     args += ', ' + ', '.join([r['code'] for r in results])
                 result_name = _get_generated_name('u_f_result', envs=envs)
+                envs[-1]['temps'].add(result_name)
                 envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({args});')
                 envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
                 return {'code': result_name}

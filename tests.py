@@ -710,6 +710,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (loop [line (read-line)] (if (= nil line) ["done"] (recur (read-line)))))', 'input': 'line', 'output': '[done]'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) {"a" "b"} (recur (read-line)))))', 'input': 'line', 'output': '{a b}'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) "done" (do (print line) (recur (read-line))))))', 'input': f'line1{LSEP}line2{LSEP}', 'output': 'line1line2done'},
+            {'src': '(defn f [a] (if (> a 2) a (f (+ a 1)))) (print (f 0))', 'output': '3'},
         ]
         for test in tests:
             with self.subTest(test=test):
