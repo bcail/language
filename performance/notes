@@ -1,3 +1,18 @@
+Fibonacci Performance
+=====================
+
+2023-03-04 (Commit 39ec9029064744f9bee950a469a64862d73dcf50)
+$ time ./fib
+    9.22746e+06
+    real	0m0.131s
+    user	0m0.127s
+    sys	0m0.005s
+$ time python3 fib.py
+    9227465
+    real	0m3.144s
+    user	0m3.139s
+    sys	0m0.004s
+
 Word Counts Performance
 =======================
 
