@@ -665,9 +665,11 @@ class CompileTests(unittest.TestCase):
         tests = [
             {'src': '(defn f1 [x y] (+ x y)) (print (f1 1 2))', 'output': '3'},
             {'src': '(defn f1 [x y] (print "function")) (f1 1 2)', 'output': 'function'},
-            {'src': '(defn f1 [x y] (print "function") (print "done")) (f1 1 2)', 'output': 'functiondone'},
+            {'src': '(defn f1 [x y] (print "function") (print "done") "return") (print (f1 1 2))', 'output': 'functiondonereturn'},
             {'src': '(defn f-1 [x y] (+ x y)) (print (f-1 1 2))', 'output': '3'},
-            {'src': '(defn f-1 [cnt acc] (if (= 0 cnt) acc (recur (- cnt 1) (+ acc 1)))) (print (f-1 3 0))', 'output': '3'},
+            {'src': '(defn f-1 [cnt acc] (if (= 0 cnt) (str acc) (recur (- cnt 1) (+ acc 1)))) (print (f-1 3 0))', 'output': '3'},
+            {'src': '(defn f-1 [a] (if (> a 2) a (f-1 (+ a 1)))) (print (f-1 0))', 'output': '3'},
+            {'src': '(defn fib [n] (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))) (println (fib 5))', 'output': f'5{LSEP}'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -710,7 +712,6 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (loop [line (read-line)] (if (= nil line) ["done"] (recur (read-line)))))', 'input': 'line', 'output': '[done]'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) {"a" "b"} (recur (read-line)))))', 'input': 'line', 'output': '{a b}'},
             {'src': '(print (loop [line (read-line)] (if (= nil line) "done" (do (print line) (recur (read-line))))))', 'input': f'line1{LSEP}line2{LSEP}', 'output': 'line1line2done'},
-            {'src': '(defn f [a] (if (> a 2) a (f (+ a 1)))) (print (f 0))', 'output': '3'},
         ]
         for test in tests:
             with self.subTest(test=test):

@@ -1213,20 +1213,22 @@ def fn_c(params, envs, f_name=None):
 
     recur_name = _get_generated_name('recur', envs=envs)
     local_env['temps'].add(recur_name)
-    local_env['pre'].append(f'  Recur {recur_name}_1;')
-    local_env['pre'].append(f'  recur_init(&{recur_name}_1);')
-    local_env['pre'].append(f'  Value {recur_name} = RECUR_VAL(&{recur_name}_1);')
     local_env['bindings'][recur_name] = None
 
     for binding in bindings:
         local_env['bindings'][binding.name] = None
 
-    f_code = '\n'.join(local_env['pre'])
+    f_code =  f'  Recur {recur_name}_1;'
+    f_code += f'  recur_init(&{recur_name}_1);'
+    f_code += f'  Value {recur_name} = RECUR_VAL(&{recur_name}_1);'
+
+    loop_result = _get_generated_name('loop_result', envs=envs)
+    envs[-1]['temps'].add(loop_result)
 
     loop_post = []
 
     f_code += '\n  bool continueFlag = false;'
-    f_code += '\n  do {\n'
+    f_code += '\n  do {'
     for form in exprs[:-1]:
         form_env = {'temps': local_env['temps'], 'pre': [], 'post': [], 'bindings': {}}
         envs.append(form_env)
@@ -1243,28 +1245,33 @@ def fn_c(params, envs, f_name=None):
     compiled = compile_form(exprs[-1], envs=envs)
     if form_env['pre']:
         f_code += '\n' + '\n'.join(form_env['pre'])
+
+    f_code += f'\n  Value {loop_result} = {compiled["code"]};'
+    f_code += '\n    if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (loop_result, loop_result)
+
     if form_env['post']:
-        loop_post.extend(form_env['post'])
-    f_code += f'\n  Value result = {compiled["code"]};'
-    f_code +=  '\n  if (IS_RECUR(result)) {'
+        f_code += '\n' + '\n  '.join(form_env['post'])
+
+    envs.pop()
+
+    f_code +=  '\n  if (IS_RECUR(%s)) {' % loop_result
+    f_code += f'\n      /* grab values from result and update  */'
 
     for index, fn_param in enumerate(list(local_env['bindings'].keys())[1:]):
         f_code += '\n    if (IS_OBJ(%s)) {\n      dec_ref_and_free(AS_OBJ(%s));\n    }' % (fn_param, fn_param)
-        f_code += f'\n    {fn_param} = recur_get(result, NUMBER_VAL({index}));'
+        f_code += f'\n    {fn_param} = recur_get({loop_result}, NUMBER_VAL({index}));'
         f_code += '\n    if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (fn_param, fn_param)
+    if loop_post:
+        f_code += '\n' + '\n'.join(loop_post)
 
     f_code += f'\n    continueFlag = true;'
     f_code += f'\n    recur_free(&{recur_name}_1);'
     f_code +=  '\n  }\n  else {\n'
-    f_code += '\n  if (IS_OBJ(result)) {\n    inc_ref(AS_OBJ(result));\n  }'
-
     if loop_post:
-        f_code += '\n'.join(loop_post)
+        f_code += '\n  '.join(loop_post)
 
     f_code += f'\n    recur_free(&{recur_name}_1);'
-    f_code +=  '\n    return result;\n  }'
-
-    envs.pop()
+    f_code += '\n    return %s;\n  }' % loop_result
 
     f_code += '\n  } while (continueFlag);'
     f_code += '\n  return NIL_VAL;'
