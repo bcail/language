@@ -728,6 +728,16 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
+    def test_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            file_name = os.path.join(tmp, 'file')
+            with open(file_name, 'wb') as f:
+                f.write('asdf'.encode('utf8'))
+
+            test = {'src': f'(print (let [f (file/open "{file_name}"), data (file/read f)] (do (file/close f) data)))', 'input': '', 'output': 'asdf'}
+
+            _run_test(test, self.assertEqual)
+
 
 if __name__ == '__main__':
     unittest.main()

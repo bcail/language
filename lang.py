@@ -1263,6 +1263,30 @@ def readline_c(params, envs):
     return {'code': result_name}
 
 
+def file_open_c(params, envs):
+    path = compile_form(params[0], envs=envs)['code']
+    result_name = _get_generated_name('file_obj', envs=envs)
+    envs[-1]['temps'].add(result_name)
+    envs[-1]['pre'].append(f'  Value {result_name} = file_open({path});')
+    return {'code': result_name}
+
+
+def file_read_c(params, envs):
+    file_obj = compile_form(params[0], envs=envs)['code']
+    result_name = _get_generated_name('file_data', envs=envs)
+    envs[-1]['temps'].add(result_name)
+    envs[-1]['pre'].append(f'  Value {result_name} = file_read({file_obj});')
+    return {'code': result_name}
+
+
+def file_close_c(params, envs):
+    file_obj = compile_form(params[0], envs=envs)['code']
+    result_name = _get_generated_name('file_close', envs=envs)
+    envs[-1]['temps'].add(result_name)
+    envs[-1]['pre'].append(f'  file_close({file_obj});')
+    return {'code': result_name}
+
+
 global_compile_env = {
     'nil?': {'function': nil_c},
     '+': {'function': add_c},
@@ -1295,6 +1319,9 @@ global_compile_env = {
     'str/split': {'function': str_split_c},
     'str/lower': {'function': str_lower_c},
     'str/blank?': {'function': str_blank_c},
+    'file/open': {'function': file_open_c},
+    'file/read': {'function': file_read_c},
+    'file/close': {'function': file_close_c},
 }
 
 
@@ -1561,11 +1588,13 @@ c_types = '''
 #define BOOL_VAL(value)  ((Value){BOOL, {.boolean = value}})
 #define NUMBER_VAL(value)  ((Value){NUMBER, {.number = value}})
 #define RECUR_VAL(value)  ((Value){RECUR, {.recur = value}})
+#define FILE_VAL(value)   ((Value){FILE_HANDLE, {.file = (FILE*)value}})
 #define OBJ_VAL(object)   ((Value){OBJ, {.obj = (Obj*)object}})
 #define AS_BOOL(value)  ((value).data.boolean)
 #define AS_NUMBER(value)  ((value).data.number)
-#define AS_OBJ(value)  ((value).data.obj)
 #define AS_RECUR(value)       ((value).data.recur)
+#define AS_FILE(value)       ((value).data.file)
+#define AS_OBJ(value)  ((value).data.obj)
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
 #define AS_LIST(value)       ((ObjList*)AS_OBJ(value))
@@ -1574,6 +1603,7 @@ c_types = '''
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
 #define IS_RECUR(value)  ((value).type == RECUR)
+#define IS_FILE(value)  ((value).type == FILE_HANDLE)
 #define IS_OBJ(value)  ((value).type == OBJ)
 #define IS_STRING(value)  isObjType(value, OBJ_STRING)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
@@ -1611,6 +1641,7 @@ typedef enum {
   BOOL,
   NUMBER,
   RECUR,
+  FILE_HANDLE,
   OBJ,
 } ValueType;
 
@@ -1623,6 +1654,7 @@ typedef struct {
     double number;
     Obj* obj;
     Recur* recur;
+    FILE* file;
   } data;
 } Value;
 
@@ -2334,6 +2366,32 @@ Value str_join(Value list_val) {
   heapChars[num_bytes] = 0;
   uint32_t hash = hashString(heapChars, num_bytes);
   return OBJ_VAL(allocate_string(heapChars, num_bytes, hash));
+}
+
+Value file_open(Value path) {
+  FILE* fp = fopen(AS_CSTRING(path), "r");
+  return FILE_VAL(fp);
+}
+
+Value file_read(Value file) {
+  int ch = 0;
+  char buffer[MAX_LINE];
+  int num_chars;
+  FILE* fp = AS_FILE(file);
+  for (num_chars=0; num_chars<(MAX_LINE-1) && (ch=getc(fp)) != EOF; num_chars++) {
+    buffer[num_chars] = (char) ch;
+  }
+  if ((ch == EOF) && (num_chars == 0)) {
+    return NIL_VAL;
+  }
+  Value result = OBJ_VAL(copyString(buffer, (size_t) num_chars));
+  inc_ref(AS_OBJ(result));
+  return result;
+}
+
+Value file_close(Value file) {
+  fclose(AS_FILE(file));
+  return NIL_VAL;
 }
 
 void free_object(Obj* object) {
