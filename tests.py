@@ -348,13 +348,13 @@ clang_cmd = os.environ.get('CLANG', CLANG_CMD)
 
 if platform.system() == 'Darwin':
     compilers = [
-        ([clang_cmd], None, 'clang_regular'),
-        ([gcc_cmd], None, 'gcc_regular'),
+        ([clang_cmd, '-std=c99'], None, 'clang_regular'),
+        ([gcc_cmd, '-std=c99'], None, 'gcc_regular'),
     ]
 elif platform.system() == 'Windows':
     cc_path = 'clang.exe'
     compilers = [
-        ([cc_path], None, 'clang_regular'),
+        ([cc_path, '-std=c99'], None, 'clang_regular'),
     ]
 else:
     compilers = [

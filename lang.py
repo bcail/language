@@ -2500,12 +2500,12 @@ CLANG_CMD = 'clang'
 # See https://github.com/airbus-seclab/c-compiler-security
 GCC_CHECK_OPTIONS = [
     '-O2',
+    '-std=c99',
     '-Werror',
     '-Wall',
     '-Wextra',
     '-Wno-error=unused-parameter',
     '-Wno-error=unused-variable',
-    '-std=c99',
     '-pedantic',
     '-Wpedantic',
     '-Wformat=2',
@@ -2562,6 +2562,7 @@ GCC_CHECK_ENV = {
 
 CLANG_CHECK_OPTIONS = [
     '-O2',
+    '-std=c99',
     '-Werror',
     '-Walloca',
     '-Wcast-qual',
