@@ -733,6 +733,7 @@ class CompileTests(unittest.TestCase):
             file_name = os.path.join(tmp, 'file')
             with open(file_name, 'wb') as f:
                 f.write('asdf'.encode('utf8'))
+            file_name = file_name.replace('\\', '\\\\')
 
             test = {'src': f'(print (let [f (file/open "{file_name}"), data (file/read f)] (do (file/close f) data)))', 'input': '', 'output': 'asdf'}
 
