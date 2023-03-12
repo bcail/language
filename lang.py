@@ -929,6 +929,7 @@ def let_c(params, envs):
     envs[0]['functions'][f_name] = 'Value %s(%s) {\n  %s\n}' % (f_name, f_params, f_code)
 
     result_name = _get_generated_name('let_result', envs=envs)
+    envs[-1]['temps'].add(result_name)
 
     envs.pop()
 
@@ -1265,9 +1266,13 @@ def readline_c(params, envs):
 
 def file_open_c(params, envs):
     path = compile_form(params[0], envs=envs)['code']
+    mode = 'r'
+    if len(params) > 1:
+        if params[1] == 'w':
+            mode = 'w'
     result_name = _get_generated_name('file_obj', envs=envs)
     envs[-1]['temps'].add(result_name)
-    envs[-1]['pre'].append(f'  Value {result_name} = file_open({path});')
+    envs[-1]['pre'].append(f'  Value {result_name} = file_open({path}, "{mode}");')
     return {'code': result_name}
 
 
@@ -1276,14 +1281,24 @@ def file_read_c(params, envs):
     result_name = _get_generated_name('file_data', envs=envs)
     envs[-1]['temps'].add(result_name)
     envs[-1]['pre'].append(f'  Value {result_name} = file_read({file_obj});')
+    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+    return {'code': result_name}
+
+
+def file_write_c(params, envs):
+    file_obj = compile_form(params[0], envs=envs)['code']
+    data = compile_form(params[1], envs=envs)['code']
+    result_name = _get_generated_name('file_write_result', envs=envs)
+    envs[-1]['temps'].add(result_name)
+    envs[-1]['pre'].append(f'  Value {result_name} = file_write({file_obj}, {data});')
     return {'code': result_name}
 
 
 def file_close_c(params, envs):
     file_obj = compile_form(params[0], envs=envs)['code']
-    result_name = _get_generated_name('file_close', envs=envs)
+    result_name = _get_generated_name('file_close_result', envs=envs)
     envs[-1]['temps'].add(result_name)
-    envs[-1]['pre'].append(f'  file_close({file_obj});')
+    envs[-1]['pre'].append(f'  Value {result_name} = file_close({file_obj});')
     return {'code': result_name}
 
 
@@ -1321,6 +1336,7 @@ global_compile_env = {
     'str/blank?': {'function': str_blank_c},
     'file/open': {'function': file_open_c},
     'file/read': {'function': file_read_c},
+    'file/write': {'function': file_write_c},
     'file/close': {'function': file_close_c},
 }
 
@@ -2368,8 +2384,8 @@ Value str_join(Value list_val) {
   return OBJ_VAL(allocate_string(heapChars, num_bytes, hash));
 }
 
-Value file_open(Value path) {
-  FILE* fp = fopen(AS_CSTRING(path), "r");
+Value file_open(Value path, const char* mode) {
+  FILE* fp = fopen(AS_CSTRING(path), mode);
   return FILE_VAL(fp);
 }
 
@@ -2387,6 +2403,13 @@ Value file_read(Value file) {
   Value result = OBJ_VAL(copyString(buffer, (size_t) num_chars));
   inc_ref(AS_OBJ(result));
   return result;
+}
+
+Value file_write(Value file, Value data) {
+  FILE* fp = AS_FILE(file);
+  fprintf(fp, "%s", AS_CSTRING(data));
+  fflush(fp);
+  return NIL_VAL;
 }
 
 Value file_close(Value file) {
