@@ -23,11 +23,13 @@
 #define BOOL_VAL(value)  ((Value){BOOL, {.boolean = value}})
 #define NUMBER_VAL(value)  ((Value){NUMBER, {.number = value}})
 #define RECUR_VAL(value)  ((Value){RECUR, {.recur = value}})
+#define FILE_VAL(value)   ((Value){FILE_HANDLE, {.file = (FILE*)value}})
 #define OBJ_VAL(object)   ((Value){OBJ, {.obj = (Obj*)object}})
 #define AS_BOOL(value)  ((value).data.boolean)
 #define AS_NUMBER(value)  ((value).data.number)
-#define AS_OBJ(value)  ((value).data.obj)
 #define AS_RECUR(value)       ((value).data.recur)
+#define AS_FILE(value)       ((value).data.file)
+#define AS_OBJ(value)  ((value).data.obj)
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
 #define AS_LIST(value)       ((ObjList*)AS_OBJ(value))
@@ -36,6 +38,7 @@
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
 #define IS_RECUR(value)  ((value).type == RECUR)
+#define IS_FILE(value)  ((value).type == FILE_HANDLE)
 #define IS_OBJ(value)  ((value).type == OBJ)
 #define IS_STRING(value)  isObjType(value, OBJ_STRING)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
@@ -73,6 +76,7 @@ typedef enum {
   BOOL,
   NUMBER,
   RECUR,
+  FILE_HANDLE,
   OBJ,
 } ValueType;
 
@@ -85,6 +89,7 @@ typedef struct {
     double number;
     Obj* obj;
     Recur* recur;
+    FILE* file;
   } data;
 } Value;
 
@@ -798,6 +803,39 @@ Value str_join(Value list_val) {
   return OBJ_VAL(allocate_string(heapChars, num_bytes, hash));
 }
 
+Value file_open(Value path, const char* mode) {
+  FILE* fp = fopen(AS_CSTRING(path), mode);
+  return FILE_VAL(fp);
+}
+
+Value file_read(Value file) {
+  int ch = 0;
+  char buffer[MAX_LINE];
+  int num_chars;
+  FILE* fp = AS_FILE(file);
+  for (num_chars=0; num_chars<(MAX_LINE-1) && (ch=getc(fp)) != EOF; num_chars++) {
+    buffer[num_chars] = (char) ch;
+  }
+  if ((ch == EOF) && (num_chars == 0)) {
+    return NIL_VAL;
+  }
+  Value result = OBJ_VAL(copyString(buffer, (size_t) num_chars));
+  inc_ref(AS_OBJ(result));
+  return result;
+}
+
+Value file_write(Value file, Value data) {
+  FILE* fp = AS_FILE(file);
+  fprintf(fp, "%s", AS_CSTRING(data));
+  fflush(fp);
+  return NIL_VAL;
+}
+
+Value file_close(Value file) {
+  fclose(AS_FILE(file));
+  return NIL_VAL;
+}
+
 void free_object(Obj* object) {
   switch (object->type) {
     case OBJ_STRING: {
@@ -842,7 +880,7 @@ void free_object(Obj* object) {
 
 /* CUSTOM CODE */
 
-Value let(ObjMap* user_globals, Value counts, Value i, Value recur, Value recur_1, Value word, Value words, Value numwords) {
+Value let(ObjMap* user_globals, Value word, Value recur_1, Value numwords, Value recur, Value counts, Value i, Value words) {
     Value map_get_ = map_get(AS_MAP(counts), word, NUMBER_VAL(0));
   if (IS_OBJ(map_get_)) {
     inc_ref(AS_OBJ(map_get_));
@@ -860,13 +898,13 @@ Value let(ObjMap* user_globals, Value counts, Value i, Value recur, Value recur_
   return map_assoc;
 }
 
-Value let_1(ObjMap* user_globals, Value counts, Value i, Value recur, Value recur_1, Value words, Value numwords) {
+Value let_1(ObjMap* user_globals, Value recur_1, Value numwords, Value recur, Value counts, Value i, Value words) {
     Value word = list_get(words, i);
 
   Value if_result_1 = NIL_VAL;
   Value str_blank_ = str_blank(word);
   if (is_truthy(equal(BOOL_VAL(false), str_blank_))) {
-    Value let_result = let(user_globals, counts, i, recur, recur_1, word, words, numwords);
+    Value let_result = let(user_globals, word, recur_1, numwords, recur, counts, i, words);
       if_result_1 = let_result;
     if (IS_OBJ(if_result_1)) {
       inc_ref(AS_OBJ(if_result_1));
@@ -883,14 +921,15 @@ Value let_1(ObjMap* user_globals, Value counts, Value i, Value recur, Value recu
   return recur_1;
 }
 
-Value loop(ObjMap* user_globals, Value recur, Value counts, Value numwords, Value words) {
-  Recur recur_1_1;
-  recur_init(&recur_1_1);
-  Value recur_1 = RECUR_VAL(&recur_1_1);
+Value loop(ObjMap* user_globals, Value recur, Value words, Value counts, Value numwords) {
+
   Value i = NUMBER_VAL(0);
   if (IS_OBJ(i)) {
     inc_ref(AS_OBJ(i));
   }
+  Recur recur_1_1;
+  recur_init(&recur_1_1);
+  Value recur_1 = RECUR_VAL(&recur_1_1);
   bool continueFlag = false;
   do {
   Value if_result = NIL_VAL;
@@ -901,28 +940,28 @@ Value loop(ObjMap* user_globals, Value recur, Value counts, Value numwords, Valu
     }
   } // end true code
   else {
-  Value let_result = let_1(user_globals, counts, i, recur, recur_1, words, numwords);
-  if_result = let_result;
+  Value let_result_1 = let_1(user_globals, recur_1, numwords, recur, counts, i, words);
+  if_result = let_result_1;
     if (IS_OBJ(if_result)) {
       inc_ref(AS_OBJ(if_result));
     }
-  if (IS_OBJ(let_result)) {
-    dec_ref_and_free(AS_OBJ(let_result));
+  if (IS_OBJ(let_result_1)) {
+    dec_ref_and_free(AS_OBJ(let_result_1));
   }
   } // end false code
-    Value loop_result = if_result;
-    if (IS_OBJ(loop_result)) {
-      inc_ref(AS_OBJ(loop_result));
+    Value loop_result_1 = if_result;
+    if (IS_OBJ(loop_result_1)) {
+      inc_ref(AS_OBJ(loop_result_1));
     }
   if (IS_OBJ(if_result)) {
     dec_ref_and_free(AS_OBJ(if_result));
   }
-    if (IS_RECUR(loop_result)) {
+    if (IS_RECUR(loop_result_1)) {
       /* grab values from result and update  */
       if (IS_OBJ(i)) {
       dec_ref_and_free(AS_OBJ(i));
     }
-      i = recur_get(loop_result, NUMBER_VAL(0));
+      i = recur_get(loop_result_1, NUMBER_VAL(0));
       if (IS_OBJ(i)) {
       inc_ref(AS_OBJ(i));
     }
@@ -932,75 +971,76 @@ Value loop(ObjMap* user_globals, Value recur, Value counts, Value numwords, Valu
     else {
 
       recur_free(&recur_1_1);
+      return loop_result_1;
+    }
+  } while (continueFlag);
+  return NIL_VAL;
+}
+
+Value let_2(ObjMap* user_globals, Value recur, Value words, Value counts) {
+    Value numwords = list_count(words);
+
+  Value loop_result_2 = loop(user_globals, recur,words,counts,numwords);
+
+  if (IS_OBJ(loop_result_2)) {
+    inc_ref(AS_OBJ(loop_result_2));
+  }
+  if (IS_OBJ(loop_result_2)) {
+    dec_ref_and_free(AS_OBJ(loop_result_2));
+  }
+  return loop_result_2;
+}
+
+Value u_process_M_words(ObjMap* user_globals, Value counts, Value words) {
+    Recur recur_1;
+  recur_init(&recur_1);
+  Value recur = RECUR_VAL(&recur_1);
+  bool continueFlag = false;
+  do {
+  Value let_result = let_2(user_globals, recur, words, counts);
+    Value loop_result = let_result;
+    if (IS_OBJ(loop_result)) {
+      inc_ref(AS_OBJ(loop_result));
+    }
+  if (IS_OBJ(let_result)) {
+    dec_ref_and_free(AS_OBJ(let_result));
+  }
+    if (IS_RECUR(loop_result)) {
+      /* grab values from result and update  */
+      if (IS_OBJ(counts)) {
+      dec_ref_and_free(AS_OBJ(counts));
+    }
+      counts = recur_get(loop_result, NUMBER_VAL(0));
+      if (IS_OBJ(counts)) {
+      inc_ref(AS_OBJ(counts));
+    }
+      if (IS_OBJ(words)) {
+      dec_ref_and_free(AS_OBJ(words));
+    }
+      words = recur_get(loop_result, NUMBER_VAL(1));
+      if (IS_OBJ(words)) {
+      inc_ref(AS_OBJ(words));
+    }
+    continueFlag = true;
+    recur_free(&recur_1);
+  }
+    else {
+
+      recur_free(&recur_1);
       return loop_result;
     }
   } while (continueFlag);
   return NIL_VAL;
 }
 
-Value let_2(ObjMap* user_globals, Value recur, Value counts, Value words) {
-    Value numwords = list_count(words);
-
-  Value loop_result_1 = loop(user_globals, recur,counts,numwords,words);
-
-  if (IS_OBJ(loop_result_1)) {
-    inc_ref(AS_OBJ(loop_result_1));
-  }
-  if (IS_OBJ(loop_result_1)) {
-    dec_ref_and_free(AS_OBJ(loop_result_1));
-  }
-  return loop_result_1;
-}
-
-Value fn(ObjMap* user_globals, Value counts, Value words) {
-    Recur recur_1;
-  recur_init(&recur_1);
-  Value recur = RECUR_VAL(&recur_1);
-  bool continueFlag = false;
-  do {
-
-  Value let_result = let_2(user_globals, recur, counts, words);
-  Value result = let_result;
-  if (IS_RECUR(result)) {
-    if (IS_OBJ(counts)) {
-      dec_ref_and_free(AS_OBJ(counts));
-    }
-    counts = recur_get(result, NUMBER_VAL(0));
-    if (IS_OBJ(counts)) {
-      inc_ref(AS_OBJ(counts));
-    }
-    if (IS_OBJ(words)) {
-      dec_ref_and_free(AS_OBJ(words));
-    }
-    words = recur_get(result, NUMBER_VAL(1));
-    if (IS_OBJ(words)) {
-      inc_ref(AS_OBJ(words));
-    }
-    continueFlag = true;
-    recur_free(&recur_1);
-  }
-  else {
-
-  if (IS_OBJ(result)) {
-    inc_ref(AS_OBJ(result));
-  }  if (IS_OBJ(let_result)) {
-    dec_ref_and_free(AS_OBJ(let_result));
-  }
-    recur_free(&recur_1);
-    return result;
-  }
-  } while (continueFlag);
-  return NIL_VAL;
-}
-
-Value let_3(ObjMap* user_globals, Value counts, Value recur_1, Value line) {
+Value let_3(ObjMap* user_globals, Value line, Value recur_1, Value counts) {
     Value str_lower_ = str_lower(line);
   inc_ref(AS_OBJ(str_lower_));
   Value str_split_ = str_split(str_lower_);
   inc_ref(AS_OBJ(str_split_));
   Value words = str_split_;
 
-  Value u_f_result = fn(user_globals, counts, words);
+  Value u_f_result = u_process_M_words(user_globals, counts, words);
 
   if (IS_OBJ(u_f_result)) {
     inc_ref(AS_OBJ(u_f_result));
@@ -1013,114 +1053,88 @@ Value let_3(ObjMap* user_globals, Value counts, Value recur_1, Value line) {
   return u_f_result;
 }
 
-Value fn_1(ObjMap* user_globals, Value counts, Value line) {
+Value u_process_M_line(ObjMap* user_globals, Value counts, Value line) {
     Recur recur_1_1;
   recur_init(&recur_1_1);
   Value recur_1 = RECUR_VAL(&recur_1_1);
   bool continueFlag = false;
   do {
-
-  Value let_result = let_3(user_globals, counts, recur_1, line);
-  Value result = let_result;
-  if (IS_RECUR(result)) {
-    if (IS_OBJ(counts)) {
+  Value let_result_1 = let_3(user_globals, line, recur_1, counts);
+    Value loop_result_1 = let_result_1;
+    if (IS_OBJ(loop_result_1)) {
+      inc_ref(AS_OBJ(loop_result_1));
+    }
+  if (IS_OBJ(let_result_1)) {
+    dec_ref_and_free(AS_OBJ(let_result_1));
+  }
+    if (IS_RECUR(loop_result_1)) {
+      /* grab values from result and update  */
+      if (IS_OBJ(counts)) {
       dec_ref_and_free(AS_OBJ(counts));
     }
-    counts = recur_get(result, NUMBER_VAL(0));
-    if (IS_OBJ(counts)) {
+      counts = recur_get(loop_result_1, NUMBER_VAL(0));
+      if (IS_OBJ(counts)) {
       inc_ref(AS_OBJ(counts));
     }
-    if (IS_OBJ(line)) {
+      if (IS_OBJ(line)) {
       dec_ref_and_free(AS_OBJ(line));
     }
-    line = recur_get(result, NUMBER_VAL(1));
-    if (IS_OBJ(line)) {
+      line = recur_get(loop_result_1, NUMBER_VAL(1));
+      if (IS_OBJ(line)) {
       inc_ref(AS_OBJ(line));
     }
     continueFlag = true;
     recur_free(&recur_1_1);
   }
-  else {
+    else {
 
-  if (IS_OBJ(result)) {
-    inc_ref(AS_OBJ(result));
-  }  if (IS_OBJ(let_result)) {
-    dec_ref_and_free(AS_OBJ(let_result));
-  }
-    recur_free(&recur_1_1);
-    return result;
-  }
+      recur_free(&recur_1_1);
+      return loop_result_1;
+    }
   } while (continueFlag);
   return NIL_VAL;
 }
 
-Value fn_2(ObjMap* user_globals, Value a, Value b) {
+Value u_compare(ObjMap* user_globals, Value a, Value b) {
     Recur recur_2_1;
   recur_init(&recur_2_1);
   Value recur_2 = RECUR_VAL(&recur_2_1);
   bool continueFlag = false;
   do {
-
-  Value result = greater(user_globals, list_get(a, NUMBER_VAL(1)), list_get(b, NUMBER_VAL(1)));
-  if (IS_RECUR(result)) {
-    if (IS_OBJ(a)) {
+    Value loop_result_2 = greater(user_globals, list_get(a, NUMBER_VAL(1)), list_get(b, NUMBER_VAL(1)));
+    if (IS_OBJ(loop_result_2)) {
+      inc_ref(AS_OBJ(loop_result_2));
+    }
+    if (IS_RECUR(loop_result_2)) {
+      /* grab values from result and update  */
+      if (IS_OBJ(a)) {
       dec_ref_and_free(AS_OBJ(a));
     }
-    a = recur_get(result, NUMBER_VAL(0));
-    if (IS_OBJ(a)) {
+      a = recur_get(loop_result_2, NUMBER_VAL(0));
+      if (IS_OBJ(a)) {
       inc_ref(AS_OBJ(a));
     }
-    if (IS_OBJ(b)) {
+      if (IS_OBJ(b)) {
       dec_ref_and_free(AS_OBJ(b));
     }
-    b = recur_get(result, NUMBER_VAL(1));
-    if (IS_OBJ(b)) {
+      b = recur_get(loop_result_2, NUMBER_VAL(1));
+      if (IS_OBJ(b)) {
       inc_ref(AS_OBJ(b));
     }
     continueFlag = true;
     recur_free(&recur_2_1);
   }
-  else {
+    else {
 
-  if (IS_OBJ(result)) {
-    inc_ref(AS_OBJ(result));
-  }
-    recur_free(&recur_2_1);
-    return result;
-  }
+      recur_free(&recur_2_1);
+      return loop_result_2;
+    }
   } while (continueFlag);
   return NIL_VAL;
 }
 
-Value do_f(ObjMap* user_globals, Value counts, Value recur_3, Value line) {
-  Value if_result_1 = NIL_VAL;
-  Value str_blank_ = str_blank(line);
-  if (is_truthy(equal(BOOL_VAL(false), str_blank_))) {
-    Value u_f_result = fn_1(user_globals, counts, line);
-      if_result_1 = u_f_result;
-    if (IS_OBJ(if_result_1)) {
-      inc_ref(AS_OBJ(if_result_1));
-    }
-    if (IS_OBJ(u_f_result)) {
-    dec_ref_and_free(AS_OBJ(u_f_result));
-  }
-  } // end true code
-
-  Value readline_result_1 = readline();
-  recur_add(AS_RECUR(recur_3), readline_result_1);
-  if (IS_OBJ(if_result_1)) {
-    dec_ref_and_free(AS_OBJ(if_result_1));
-  }
-  if (IS_OBJ(readline_result_1)) {
-    dec_ref_and_free(AS_OBJ(readline_result_1));
-  }
-  return recur_3;
-}
-
 Value loop_1(ObjMap* user_globals, Value counts) {
-  Recur recur_3_1;
-  recur_init(&recur_3_1);
-  Value recur_3 = RECUR_VAL(&recur_3_1);
+
   Value readline_result = readline();
   Value line = readline_result;
   if (IS_OBJ(line)) {
@@ -1129,6 +1143,9 @@ Value loop_1(ObjMap* user_globals, Value counts) {
   if (IS_OBJ(readline_result)) {
     dec_ref_and_free(AS_OBJ(readline_result));
   }
+  Recur recur_3_1;
+  recur_init(&recur_3_1);
+  Value recur_3 = RECUR_VAL(&recur_3_1);
   bool continueFlag = false;
   do {
   Value if_result = NIL_VAL;
@@ -1139,28 +1156,50 @@ Value loop_1(ObjMap* user_globals, Value counts) {
     }
   } // end true code
   else {
-  Value do_result = do_f(user_globals, counts, recur_3, line);
+  Value if_result_1 = NIL_VAL;
+  Value str_blank_ = str_blank(line);
+  if (is_truthy(equal(BOOL_VAL(false), str_blank_))) {
+    Value u_f_result_1 = u_process_M_line(user_globals, counts, line);
+      if_result_1 = u_f_result_1;
+    if (IS_OBJ(if_result_1)) {
+      inc_ref(AS_OBJ(if_result_1));
+    }
+    if (IS_OBJ(u_f_result_1)) {
+    dec_ref_and_free(AS_OBJ(u_f_result_1));
+  }
+  } // end true code
+
+    Value readline_result_1 = readline();
+    Value do_result = NIL_VAL;
+  recur_add(AS_RECUR(recur_3), readline_result_1);
+  do_result = recur_3;
   if_result = do_result;
     if (IS_OBJ(if_result)) {
       inc_ref(AS_OBJ(if_result));
     }
-  if (IS_OBJ(do_result)) {
+  if (IS_OBJ(if_result_1)) {
+    dec_ref_and_free(AS_OBJ(if_result_1));
+  }
+    if (IS_OBJ(readline_result_1)) {
+    dec_ref_and_free(AS_OBJ(readline_result_1));
+  }
+    if (IS_OBJ(do_result)) {
   dec_ref_and_free(AS_OBJ(do_result));
   }
   } // end false code
-    Value loop_result = if_result;
-    if (IS_OBJ(loop_result)) {
-      inc_ref(AS_OBJ(loop_result));
+    Value loop_result_3 = if_result;
+    if (IS_OBJ(loop_result_3)) {
+      inc_ref(AS_OBJ(loop_result_3));
     }
   if (IS_OBJ(if_result)) {
     dec_ref_and_free(AS_OBJ(if_result));
   }
-    if (IS_RECUR(loop_result)) {
+    if (IS_RECUR(loop_result_3)) {
       /* grab values from result and update  */
       if (IS_OBJ(line)) {
       dec_ref_and_free(AS_OBJ(line));
     }
-      line = recur_get(loop_result, NUMBER_VAL(0));
+      line = recur_get(loop_result_3, NUMBER_VAL(0));
       if (IS_OBJ(line)) {
       inc_ref(AS_OBJ(line));
     }
@@ -1170,7 +1209,7 @@ Value loop_1(ObjMap* user_globals, Value counts) {
     else {
 
       recur_free(&recur_3_1);
-      return loop_result;
+      return loop_result_3;
     }
   } while (continueFlag);
   return NIL_VAL;
@@ -1179,7 +1218,7 @@ Value loop_1(ObjMap* user_globals, Value counts) {
 Value let_4(ObjMap* user_globals, Value counts) {
     Value map_pairs_ = map_pairs(AS_MAP(counts));
   inc_ref(AS_OBJ(map_pairs_));
-  Value sortedlist = list_sort(user_globals, map_pairs_, fn_2);
+  Value sortedlist = list_sort(user_globals, map_pairs_, u_compare);
 
   Value str = OBJ_VAL(copyString(" ", (size_t) 1));
   inc_ref(AS_OBJ(str));
@@ -1204,20 +1243,20 @@ Value let_5(ObjMap* user_globals) {
 
   Value counts = map;
 
-  Value loop_result_1 = loop_1(user_globals, counts);
-  Value let_result = let_4(user_globals, counts);
+  Value loop_result_4 = loop_1(user_globals, counts);
+  Value let_result_2 = let_4(user_globals, counts);
 
-  if (IS_OBJ(let_result)) {
-    inc_ref(AS_OBJ(let_result));
+  if (IS_OBJ(let_result_2)) {
+    inc_ref(AS_OBJ(let_result_2));
   }
   dec_ref_and_free(AS_OBJ(map));
-  if (IS_OBJ(loop_result_1)) {
-    dec_ref_and_free(AS_OBJ(loop_result_1));
+  if (IS_OBJ(loop_result_4)) {
+    dec_ref_and_free(AS_OBJ(loop_result_4));
   }
-  if (IS_OBJ(let_result)) {
-    dec_ref_and_free(AS_OBJ(let_result));
+  if (IS_OBJ(let_result_2)) {
+    dec_ref_and_free(AS_OBJ(let_result_2));
   }
-  return let_result;
+  return let_result_2;
 }
 
 int main(void)
@@ -1225,9 +1264,9 @@ int main(void)
   interned_strings = allocate_map();
   ObjMap* user_globals = allocate_map();
 
-  Value let_result = let_5(user_globals);
-  if (IS_OBJ(let_result)) {
-    dec_ref_and_free(AS_OBJ(let_result));
+  Value let_result_3 = let_5(user_globals);
+  if (IS_OBJ(let_result_3)) {
+    dec_ref_and_free(AS_OBJ(let_result_3));
   }
   free_object((Obj*)user_globals);
   free_object((Obj*)interned_strings);
