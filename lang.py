@@ -1644,13 +1644,10 @@ typedef enum {
   OBJ_MAP,
 } ObjType;
 
-typedef struct Obj Obj;
-
-struct Obj {
+typedef struct {
   ObjType type;
   uint32_t ref_cnt;
-  // struct Obj* next;
-};
+} Obj;
 
 typedef enum {
   NIL,
