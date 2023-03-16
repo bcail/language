@@ -63,13 +63,10 @@ typedef enum {
   OBJ_MAP,
 } ObjType;
 
-typedef struct Obj Obj;
-
-struct Obj {
+typedef struct {
   ObjType type;
   uint32_t ref_cnt;
-  // struct Obj* next;
-};
+} Obj;
 
 typedef enum {
   NIL,
@@ -226,11 +223,15 @@ ObjString* copyString(const char* chars, size_t length) {
   return allocate_string(heapChars, length, hash);
 }
 
-ObjList* allocate_list(void) {
+ObjList* allocate_list(size_t initial_capacity) {
   ObjList* list = ALLOCATE_OBJ(ObjList, OBJ_LIST);
   list->count = 0;
-  list->capacity = 0;
-  list->values = NULL;
+  list->capacity = (size_t) initial_capacity;
+  if (initial_capacity == 0) {
+    list->values = NULL;
+  } else {
+    list->values = GROW_ARRAY(Value, NULL, 0, (size_t) initial_capacity);
+  }
   return list;
 }
 
@@ -593,8 +594,8 @@ Value map_get(ObjMap* map, Value key, Value defaultVal) {
 }
 
 Value map_keys(ObjMap* map) {
-  ObjList* keys = allocate_list();
   size_t num_entries = map->num_entries;
+  ObjList* keys = allocate_list(num_entries);
   for (size_t i = 0; i < num_entries; i++) {
     list_add(OBJ_VAL(keys), map->entries[i].key);
   }
@@ -602,8 +603,8 @@ Value map_keys(ObjMap* map) {
 }
 
 Value map_vals(ObjMap* map) {
-  ObjList* vals = allocate_list();
   size_t num_entries = map->num_entries;
+  ObjList* vals = allocate_list(num_entries);
   for (size_t i = 0; i < num_entries; i++) {
     list_add(OBJ_VAL(vals), map->entries[i].value);
   }
@@ -611,11 +612,11 @@ Value map_vals(ObjMap* map) {
 }
 
 Value map_pairs(ObjMap* map) {
-  ObjList* pairs = allocate_list();
   size_t num_entries = map->num_entries;
+  ObjList* pairs = allocate_list(num_entries);
   for (size_t i = 0; i < num_entries; i++) {
     if (!AS_BOOL(equal(map->entries[i].key, NIL_VAL))) {
-      ObjList* pair = allocate_list();
+      ObjList* pair = allocate_list((size_t) 2);
       list_add(OBJ_VAL(pair), map->entries[i].key);
       list_add(OBJ_VAL(pair), map->entries[i].value);
       list_add(OBJ_VAL(pairs), OBJ_VAL(pair));
@@ -721,7 +722,7 @@ Value str_lower(Value string) {
 
 Value str_split(Value string) {
   ObjString* s = AS_STRING(string);
-  ObjList* splits = allocate_list();
+  ObjList* splits = allocate_list((size_t) 0);
   size_t split_length = 0;
   int split_start_index = 0;
   for (int i=0; s->chars[i] != '\0'; i++) {
@@ -880,7 +881,7 @@ void free_object(Obj* object) {
 
 /* CUSTOM CODE */
 
-Value let(ObjMap* user_globals, Value word, Value recur_1, Value numwords, Value recur, Value counts, Value i, Value words) {
+Value let(ObjMap* user_globals, Value recur_1, Value counts, Value i, Value words, Value recur, Value word, Value numwords) {
     Value map_get_ = map_get(AS_MAP(counts), word, NUMBER_VAL(0));
   if (IS_OBJ(map_get_)) {
     inc_ref(AS_OBJ(map_get_));
@@ -898,13 +899,13 @@ Value let(ObjMap* user_globals, Value word, Value recur_1, Value numwords, Value
   return map_assoc;
 }
 
-Value let_1(ObjMap* user_globals, Value recur_1, Value numwords, Value recur, Value counts, Value i, Value words) {
+Value let_1(ObjMap* user_globals, Value recur_1, Value counts, Value i, Value words, Value recur, Value numwords) {
     Value word = list_get(words, i);
 
   Value if_result_1 = NIL_VAL;
   Value str_blank_ = str_blank(word);
   if (is_truthy(equal(BOOL_VAL(false), str_blank_))) {
-    Value let_result = let(user_globals, word, recur_1, numwords, recur, counts, i, words);
+    Value let_result = let(user_globals, recur_1, counts, i, words, recur, word, numwords);
       if_result_1 = let_result;
     if (IS_OBJ(if_result_1)) {
       inc_ref(AS_OBJ(if_result_1));
@@ -921,7 +922,7 @@ Value let_1(ObjMap* user_globals, Value recur_1, Value numwords, Value recur, Va
   return recur_1;
 }
 
-Value loop(ObjMap* user_globals, Value recur, Value words, Value counts, Value numwords) {
+Value loop(ObjMap* user_globals, Value recur, Value numwords, Value words, Value counts) {
 
   Value i = NUMBER_VAL(0);
   if (IS_OBJ(i)) {
@@ -940,7 +941,7 @@ Value loop(ObjMap* user_globals, Value recur, Value words, Value counts, Value n
     }
   } // end true code
   else {
-  Value let_result_1 = let_1(user_globals, recur_1, numwords, recur, counts, i, words);
+  Value let_result_1 = let_1(user_globals, recur_1, counts, i, words, recur, numwords);
   if_result = let_result_1;
     if (IS_OBJ(if_result)) {
       inc_ref(AS_OBJ(if_result));
@@ -980,7 +981,7 @@ Value loop(ObjMap* user_globals, Value recur, Value words, Value counts, Value n
 Value let_2(ObjMap* user_globals, Value recur, Value words, Value counts) {
     Value numwords = list_count(words);
 
-  Value loop_result_2 = loop(user_globals, recur,words,counts,numwords);
+  Value loop_result_2 = loop(user_globals, recur,numwords,words,counts);
 
   if (IS_OBJ(loop_result_2)) {
     inc_ref(AS_OBJ(loop_result_2));
@@ -1033,7 +1034,7 @@ Value u_process_M_words(ObjMap* user_globals, Value counts, Value words) {
   return NIL_VAL;
 }
 
-Value let_3(ObjMap* user_globals, Value line, Value recur_1, Value counts) {
+Value let_3(ObjMap* user_globals, Value recur_1, Value line, Value counts) {
     Value str_lower_ = str_lower(line);
   inc_ref(AS_OBJ(str_lower_));
   Value str_split_ = str_split(str_lower_);
@@ -1059,7 +1060,7 @@ Value u_process_M_line(ObjMap* user_globals, Value counts, Value line) {
   Value recur_1 = RECUR_VAL(&recur_1_1);
   bool continueFlag = false;
   do {
-  Value let_result_1 = let_3(user_globals, line, recur_1, counts);
+  Value let_result_1 = let_3(user_globals, recur_1, line, counts);
     Value loop_result_1 = let_result_1;
     if (IS_OBJ(loop_result_1)) {
       inc_ref(AS_OBJ(loop_result_1));
