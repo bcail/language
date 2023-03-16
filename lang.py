@@ -1077,7 +1077,7 @@ def str_c(params, envs):
         tmp_list_name = _get_generated_name('str_arg_tmp_list', envs=envs)
         name = _get_generated_name('str', envs=envs)
         envs[-1]['temps'].add(name)
-        envs[-1]['pre'].append(f'  Value {tmp_list_name} = OBJ_VAL(allocate_list());\n  inc_ref(AS_OBJ({tmp_list_name}));')
+        envs[-1]['pre'].append(f'  Value {tmp_list_name} = OBJ_VAL(allocate_list((size_t) 0));\n  inc_ref(AS_OBJ({tmp_list_name}));')
         for param in params:
             result = compile_form(param, envs=envs)
             envs[-1]['pre'].append(f'  list_add({tmp_list_name}, {result["code"]});')
@@ -1376,7 +1376,7 @@ def new_string_c(s, envs):
 def new_vector_c(v, envs):
     name = _get_generated_name('lst', envs=envs)
     envs[-1]['temps'].add(name)
-    c_code = f'  Value {name} = OBJ_VAL(allocate_list());\n  inc_ref(AS_OBJ({name}));'
+    c_code = f'  Value {name} = OBJ_VAL(allocate_list((size_t) 0));\n  inc_ref(AS_OBJ({name}));'
     c_items = [compile_form(item, envs=envs)['code'] for item in v.items]
     for c_item in c_items:
         c_code += f'\n  list_add({name}, {c_item});'
@@ -1804,11 +1804,15 @@ ObjString* copyString(const char* chars, size_t length) {
   return allocate_string(heapChars, length, hash);
 }
 
-ObjList* allocate_list(void) {
+ObjList* allocate_list(size_t initial_capacity) {
   ObjList* list = ALLOCATE_OBJ(ObjList, OBJ_LIST);
   list->count = 0;
-  list->capacity = 0;
-  list->values = NULL;
+  list->capacity = (size_t) initial_capacity;
+  if (initial_capacity == 0) {
+    list->values = NULL;
+  } else {
+    list->values = GROW_ARRAY(Value, NULL, 0, (size_t) initial_capacity);
+  }
   return list;
 }
 
@@ -2171,8 +2175,8 @@ Value map_get(ObjMap* map, Value key, Value defaultVal) {
 }
 
 Value map_keys(ObjMap* map) {
-  ObjList* keys = allocate_list();
   size_t num_entries = map->num_entries;
+  ObjList* keys = allocate_list(num_entries);
   for (size_t i = 0; i < num_entries; i++) {
     list_add(OBJ_VAL(keys), map->entries[i].key);
   }
@@ -2180,8 +2184,8 @@ Value map_keys(ObjMap* map) {
 }
 
 Value map_vals(ObjMap* map) {
-  ObjList* vals = allocate_list();
   size_t num_entries = map->num_entries;
+  ObjList* vals = allocate_list(num_entries);
   for (size_t i = 0; i < num_entries; i++) {
     list_add(OBJ_VAL(vals), map->entries[i].value);
   }
@@ -2189,11 +2193,11 @@ Value map_vals(ObjMap* map) {
 }
 
 Value map_pairs(ObjMap* map) {
-  ObjList* pairs = allocate_list();
   size_t num_entries = map->num_entries;
+  ObjList* pairs = allocate_list(num_entries);
   for (size_t i = 0; i < num_entries; i++) {
     if (!AS_BOOL(equal(map->entries[i].key, NIL_VAL))) {
-      ObjList* pair = allocate_list();
+      ObjList* pair = allocate_list((size_t) 2);
       list_add(OBJ_VAL(pair), map->entries[i].key);
       list_add(OBJ_VAL(pair), map->entries[i].value);
       list_add(OBJ_VAL(pairs), OBJ_VAL(pair));
@@ -2299,7 +2303,7 @@ Value str_lower(Value string) {
 
 Value str_split(Value string) {
   ObjString* s = AS_STRING(string);
-  ObjList* splits = allocate_list();
+  ObjList* splits = allocate_list((size_t) 0);
   size_t split_length = 0;
   int split_start_index = 0;
   for (int i=0; s->chars[i] != '\\0'; i++) {
