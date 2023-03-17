@@ -1074,13 +1074,14 @@ def str_c(params, envs):
         result = compile_form(params[0], envs=envs)
         arg_name = result['code']
     else:
+        num_params = len(params)
         tmp_list_name = _get_generated_name('str_arg_tmp_list', envs=envs)
         name = _get_generated_name('str', envs=envs)
         envs[-1]['temps'].add(name)
-        envs[-1]['pre'].append(f'  Value {tmp_list_name} = OBJ_VAL(allocate_list((size_t) 0));\n  inc_ref(AS_OBJ({tmp_list_name}));')
+        envs[-1]['pre'].append(f'  Value {tmp_list_name} = OBJ_VAL(allocate_list((size_t) {num_params}));\n  inc_ref(AS_OBJ({tmp_list_name}));')
         for param in params:
             result = compile_form(param, envs=envs)
-            envs[-1]['pre'].append(f'  list_add({tmp_list_name}, {result["code"]});')
+            envs[-1]['pre'].append(f'  list_add(AS_LIST({tmp_list_name}), {result["code"]});')
         envs[-1]['pre'].append(f'  Value {name} = str_join({tmp_list_name});\n  inc_ref(AS_OBJ({name}));')
         envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({tmp_list_name}));')
         envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
@@ -1376,10 +1377,11 @@ def new_string_c(s, envs):
 def new_vector_c(v, envs):
     name = _get_generated_name('lst', envs=envs)
     envs[-1]['temps'].add(name)
-    c_code = f'  Value {name} = OBJ_VAL(allocate_list((size_t) 0));\n  inc_ref(AS_OBJ({name}));'
+    num_items = len(v.items)
+    c_code = f'  Value {name} = OBJ_VAL(allocate_list((size_t) {num_items}));\n  inc_ref(AS_OBJ({name}));'
     c_items = [compile_form(item, envs=envs)['code'] for item in v.items]
     for c_item in c_items:
-        c_code += f'\n  list_add({name}, {c_item});'
+        c_code += f'\n  list_add(AS_LIST({name}), {c_item});'
 
     envs[-1]['pre'].append(f'{c_code}\n')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
@@ -1816,8 +1818,7 @@ ObjList* allocate_list(size_t initial_capacity) {
   return list;
 }
 
-void list_add(Value list_value, Value item) {
-  ObjList* list = AS_LIST(list_value);
+void list_add(ObjList* list, Value item) {
   if (list->capacity < list->count + 1) {
     size_t oldCapacity = list->capacity;
     list->capacity = GROW_CAPACITY(oldCapacity);
@@ -2178,7 +2179,7 @@ Value map_keys(ObjMap* map) {
   size_t num_entries = map->num_entries;
   ObjList* keys = allocate_list(num_entries);
   for (size_t i = 0; i < num_entries; i++) {
-    list_add(OBJ_VAL(keys), map->entries[i].key);
+    list_add(keys, map->entries[i].key);
   }
   return OBJ_VAL(keys);
 }
@@ -2187,7 +2188,7 @@ Value map_vals(ObjMap* map) {
   size_t num_entries = map->num_entries;
   ObjList* vals = allocate_list(num_entries);
   for (size_t i = 0; i < num_entries; i++) {
-    list_add(OBJ_VAL(vals), map->entries[i].value);
+    list_add(vals, map->entries[i].value);
   }
   return OBJ_VAL(vals);
 }
@@ -2198,9 +2199,9 @@ Value map_pairs(ObjMap* map) {
   for (size_t i = 0; i < num_entries; i++) {
     if (!AS_BOOL(equal(map->entries[i].key, NIL_VAL))) {
       ObjList* pair = allocate_list((size_t) 2);
-      list_add(OBJ_VAL(pair), map->entries[i].key);
-      list_add(OBJ_VAL(pair), map->entries[i].value);
-      list_add(OBJ_VAL(pairs), OBJ_VAL(pair));
+      list_add(pair, map->entries[i].key);
+      list_add(pair, map->entries[i].value);
+      list_add(pairs, OBJ_VAL(pair));
     }
   }
   return OBJ_VAL(pairs);
@@ -2309,7 +2310,7 @@ Value str_split(Value string) {
   for (int i=0; s->chars[i] != '\\0'; i++) {
     if (s->chars[i] == ' ') {
       ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
-      list_add(OBJ_VAL(splits), OBJ_VAL(split));
+      list_add(splits, OBJ_VAL(split));
       split_start_index = i + 1;
       split_length = 0;
     }
@@ -2318,7 +2319,7 @@ Value str_split(Value string) {
     }
   }
   ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
-  list_add(OBJ_VAL(splits), OBJ_VAL(split));
+  list_add(splits, OBJ_VAL(split));
   return OBJ_VAL(splits);
 }
 
