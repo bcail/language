@@ -1179,6 +1179,16 @@ def map_assoc_c(params, envs):
     return {'code': result_name}
 
 
+def map_dissoc_c(params, envs):
+    m = compile_form(params[0], envs=envs)['code']
+    key = compile_form(params[1], envs=envs)['code']
+    value = compile_form(params[2], envs=envs)['code']
+    result_name = _get_generated_name('map_dissoc', envs=envs)
+    envs[-1]['temps'].add(result_name)
+    envs[-1]['pre'].append(f'  Value {result_name} = map_remove({m}, {key});')
+    return {'code': result_name}
+
+
 def map_keys_c(params, envs):
     m = compile_form(params[0], envs=envs)['code']
     name = _get_generated_name('map_keys_', envs=envs)
@@ -1329,6 +1339,7 @@ global_compile_env = {
     'get': {'function': map_get_c},
     'contains?': {'function': map_contains_c},
     'assoc': {'function': map_assoc_c},
+    'dissoc': {'function': map_dissoc_c},
     'keys': {'function': map_keys_c},
     'vals': {'function': map_vals_c},
     'pairs': {'function': map_pairs_c},
@@ -1634,6 +1645,7 @@ c_types = '''
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
 #define IS_MAP(value)  isObjType(value, OBJ_MAP)
 #define MAP_EMPTY (-1)
+#define MAP_TOMBSTONE (-2)
 #define MAP_MAX_LOAD 0.75
 #define MAX_LINE 1000
 
@@ -2163,6 +2175,34 @@ Value map_set(ObjMap* map, Value key, Value value) {
   entry->key = key;
   entry->value = value;
   return OBJ_VAL(map);
+}
+
+Value map_remove(Value map, Value key) {
+  ObjMap* obj_map = AS_MAP(map);
+
+  int32_t indices_index = find_indices_index(obj_map->indices, obj_map->entries, obj_map->indices_capacity, key);
+  int32_t entries_index = (int32_t) obj_map->indices[indices_index];
+
+  bool isNewKey = (entries_index == MAP_EMPTY);
+  if (isNewKey) {
+    return map;
+  }
+
+  obj_map->indices[indices_index] = MAP_TOMBSTONE;
+
+  MapEntry entry = obj_map->entries[entries_index];
+
+  if (IS_OBJ(entry.key)) {
+    dec_ref_and_free(AS_OBJ(entry.key));
+  }
+  if (IS_OBJ(entry.value)) {
+    dec_ref_and_free(AS_OBJ(entry.value));
+  }
+
+  obj_map->entries[entries_index] = NULL;
+
+  obj_map->num_entries--;
+  return map;
 }
 
 Value map_contains(ObjMap* map, Value key) {
