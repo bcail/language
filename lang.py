@@ -1129,6 +1129,12 @@ def nth_c(params, envs):
     return {'code': f'list_get({lst["code"]}, {index})'}
 
 
+def remove_c(params, envs):
+    lst = compile_form(params[0], envs=envs)
+    index = compile_form(params[1], envs=envs)['code']
+    return {'code': f'list_remove({lst["code"]}, {index})'}
+
+
 def sort_c(params, envs):
     if len(params) == 1:
         lst = compile_form(params[0], envs=envs)
@@ -1318,6 +1324,7 @@ global_compile_env = {
     'println': {'function': println_c},
     'count': {'function': count_c},
     'nth': {'function': nth_c},
+    'remove': {'function': remove_c},
     'sort': {'function': sort_c},
     'get': {'function': map_get_c},
     'contains?': {'function': map_contains_c},
@@ -1832,6 +1839,10 @@ void list_add(ObjList* list, Value item) {
   }
 }
 
+Value list_count(Value list) {
+  return NUMBER_VAL((int) AS_LIST(list)->count);
+}
+
 Value list_get(Value list, Value index) {
   if (AS_NUMBER(index) < 0) {
     return NIL_VAL;
@@ -1846,8 +1857,22 @@ Value list_get(Value list, Value index) {
   }
 }
 
-Value list_count(Value list) {
-  return NUMBER_VAL((int) AS_LIST(list)->count);
+Value list_remove(Value list, Value index) {
+  ObjList* obj_list = AS_LIST(list);
+  if (AS_NUMBER(index) < 0 || (size_t) AS_NUMBER(index) > obj_list->count) {
+    return NIL_VAL;
+  }
+  size_t i = (size_t) AS_NUMBER(index);
+  while (i < obj_list->count) {
+    if ((i+1) == obj_list->count) {
+      obj_list->values[i] = NIL_VAL;
+    } else {
+      obj_list->values[i] = obj_list->values[i+1];
+    }
+    i++;
+  }
+  obj_list->count--;
+  return list;
 }
 
 void swap(Value v[], size_t i, size_t j) {
