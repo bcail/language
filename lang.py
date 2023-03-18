@@ -1182,7 +1182,6 @@ def map_assoc_c(params, envs):
 def map_dissoc_c(params, envs):
     m = compile_form(params[0], envs=envs)['code']
     key = compile_form(params[1], envs=envs)['code']
-    value = compile_form(params[2], envs=envs)['code']
     result_name = _get_generated_name('map_dissoc', envs=envs)
     envs[-1]['temps'].add(result_name)
     envs[-1]['pre'].append(f'  Value {result_name} = map_remove({m}, {key});')
@@ -1620,7 +1619,8 @@ c_types = '''
 #define FREE_ARRAY(type, pointer) \
             reallocate(pointer, (size_t)0)
 
-#define NIL_VAL  ((Value){NIL, {.number = 0}})
+#define NIL_VAL  ((Value){NIL, {.boolean = 0}})
+#define TOMBSTONE_VAL  ((Value){TOMBSTONE, {.boolean = 0}})
 #define BOOL_VAL(value)  ((Value){BOOL, {.boolean = value}})
 #define NUMBER_VAL(value)  ((Value){NUMBER, {.number = value}})
 #define RECUR_VAL(value)  ((Value){RECUR, {.recur = value}})
@@ -1636,6 +1636,7 @@ c_types = '''
 #define AS_LIST(value)       ((ObjList*)AS_OBJ(value))
 #define AS_MAP(value)       ((ObjMap*)AS_OBJ(value))
 #define IS_NIL(value)  ((value).type == NIL)
+#define IS_TOMBSTONE(value)  ((value).type == TOMBSTONE)
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
 #define IS_RECUR(value)  ((value).type == RECUR)
@@ -1675,6 +1676,7 @@ typedef enum {
   BOOL,
   NUMBER,
   RECUR,
+  TOMBSTONE,
   FILE_HANDLE,
   OBJ,
 } ValueType;
@@ -2180,6 +2182,10 @@ Value map_set(ObjMap* map, Value key, Value value) {
 Value map_remove(Value map, Value key) {
   ObjMap* obj_map = AS_MAP(map);
 
+  if (obj_map->num_entries == 0) {
+    return map;
+  }
+
   int32_t indices_index = find_indices_index(obj_map->indices, obj_map->entries, obj_map->indices_capacity, key);
   int32_t entries_index = (int32_t) obj_map->indices[indices_index];
 
@@ -2199,7 +2205,8 @@ Value map_remove(Value map, Value key) {
     dec_ref_and_free(AS_OBJ(entry.value));
   }
 
-  obj_map->entries[entries_index] = NULL;
+  entry.key = TOMBSTONE_VAL;
+  entry.value = TOMBSTONE_VAL;
 
   obj_map->num_entries--;
   return map;
@@ -2300,16 +2307,20 @@ Value print(Value value) {
     printf("]");
   }
   else if (IS_MAP(value)) {
-    size_t num_entries = AS_MAP(value)->num_entries;
+    ObjMap* map = AS_MAP(value);
+    size_t num_entries = map->num_entries;
     printf("{");
     bool first_entry = true;
     for (size_t i = 0; i < num_entries; i++) {
+      if (IS_TOMBSTONE(map->entries[i].key)) {
+        continue;
+      }
       if (!first_entry) {
         printf(", ");
       }
-      print(AS_MAP(value)->entries[i].key);
+      print(map->entries[i].key);
       printf(" ");
-      print(AS_MAP(value)->entries[i].value);
+      print(map->entries[i].value);
       first_entry = false;
     }
     printf("}");

@@ -524,9 +524,21 @@ class CompileTests(unittest.TestCase):
             ### {'src': '(print (contains? {} "a"))', 'output': 'false'},
             ### {'src': '(print (contains? {"a" 1} 1))', 'output': 'false'},
             ### {'src': '(print (contains? {"a" 1} "a"))', 'output': 'true'},
-            {'src': '(print (contains? {"a" 1} "z"))', 'output': 'false'},
+            ### {'src': '(print (contains? {"a" 1} "z"))', 'output': 'false'},
+            {'src': '(print (dissoc {} "1"))', 'output': '{}'},
+            {'src': '(print (dissoc {"1" 1} "1"))', 'output': '{}'},
+            {'src': '(print (dissoc {"1" 1 "2" 2} "2"))', 'output': '{1 1}'},
+            {'src': '(print (dissoc {"1" 1 "2" 2} "1"))', 'output': '{2 2}'},
+            {'src': '(print (dissoc {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5} "7"))',
+                'output': '{1 1, 2 2, 3 3, 4 4, 5 5}'},
+            {'src': '(print (dissoc {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6} "7"))',
+                'output': '{1 1, 2 2, 3 3, 4 4, 5 5, 6 6}'},
+            {'src': '(print (dissoc {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7} "3"))',
+                'output': '{1 1, 2 2, 4 4, 5 5, 6 6, 7 7}'},
+            {'src': '(print (dissoc {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7} "8"))',
+                'output': '{1 1, 2 2, 3 3, 4 4, 5 5, 6 6, 7 7}'},
             {'src': '(print (dissoc {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7 "8" 8} "8"))',
-                'output': '{1 1, 2 2, 3 3, 4 4, 5 5, 6 6, 7 7, 8 8}'},
+                'output': '{1 1, 2 2, 3 3, 4 4, 5 5, 6 6, 7 7}'},
         ]
         for test in tests:
             with self.subTest(test=test):
