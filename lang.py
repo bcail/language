@@ -2196,17 +2196,17 @@ Value map_remove(Value map, Value key) {
 
   obj_map->indices[indices_index] = MAP_TOMBSTONE;
 
-  MapEntry entry = obj_map->entries[entries_index];
+  MapEntry* entry = &(obj_map->entries[entries_index]);
 
-  if (IS_OBJ(entry.key)) {
-    dec_ref_and_free(AS_OBJ(entry.key));
+  if (IS_OBJ(entry->key)) {
+    dec_ref_and_free(AS_OBJ(entry->key));
   }
-  if (IS_OBJ(entry.value)) {
-    dec_ref_and_free(AS_OBJ(entry.value));
+  if (IS_OBJ(entry->value)) {
+    dec_ref_and_free(AS_OBJ(entry->value));
   }
 
-  entry.key = TOMBSTONE_VAL;
-  entry.value = TOMBSTONE_VAL;
+  entry->key = TOMBSTONE_VAL;
+  entry->value = TOMBSTONE_VAL;
 
   obj_map->num_entries--;
   return map;
@@ -2313,6 +2313,7 @@ Value print(Value value) {
     bool first_entry = true;
     for (size_t i = 0; i < num_entries; i++) {
       if (IS_TOMBSTONE(map->entries[i].key)) {
+        num_entries++;
         continue;
       }
       if (!first_entry) {
@@ -2517,8 +2518,13 @@ void free_object(Obj* object) {
     }
     case OBJ_MAP: {
       ObjMap* map = (ObjMap*)object;
-      for (size_t i = 0; i < map->num_entries; i++) {
+      size_t num_entries = map->num_entries;
+      for (size_t i = 0; i < num_entries; i++) {
         MapEntry entry = map->entries[i];
+        if (IS_TOMBSTONE(entry.key)) {
+          num_entries++;
+          continue;
+        }
         if (IS_OBJ(entry.key)) {
           dec_ref_and_free(AS_OBJ(entry.key));
         }
