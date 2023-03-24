@@ -2641,19 +2641,31 @@ CLANG_CHECK_ENV = {
 }
 
 
-def build_executable(file_name, output_file_name):
+def build_executable(file_name, output_file_name, with_checks=False):
     if os.path.exists(output_file_name):
         print(f'{output_file_name} already exists')
         sys.exit(1)
 
     if os.environ.get('CC'):
-        compiler = [os.environ['CC'], '-O2']
+        compiler = [os.environ['CC']]
     else:
-        compiler = [CLANG_CMD, '-O2']
+        compiler = [CLANG_CMD]
+
+    env = None
+
+    if with_checks:
+        if 'clang' in compiler[0]:
+            compiler.extend(CLANG_CHECK_OPTIONS)
+        elif 'gcc' in compiler[0]:
+            compiler.extend(GCC_CHECK_OPTIONS)
+        else:
+            raise RuntimeError(f'no checks to use for building with {compiler[0]}')
+    else:
+        compiler.extend(['-O2'])
 
     compile_cmd = compiler + ['-o', output_file_name, file_name]
     try:
-        subprocess.run(compile_cmd, check=True, capture_output=True)
+        subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
     except subprocess.CalledProcessError as e:
         if os.path.exists(file_name):
             with open(file_name, 'rb') as f:
@@ -2690,6 +2702,7 @@ if __name__ == '__main__':
     parser.add_argument('-b', action='store_true', dest='build', help='build executable')
     parser.add_argument('-r', action='store_true', dest='run', help='compile, build, & run')
     parser.add_argument('-o', action='store', dest='output', help='output file')
+    parser.add_argument('--with-checks', action='store_true', dest='with_checks', help='build with compiler checks')
     parser.add_argument('file', type=str, nargs='?', help='file to interpret')
 
     args = parser.parse_args()
@@ -2716,10 +2729,10 @@ if __name__ == '__main__':
                 with tempfile.TemporaryDirectory() as c_tmp:
                     c_file_name = os.path.join(c_tmp, 'code.c')
                     compile_to_c(Path(args.file), c_file_name)
-                    build_executable(c_file_name, output_file_name=executable)
+                    build_executable(c_file_name, output_file_name=executable, with_checks=args.with_checks)
             else:
                 c_file_name = args.file
-                build_executable(c_file_name, output_file_name=executable)
+                build_executable(c_file_name, output_file_name=executable, with_checks=args.with_checks)
             print(f'Built executable at {executable}')
         else:
             print('no file to build')
@@ -2728,12 +2741,12 @@ if __name__ == '__main__':
             with tempfile.TemporaryDirectory(dir='.') as tmp:
                 executable = os.path.join(tmp, 'program')
                 if args.file.endswith('.c'):
-                    build_executable(args.file, output_file_name=executable)
+                    build_executable(args.file, output_file_name=executable, with_checks=args.with_checks)
                     run_executable(executable)
                 else:
                     c_file_name = os.path.join(tmp, 'code.c')
                     compile_to_c(Path(args.file), c_file_name)
-                    build_executable(c_file_name, output_file_name=executable)
+                    build_executable(c_file_name, output_file_name=executable, with_checks=args.with_checks)
                     run_executable(executable)
         else:
             print('no file to run')
