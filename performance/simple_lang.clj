@@ -1,14 +1,9 @@
 (defn process-words
   [counts words]
-  (let [numwords (count words)]
-    (loop [i 0]
-      (if (= i numwords)
-        nil 
-        (let [word (nth words i)]
-          (if (= false (str/blank? word))
-            (let [curcount (get counts word 0)]
-              (assoc counts word (+ curcount 1))))
-          (recur (+ i 1)))))))
+  (for [word words]
+    (if (not (str/blank? word))
+      (let [cur-count (get counts word 0)]
+        (assoc counts word (+ cur-count 1))))))
  
 (defn process-line
   [counts line]
@@ -21,10 +16,9 @@
 
 (let [counts {}]
   (loop [line (read-line)]
-    (if (nil? line)
-      nil
+    (if (not (nil? line))
       (do
-        (if (= false (str/blank? line))
+        (if (not (str/blank? line))
           (process-line counts line))
         (recur (read-line)))))
   (let [sortedlist (sort compare (pairs counts))
@@ -32,4 +26,4 @@
     (for [entry sortedlist]
       (print (nth entry 0))
       (print space)
-      (println (nth entry 1))))
+      (println (nth entry 1)))))
