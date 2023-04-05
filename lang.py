@@ -1528,6 +1528,9 @@ def compile_form(node, envs):
                 envs[-1]['pre'].append(f_code)
                 envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (do_result, do_result))
                 return {'code': do_result}
+            elif first.name == 'not':
+                result = compile_form(rest[0], envs=envs)
+                return {'code': f'BOOL_VAL(!is_truthy({result["code"]}))'}
             elif first.name == 'recur':
                 params = [compile_form(r, envs=envs) for r in rest]
                 return (first, *params)

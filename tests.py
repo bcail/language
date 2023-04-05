@@ -580,6 +580,19 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
+    def test_not(self):
+        tests = [
+            {'src': '(print (not nil))', 'output': 'true'},
+            {'src': '(print (not true))', 'output': 'false'},
+            {'src': '(print (not false))', 'output': 'true'},
+            {'src': '(print (not []))', 'output': 'false'},
+            {'src': '(print (not 0))', 'output': 'false'},
+            {'src': '(print (not {}))', 'output': 'false'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
     def test_if(self):
         tests = [
             {'src': '(print (if true true))', 'output': 'true'},
@@ -595,6 +608,9 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (if false true ["False"]))', 'output': '[False]'},
             {'src': '(print (if false true {"False" "1"}))', 'output': '{False 1}'},
             {'src': '(print (if nil true {"False" "1"}))', 'output': '{False 1}'},
+            {'src': '(print (if (not false) "truthy" "falsey")', 'output': 'truthy'},
+            {'src': '(print (if (not true) "truthy" "falsey")', 'output': 'falsey'},
+            {'src': '(print (if (not []) "truthy" "falsey")', 'output': 'falsey'},
         ]
         for test in tests:
             with self.subTest(test=test):
