@@ -1104,7 +1104,7 @@ def str_c(params, envs):
         tmp_list_name = _get_generated_name('str_arg_tmp_list', envs=envs)
         name = _get_generated_name('str', envs=envs)
         envs[-1]['temps'].add(name)
-        envs[-1]['pre'].append(f'  Value {tmp_list_name} = OBJ_VAL(allocate_list((size_t) {num_params}));\n  inc_ref(AS_OBJ({tmp_list_name}));')
+        envs[-1]['pre'].append(f'  Value {tmp_list_name} = OBJ_VAL(allocate_list((uint32_t) {num_params}));\n  inc_ref(AS_OBJ({tmp_list_name}));')
         for param in params:
             result = compile_form(param, envs=envs)
             envs[-1]['pre'].append(f'  list_add(AS_LIST({tmp_list_name}), {result["code"]});')
@@ -1421,7 +1421,7 @@ def new_vector_c(v, envs):
     name = _get_generated_name('lst', envs=envs)
     envs[-1]['temps'].add(name)
     num_items = len(v.items)
-    c_code = f'  Value {name} = OBJ_VAL(allocate_list((size_t) {num_items}));\n  inc_ref(AS_OBJ({name}));'
+    c_code = f'  Value {name} = OBJ_VAL(allocate_list((uint32_t) {num_items}));\n  inc_ref(AS_OBJ({name}));'
     c_items = [compile_form(item, envs=envs)['code'] for item in v.items]
     for c_item in c_items:
         c_code += f'\n  list_add(AS_LIST({name}), {c_item});'
@@ -1742,8 +1742,8 @@ struct Recur {
 
 typedef struct {
   Obj obj;
-  size_t count;
-  size_t capacity;
+  uint32_t count;
+  uint32_t capacity;
   Value* values;
 } ObjList;
 
@@ -1856,10 +1856,10 @@ ObjString* copyString(const char* chars, size_t length) {
   return allocate_string(heapChars, length, hash);
 }
 
-ObjList* allocate_list(size_t initial_capacity) {
+ObjList* allocate_list(uint32_t initial_capacity) {
   ObjList* list = ALLOCATE_OBJ(ObjList, OBJ_LIST);
   list->count = 0;
-  list->capacity = (size_t) initial_capacity;
+  list->capacity = initial_capacity;
   if (initial_capacity == 0) {
     list->values = NULL;
   } else {
@@ -1870,7 +1870,7 @@ ObjList* allocate_list(size_t initial_capacity) {
 
 void list_add(ObjList* list, Value item) {
   if (list->capacity < list->count + 1) {
-    size_t oldCapacity = list->capacity;
+    uint32_t oldCapacity = list->capacity;
     list->capacity = GROW_CAPACITY(oldCapacity);
     list->values = GROW_ARRAY(Value, list->values, oldCapacity, list->capacity);
   }
@@ -1918,7 +1918,7 @@ Value list_remove(Value list, Value index) {
   return list;
 }
 
-void swap(Value v[], size_t i, size_t j) {
+void swap(Value v[], uint32_t i, uint32_t j) {
   if (i == j) {
     return;
   }
@@ -1940,9 +1940,9 @@ Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBE
 Value less_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) <= AS_NUMBER(y)); }
 Value less(ObjMap* user_globals, Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y)); }
 
-void quick_sort(ObjMap* user_globals, Value v[], size_t left, size_t right, Value (*compare) (ObjMap*, Value, Value)) {
+void quick_sort(ObjMap* user_globals, Value v[], uint32_t left, uint32_t right, Value (*compare) (ObjMap*, Value, Value)) {
   /* C Programming Language K&R p87*/
-  size_t i, last;
+  uint32_t i, last;
   if (left >= right) {
     return;
   }
@@ -1966,7 +1966,7 @@ void quick_sort(ObjMap* user_globals, Value v[], size_t left, size_t right, Valu
 
 Value list_sort(ObjMap* user_globals, Value list, Value (*compare) (ObjMap*, Value, Value)) {
   ObjList* lst = AS_LIST(list);
-  quick_sort(user_globals, lst->values, (size_t)0, (lst->count)-1, *compare);
+  quick_sort(user_globals, lst->values, 0, (lst->count)-1, *compare);
   return OBJ_VAL(lst);
 }
 
@@ -2278,7 +2278,7 @@ Value map_get(ObjMap* map, Value key, Value defaultVal) {
 
 Value map_keys(ObjMap* map) {
   size_t num_entries = map->num_entries;
-  ObjList* keys = allocate_list(num_entries);
+  ObjList* keys = allocate_list((uint32_t) num_entries);
   for (size_t i = 0; i < num_entries; i++) {
     list_add(keys, map->entries[i].key);
   }
@@ -2287,7 +2287,7 @@ Value map_keys(ObjMap* map) {
 
 Value map_vals(ObjMap* map) {
   size_t num_entries = map->num_entries;
-  ObjList* vals = allocate_list(num_entries);
+  ObjList* vals = allocate_list((uint32_t) num_entries);
   for (size_t i = 0; i < num_entries; i++) {
     list_add(vals, map->entries[i].value);
   }
@@ -2296,10 +2296,10 @@ Value map_vals(ObjMap* map) {
 
 Value map_pairs(ObjMap* map) {
   size_t num_entries = map->num_entries;
-  ObjList* pairs = allocate_list(num_entries);
+  ObjList* pairs = allocate_list((uint32_t) num_entries);
   for (size_t i = 0; i < num_entries; i++) {
     if (!AS_BOOL(equal(map->entries[i].key, NIL_VAL))) {
-      ObjList* pair = allocate_list((size_t) 2);
+      ObjList* pair = allocate_list((uint32_t) 2);
       list_add(pair, map->entries[i].key);
       list_add(pair, map->entries[i].value);
       list_add(pairs, OBJ_VAL(pair));
@@ -2410,7 +2410,7 @@ Value str_lower(Value string) {
 
 Value str_split(Value string) {
   ObjString* s = AS_STRING(string);
-  ObjList* splits = allocate_list((size_t) 0);
+  ObjList* splits = allocate_list((uint32_t) 0);
   size_t split_length = 0;
   int split_start_index = 0;
   for (int i=0; s->chars[i] != '\\0'; i++) {
