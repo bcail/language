@@ -1769,9 +1769,9 @@ typedef struct {
 
 typedef struct {
   Obj obj;
-  size_t num_entries;
-  size_t indices_capacity;
-  size_t entries_capacity;
+  uint32_t num_entries;
+  uint32_t indices_capacity;
+  uint32_t entries_capacity;
   int32_t* indices; /* start with always using int32 for now */
   MapEntry* entries;
 } ObjMap;
@@ -2079,13 +2079,12 @@ Value equal(Value x, Value y) {
   else if (IS_MAP(x)) {
     ObjMap* xMap = AS_MAP(x);
     ObjMap* yMap = AS_MAP(y);
-    size_t x_num_items = xMap->num_entries;
-    size_t y_num_items = yMap->num_entries;
+    uint32_t x_num_items = xMap->num_entries;
+    uint32_t y_num_items = yMap->num_entries;
     if (x_num_items != y_num_items) {
       return BOOL_VAL(false);
     }
-    size_t x_num_entries = xMap->num_entries;
-    for (size_t i = 0; i < x_num_entries; i++) {
+    for (uint32_t i = 0; i < xMap->num_entries; i++) {
       MapEntry x_entry = xMap->entries[i];
       MapEntry y_entry = yMap->entries[i];
       if (!AS_BOOL(equal(x_entry.key, y_entry.key))) {
@@ -2102,7 +2101,7 @@ Value equal(Value x, Value y) {
   }
 }
 
-static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t capacity, Value key) {
+static int32_t find_indices_index(int32_t* indices, MapEntry* entries, uint32_t capacity, Value key) {
   /* hash the key and get an index
    * - if indices[index] is empty, return it
    * - if indices[index] points to an entry in entries with a hash that matches our hash, return index
@@ -2126,19 +2125,19 @@ static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t ca
   }
 }
 
-static void adjustCapacity(ObjMap* map, size_t capacity) {
+static void adjustCapacity(ObjMap* map, uint32_t capacity) {
   // allocate new space
   int32_t* indices = ALLOCATE(int32_t, capacity);
   MapEntry* entries = ALLOCATE(MapEntry, capacity);
 
   // initialize all indices to MAP_EMPTY
-  for (size_t i = 0; i < capacity; i++) {
+  for (uint32_t i = 0; i < capacity; i++) {
     indices[i] = MAP_EMPTY;
   }
 
   // copy entries over to new space, filling in indices slots as well
-  size_t num_entries = map->num_entries;
-  size_t entries_index = 0;
+  uint32_t num_entries = map->num_entries;
+  uint32_t entries_index = 0;
   for (; entries_index < num_entries; entries_index++) {
     // find new index
     int32_t indices_index = find_indices_index(indices, entries, capacity, map->entries[entries_index].key);
@@ -2165,7 +2164,7 @@ static void adjustCapacity(ObjMap* map, size_t capacity) {
 Value map_set(ObjMap* map, Value key, Value value) {
   /* keep indices & entries same number of entries for now */
   if ((double)map->num_entries + 1 > (double)map->indices_capacity * MAP_MAX_LOAD) {
-    size_t capacity = GROW_CAPACITY(map->indices_capacity);
+    uint32_t capacity = GROW_CAPACITY(map->indices_capacity);
     adjustCapacity(map, capacity);
   }
 
@@ -2270,27 +2269,27 @@ Value map_get(ObjMap* map, Value key, Value defaultVal) {
 }
 
 Value map_keys(ObjMap* map) {
-  size_t num_entries = map->num_entries;
+  uint32_t num_entries = map->num_entries;
   ObjList* keys = allocate_list((uint32_t) num_entries);
-  for (size_t i = 0; i < num_entries; i++) {
+  for (uint32_t i = 0; i < num_entries; i++) {
     list_add(keys, map->entries[i].key);
   }
   return OBJ_VAL(keys);
 }
 
 Value map_vals(ObjMap* map) {
-  size_t num_entries = map->num_entries;
+  uint32_t num_entries = map->num_entries;
   ObjList* vals = allocate_list((uint32_t) num_entries);
-  for (size_t i = 0; i < num_entries; i++) {
+  for (uint32_t i = 0; i < num_entries; i++) {
     list_add(vals, map->entries[i].value);
   }
   return OBJ_VAL(vals);
 }
 
 Value map_pairs(ObjMap* map) {
-  size_t num_entries = map->num_entries;
+  uint32_t num_entries = map->num_entries;
   ObjList* pairs = allocate_list((uint32_t) num_entries);
-  for (size_t i = 0; i < num_entries; i++) {
+  for (uint32_t i = 0; i < num_entries; i++) {
     if (!AS_BOOL(equal(map->entries[i].key, NIL_VAL))) {
       ObjList* pair = allocate_list((uint32_t) 2);
       list_add(pair, map->entries[i].key);
@@ -2330,10 +2329,10 @@ Value print(Value value) {
   }
   else if (IS_MAP(value)) {
     ObjMap* map = AS_MAP(value);
-    size_t num_entries = map->num_entries;
+    uint32_t num_entries = map->num_entries;
     printf("{");
     bool first_entry = true;
-    for (size_t i = 0; i < num_entries; i++) {
+    for (uint32_t i = 0; i < num_entries; i++) {
       if (IS_TOMBSTONE(map->entries[i].key)) {
         num_entries++;
         continue;
@@ -2540,8 +2539,8 @@ void free_object(Obj* object) {
     }
     case OBJ_MAP: {
       ObjMap* map = (ObjMap*)object;
-      size_t num_entries = map->num_entries;
-      for (size_t i = 0; i < num_entries; i++) {
+      uint32_t num_entries = map->num_entries;
+      for (uint32_t i = 0; i < num_entries; i++) {
         MapEntry entry = map->entries[i];
         if (IS_TOMBSTONE(entry.key)) {
           num_entries++;
