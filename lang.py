@@ -1411,7 +1411,7 @@ def new_string_c(s, envs):
     name = _get_generated_name('str', envs=envs)
 
     envs[-1]['temps'].add(name)
-    envs[-1]['pre'].append(f'  Value {name} = OBJ_VAL(copyString("{s}", (size_t) {len(s)}));')
+    envs[-1]['pre'].append(f'  Value {name} = OBJ_VAL(copyString("{s}", {len(s)}));')
     envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
     return name
@@ -1547,7 +1547,7 @@ def compile_form(node, envs):
             if envs[0]['user_globals'][node.name]['type'] == 'var':
                 name = _get_generated_name('user_global_lookup', envs=envs)
                 envs[0]['temps'].add(name)
-                code = f'  Value {name} = OBJ_VAL(copyString("{node.name}", (size_t) {len(node.name)}));'
+                code = f'  Value {name} = OBJ_VAL(copyString("{node.name}", {len(node.name)}));'
                 code += f'\n  inc_ref(AS_OBJ({name}));'
                 envs[-1]['pre'].append(code)
                 envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
@@ -1729,7 +1729,7 @@ static inline bool isObjType(Value value, ObjType type) {
 
 typedef struct {
   Obj obj;
-  size_t length;
+  uint32_t length;
   uint32_t hash;
   char* chars;
 } ObjString;
@@ -1798,9 +1798,9 @@ void dec_ref_and_free(Obj* object) {
   }
 }
 
-static uint32_t hashString(const char* key, size_t length) {
+static uint32_t hashString(const char* key, uint32_t length) {
   uint32_t hash = 2166136261u;
-  for (size_t i = 0; i < length; i++) {
+  for (uint32_t i = 0; i < length; i++) {
     hash ^= (uint8_t)key[i];
     hash *= 16777619;
   }
@@ -1809,7 +1809,7 @@ static uint32_t hashString(const char* key, size_t length) {
 
 Value map_set(ObjMap* map, Value key, Value value);
 
-static ObjString* allocate_string(char* chars, size_t length, uint32_t hash) {
+static ObjString* allocate_string(char* chars, uint32_t length, uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->hash = hash;
@@ -1820,7 +1820,7 @@ static ObjString* allocate_string(char* chars, size_t length, uint32_t hash) {
   return string;
 }
 
-ObjString* find_interned_string(const char* chars, size_t length, uint32_t hash) {
+ObjString* find_interned_string(const char* chars, uint32_t length, uint32_t hash) {
   if (interned_strings->num_entries == 0) { return NULL; }
   uint32_t index = hash % (uint32_t)interned_strings->indices_capacity;
   for (;;) {
@@ -1831,7 +1831,7 @@ ObjString* find_interned_string(const char* chars, size_t length, uint32_t hash)
     ObjString* key_string = AS_STRING(entry.key);
     if (key_string->length == length &&
         key_string->hash == hash &&
-        memcmp(key_string->chars, chars, length) == 0) {
+        memcmp(key_string->chars, chars, (size_t)length) == 0) {
       // We found it.
       return key_string;
     }
@@ -1842,7 +1842,7 @@ ObjString* find_interned_string(const char* chars, size_t length, uint32_t hash)
   return NULL;
 }
 
-ObjString* copyString(const char* chars, size_t length) {
+ObjString* copyString(const char* chars, uint32_t length) {
   uint32_t hash = hashString(chars, length);
   if (length < 4) {
     ObjString* interned = find_interned_string(chars, length, hash);
@@ -1851,7 +1851,7 @@ ObjString* copyString(const char* chars, size_t length) {
     }
   }
   char* heapChars = ALLOCATE(char, length + 1);
-  memcpy(heapChars, chars, length);
+  memcpy(heapChars, chars, (size_t)length);
   heapChars[length] = 0; /* terminate it w/ NULL, so we can pass c-string to functions that need it */
   return allocate_string(heapChars, length, hash);
 }
@@ -1901,10 +1901,10 @@ Value list_get(Value list, int32_t index) {
 
 Value list_remove(Value list, Value index) {
   ObjList* obj_list = AS_LIST(list);
-  if (AS_NUMBER(index) < 0 || (size_t) AS_NUMBER(index) > obj_list->count) {
+  if (AS_NUMBER(index) < 0 || (uint32_t) AS_NUMBER(index) > obj_list->count) {
     return NIL_VAL;
   }
-  size_t i = (size_t) AS_NUMBER(index);
+  uint32_t i = (uint32_t) AS_NUMBER(index);
   while (i < obj_list->count) {
     if ((i+1) == obj_list->count) {
       obj_list->values[i] = NIL_VAL;
@@ -1976,7 +1976,7 @@ void recur_init(Recur* recur) {
 }
 
 void recur_free(Recur* recur) {
-  for (size_t i = 0; i < recur->count; i++) {
+  for (uint32_t i = 0; i < recur->count; i++) {
     Value v = recur->values[i];
     if (IS_OBJ(v)) {
       dec_ref_and_free(AS_OBJ(v));
@@ -2055,7 +2055,7 @@ Value equal(Value x, Value y) {
     ObjString* xString = AS_STRING(x);
     ObjString* yString = AS_STRING(y);
     if ((xString->length == yString->length) &&
-        (memcmp(xString->chars, yString->chars, xString->length) == 0)) {
+        (memcmp(xString->chars, yString->chars, (size_t)xString->length) == 0)) {
       return BOOL_VAL(true);
     }
     return BOOL_VAL(false);
@@ -2118,7 +2118,7 @@ static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t ca
     ObjString* entry_key_string = AS_STRING(entries[indices[index]].key);
     if (key_string->length == entry_key_string->length &&
         key_string->hash == entry_key_string->hash &&
-        memcmp(key_string->chars, entry_key_string->chars, key_string->length) == 0) {
+        memcmp(key_string->chars, entry_key_string->chars, (size_t)key_string->length) == 0) {
       return (int32_t) index;
     }
 
@@ -2364,14 +2364,14 @@ Value readline(void) {
   /* K&R p29 */
   int ch = 0;
   char buffer[MAX_LINE];
-  int num_chars;
+  uint32_t num_chars;
   for (num_chars=0; num_chars<(MAX_LINE-1) && (ch=getchar()) != EOF && ch != '\\n'; num_chars++) {
     buffer[num_chars] = (char) ch;
   }
   if ((ch == EOF) && (num_chars == 0)) {
     return NIL_VAL;
   }
-  Value result = OBJ_VAL(copyString(buffer, (size_t) num_chars));
+  Value result = OBJ_VAL(copyString(buffer, num_chars));
   inc_ref(AS_OBJ(result));
   return result;
 }
@@ -2404,7 +2404,7 @@ Value str_lower(Value string) {
 Value str_split(Value string) {
   ObjString* s = AS_STRING(string);
   ObjList* splits = allocate_list((uint32_t) 0);
-  size_t split_length = 0;
+  uint32_t split_length = 0;
   int split_start_index = 0;
   for (int i=0; s->chars[i] != '\\0'; i++) {
     if (s->chars[i] == ' ') {
@@ -2432,25 +2432,25 @@ Value str_str(Value v) {
   Value s;
   if (IS_BOOL(v)) {
     if (AS_BOOL(v)) {
-      s = OBJ_VAL(copyString("true", (size_t)4));
+      s = OBJ_VAL(copyString("true", 4));
     }
     else {
-      s = OBJ_VAL(copyString("false", (size_t)5));
+      s = OBJ_VAL(copyString("false", 5));
     }
   }
   else if (IS_NUMBER(v)) {
     char str[100];
-    int num_chars = sprintf(str, "%g", AS_NUMBER(v));
-    s = OBJ_VAL(copyString(str, (size_t)num_chars));
+    int32_t num_chars = sprintf(str, "%g", AS_NUMBER(v));
+    s = OBJ_VAL(copyString(str, (uint32_t) num_chars));
   }
   else if (IS_LIST(v)) {
-    s = OBJ_VAL(copyString("[]", (size_t)2));
+    s = OBJ_VAL(copyString("[]", 2));
   }
   else if (IS_MAP(v)) {
-    s = OBJ_VAL(copyString("{}", (size_t)2));
+    s = OBJ_VAL(copyString("{}", 2));
   }
   else {
-    s = OBJ_VAL(copyString("", (size_t)0));
+    s = OBJ_VAL(copyString("", 0));
   }
   inc_ref(AS_OBJ(s));
   return s;
@@ -2459,7 +2459,7 @@ Value str_str(Value v) {
 Value str_join(Value list_val) {
   ObjList* list = AS_LIST(list_val);
 
-  size_t num_bytes = 0;
+  uint32_t num_bytes = 0;
 
   for (uint32_t i = 0; i < list->count; i++) {
     Value v = list_get(list_val, (int32_t)i);
@@ -2471,13 +2471,13 @@ Value str_join(Value list_val) {
     }
   }
 
-  char* heapChars = ALLOCATE(char, num_bytes+1);
+  char* heapChars = ALLOCATE(char, (size_t)(num_bytes+1));
   char* start_char = heapChars;
 
   for (uint32_t i = 0; i < list->count; i++) {
     Value v = list_get(list_val, (int32_t)i);
     ObjString* s = AS_STRING(str_str(v));
-    memcpy(start_char, s->chars, s->length);
+    memcpy(start_char, s->chars, (size_t)s->length);
     start_char = start_char + s->length;
   }
   heapChars[num_bytes] = 0;
@@ -2493,7 +2493,7 @@ Value file_open(Value path, const char* mode) {
 Value file_read(Value file) {
   int ch = 0;
   char buffer[MAX_LINE];
-  int num_chars;
+  uint32_t num_chars;
   FILE* fp = AS_FILE(file);
   for (num_chars=0; num_chars<(MAX_LINE-1) && (ch=getc(fp)) != EOF; num_chars++) {
     buffer[num_chars] = (char) ch;
@@ -2501,7 +2501,7 @@ Value file_read(Value file) {
   if ((ch == EOF) && (num_chars == 0)) {
     return NIL_VAL;
   }
-  Value result = OBJ_VAL(copyString(buffer, (size_t) num_chars));
+  Value result = OBJ_VAL(copyString(buffer, num_chars));
   inc_ref(AS_OBJ(result));
   return result;
 }
@@ -2608,7 +2608,7 @@ def _compile(source):
 
     for name, value in env['user_globals'].items():
         if value['type'] == 'var':
-            c_code += f'\n  map_set(user_globals, OBJ_VAL(copyString("{name}", (size_t) {len(name)})), {value["code"]});\n'
+            c_code += f'\n  map_set(user_globals, OBJ_VAL(copyString("{name}", {len(name)})), {value["code"]});\n'
 
     c_code += '\n' + '\n'.join(env['pre'])
 
