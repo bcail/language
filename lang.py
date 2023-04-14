@@ -1002,7 +1002,7 @@ def _loop(envs, bindings, exprs):
 
         for index, var in enumerate(bindings):
             loop_code += '\n      if (IS_OBJ(%s)) {\n      dec_ref_and_free(AS_OBJ(%s));\n    }' % (var, var)
-            loop_code += f'\n      {var} = recur_get({loop_result}, NUMBER_VAL({index}));'
+            loop_code += f'\n      {var} = recur_get({loop_result}, {index});'
             loop_code += '\n      if (IS_OBJ(%s)) {\n      inc_ref(AS_OBJ(%s));\n    }' % (var, var)
 
         if loop_post:
@@ -1491,7 +1491,7 @@ def compile_form(node, envs):
                 envs[-1]['temps'].add(lst_name)
                 envs[-1]['temps'].add(lst_count)
                 envs[-1]['pre'].append(f'  ObjList* {lst_name} = AS_LIST({lst["code"]});')
-                envs[-1]['pre'].append('  for(size_t i=0; i<%s->count; i++) {\n' % lst_name)
+                envs[-1]['pre'].append('  for(uint32_t i=0; i<%s->count; i++) {\n' % lst_name)
                 envs[-1]['pre'].append(f'    Value {c_name} = {lst_name}->values[i];')
                 local_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
                 envs.append(local_env)
@@ -1735,8 +1735,8 @@ typedef struct {
 } ObjString;
 
 struct Recur {
-  size_t count;
-  size_t capacity;
+  uint32_t count;
+  uint32_t capacity;
   Value* values;
 };
 
@@ -1989,7 +1989,7 @@ void recur_free(Recur* recur) {
 
 void recur_add(Recur* recur, Value item) {
   if (recur->capacity < recur->count + 1) {
-    size_t oldCapacity = recur->capacity;
+    uint32_t oldCapacity = recur->capacity;
     recur->capacity = GROW_CAPACITY(oldCapacity);
     recur->values = GROW_ARRAY(Value, recur->values, oldCapacity, recur->capacity);
   }
@@ -2001,19 +2001,13 @@ void recur_add(Recur* recur, Value item) {
   }
 }
 
-Value recur_get(Value recur, Value index) {
-  /* size_t is the unsigned integer type returned by the sizeof operator */
-  size_t num_index = (size_t) AS_NUMBER(index);
-  if (num_index < AS_RECUR(recur)->count) {
-    return AS_RECUR(recur)->values[num_index];
+Value recur_get(Value recur, uint32_t index) {
+  if (index < AS_RECUR(recur)->count) {
+    return AS_RECUR(recur)->values[index];
   }
   else {
     return NIL_VAL;
   }
-}
-
-Value recur_count(Value recur) {
-  return NUMBER_VAL((int) AS_RECUR(recur)->count);
 }
 
 ObjMap* allocate_map(void) {
