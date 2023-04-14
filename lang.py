@@ -1152,7 +1152,7 @@ def str_split_c(params, envs):
 def nth_c(params, envs):
     lst = compile_form(params[0], envs=envs)
     index = compile_form(params[1], envs=envs)['code']
-    return {'code': f'list_get({lst["code"]}, {index})'}
+    return {'code': f'list_get({lst["code"]}, (int32_t) AS_NUMBER({index}))'}
 
 
 def remove_c(params, envs):
@@ -1886,14 +1886,13 @@ Value list_count(Value list) {
   return NUMBER_VAL((int) AS_LIST(list)->count);
 }
 
-Value list_get(Value list, Value index) {
-  if (AS_NUMBER(index) < 0) {
+Value list_get(Value list, int32_t index) {
+  if (index < 0) {
     return NIL_VAL;
   }
-  /* size_t is the unsigned integer type returned by the sizeof operator */
-  size_t num_index = (size_t) AS_NUMBER(index);
-  if (num_index < AS_LIST(list)->count) {
-    return AS_LIST(list)->values[num_index];
+
+  if ((uint32_t) index < AS_LIST(list)->count) {
+    return AS_LIST(list)->values[index];
   }
   else {
     return NIL_VAL;
@@ -2066,9 +2065,9 @@ Value equal(Value x, Value y) {
     ObjList* yList = AS_LIST(y);
     if (xList->count == yList->count) {
       Value num_items = list_count(x);
-      for (int i = 0; i < AS_NUMBER(num_items); i++) {
-        Value xItem = list_get(x, NUMBER_VAL(i));
-        Value yItem = list_get(y, NUMBER_VAL(i));
+      for (int32_t i = 0; i < AS_NUMBER(num_items); i++) {
+        Value xItem = list_get(x, i);
+        Value yItem = list_get(y, i);
         if (!AS_BOOL(equal(xItem, yItem))) {
           return BOOL_VAL(false);
         }
@@ -2321,11 +2320,11 @@ Value print(Value value) {
     Value num_items = list_count(value);
     printf("[");
     if (AS_NUMBER(num_items) > 0) {
-      print(list_get(value, NUMBER_VAL(0)));
+      print(list_get(value, 0));
     }
     for (int i = 1; i < AS_NUMBER(num_items); i++) {
       printf(" ");
-      print(list_get(value, NUMBER_VAL(i)));
+      print(list_get(value, i));
     }
     printf("]");
   }
@@ -2462,8 +2461,8 @@ Value str_join(Value list_val) {
 
   size_t num_bytes = 0;
 
-  for (size_t i = 0; i < list->count; i++) {
-    Value v = list_get(list_val, NUMBER_VAL((double)i));
+  for (uint32_t i = 0; i < list->count; i++) {
+    Value v = list_get(list_val, (int32_t)i);
     Value v_str = str_str(v);
     num_bytes = num_bytes + AS_STRING(v_str)->length;
     dec_ref_and_free(AS_OBJ(v_str));
@@ -2475,8 +2474,8 @@ Value str_join(Value list_val) {
   char* heapChars = ALLOCATE(char, num_bytes+1);
   char* start_char = heapChars;
 
-  for (size_t i = 0; i < list->count; i++) {
-    Value v = list_get(list_val, NUMBER_VAL((double)i));
+  for (uint32_t i = 0; i < list->count; i++) {
+    Value v = list_get(list_val, (int32_t)i);
     ObjString* s = AS_STRING(str_str(v));
     memcpy(start_char, s->chars, s->length);
     start_char = start_char + s->length;
@@ -2529,8 +2528,8 @@ void free_object(Obj* object) {
     }
     case OBJ_LIST: {
       ObjList* list = (ObjList*)object;
-      for (size_t i = 0; i < list->count; i++) {
-        Value v = list_get(OBJ_VAL(object), NUMBER_VAL((double)i));
+      for (uint32_t i = 0; i < list->count; i++) {
+        Value v = list_get(OBJ_VAL(object), (int32_t)i);
         if (IS_OBJ(v)) {
           dec_ref_and_free(AS_OBJ(v));
         }
