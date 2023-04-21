@@ -580,7 +580,7 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
-    def test_not(self):
+    def test_not_or_and(self):
         tests = [
             {'src': '(print (not nil))', 'output': 'true'},
             {'src': '(print (not true))', 'output': 'false'},
@@ -588,6 +588,18 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (not []))', 'output': 'false'},
             {'src': '(print (not 0))', 'output': 'false'},
             {'src': '(print (not {}))', 'output': 'false'},
+            {'src': '(print (and nil))', 'output': 'nil'},
+            {'src': '(print (and false))', 'output': 'false'},
+            {'src': '(print (and 1))', 'output': '1'},
+            {'src': '(print (and "1" false 2))', 'output': 'false'},
+            {'src': '(print (and 1 {} 3))', 'output': '3'},
+            {'src': '(print (or nil))', 'output': 'nil'},
+            {'src': '(print (or false))', 'output': 'false'},
+            {'src': '(print (or "1"))', 'output': '1'},
+            {'src': '(print (or false "1" nil))', 'output': '1'},
+            {'src': '(print (or false nil))', 'output': 'nil'},
+            {'src': '(print (or 1 "2" 3))', 'output': '1'},
+            {'src': '(print (or "a" 2 nil))', 'output': 'a'},
         ]
         for test in tests:
             with self.subTest(test=test):

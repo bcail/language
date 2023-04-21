@@ -1531,6 +1531,38 @@ def compile_form(node, envs):
             elif first.name == 'not':
                 result = compile_form(rest[0], envs=envs)
                 return {'code': f'BOOL_VAL(!is_truthy({result["code"]}))'}
+            elif first.name == 'and':
+                params = [compile_form(r, envs=envs) for r in rest]
+                num_params = len(params)
+                and_result = _get_generated_name('and_result', envs)
+                and_params = _get_generated_name('and_params', envs)
+                envs[-1]['temps'].add(and_result)
+                envs[-1]['temps'].add(and_params)
+                envs[-1]['pre'].append(f'  Value {and_params}[{num_params}];')
+                for index, p in enumerate(params):
+                    envs[-1]['pre'].append(f'  {and_params}[{index}] = {p["code"]}; ')
+                envs[-1]['pre'].append(f'  Value {and_result} = BOOL_VAL(true);')
+                envs[-1]['pre'].append('  for (int i = 0; i<%s; i++) {' % num_params)
+                envs[-1]['pre'].append('    %s = %s[i];' % (and_result, and_params))
+                envs[-1]['pre'].append('    if(!is_truthy(%s)) { break; }' % and_result)
+                envs[-1]['pre'].append('  }')
+                return {'code': and_result}
+            elif first.name == 'or':
+                params = [compile_form(r, envs=envs) for r in rest]
+                num_params = len(params)
+                or_result = _get_generated_name('or_result', envs)
+                or_params = _get_generated_name('or_params', envs)
+                envs[-1]['temps'].add(or_result)
+                envs[-1]['temps'].add(or_params)
+                envs[-1]['pre'].append(f'  Value {or_params}[{num_params}];')
+                for index, p in enumerate(params):
+                    envs[-1]['pre'].append(f'  {or_params}[{index}] = {p["code"]}; ')
+                envs[-1]['pre'].append(f'  Value {or_result} = BOOL_VAL(true);')
+                envs[-1]['pre'].append('  for (int i = 0; i<%s; i++) {' % num_params)
+                envs[-1]['pre'].append('    %s = %s[i];' % (or_result, or_params))
+                envs[-1]['pre'].append('    if(is_truthy(%s)) { break; }' % or_result)
+                envs[-1]['pre'].append('  }')
+                return {'code': or_result}
             elif first.name == 'recur':
                 params = [compile_form(r, envs=envs) for r in rest]
                 return (first, *params)
