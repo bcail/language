@@ -1411,7 +1411,7 @@ def new_string_c(s, envs):
     name = _get_generated_name('str', envs=envs)
 
     envs[-1]['temps'].add(name)
-    envs[-1]['pre'].append(f'  Value {name} = OBJ_VAL(copyString("{s}", {len(s)}));')
+    envs[-1]['pre'].append(f'  Value {name} = OBJ_VAL(copy_string("{s}", {len(s)}));')
     envs[-1]['pre'].append(f'  inc_ref(AS_OBJ({name}));')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
     return name
@@ -1579,7 +1579,7 @@ def compile_form(node, envs):
             if envs[0]['user_globals'][node.name]['type'] == 'var':
                 name = _get_generated_name('user_global_lookup', envs=envs)
                 envs[0]['temps'].add(name)
-                code = f'  Value {name} = OBJ_VAL(copyString("{node.name}", {len(node.name)}));'
+                code = f'  Value {name} = OBJ_VAL(copy_string("{node.name}", {len(node.name)}));'
                 code += f'\n  inc_ref(AS_OBJ({name}));'
                 envs[-1]['pre'].append(code)
                 envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
@@ -1830,7 +1830,7 @@ void dec_ref_and_free(Obj* object) {
   }
 }
 
-static uint32_t hashString(const char* key, uint32_t length) {
+static uint32_t hash_string(const char* key, uint32_t length) {
   uint32_t hash = 2166136261u;
   for (uint32_t i = 0; i < length; i++) {
     hash ^= (uint8_t)key[i];
@@ -1874,8 +1874,8 @@ ObjString* find_interned_string(const char* chars, uint32_t length, uint32_t has
   return NULL;
 }
 
-ObjString* copyString(const char* chars, uint32_t length) {
-  uint32_t hash = hashString(chars, length);
+ObjString* copy_string(const char* chars, uint32_t length) {
+  uint32_t hash = hash_string(chars, length);
   if (length < 4) {
     ObjString* interned = find_interned_string(chars, length, hash);
     if (interned != NULL) {
@@ -1915,7 +1915,7 @@ void list_add(ObjList* list, Value item) {
 }
 
 Value list_count(Value list) {
-  return NUMBER_VAL((int) AS_LIST(list)->count);
+  return NUMBER_VAL((double) AS_LIST(list)->count);
 }
 
 Value list_get(Value list, int32_t index) {
@@ -2052,7 +2052,7 @@ ObjMap* allocate_map(void) {
 }
 
 Value map_count(Value map) {
-  return NUMBER_VAL((int) AS_MAP(map)->num_entries);
+  return NUMBER_VAL((double) AS_MAP(map)->num_entries);
 }
 
 bool is_truthy(Value value) {
@@ -2402,7 +2402,7 @@ Value readline(void) {
   if ((ch == EOF) && (num_chars == 0)) {
     return NIL_VAL;
   }
-  Value result = OBJ_VAL(copyString(buffer, num_chars));
+  Value result = OBJ_VAL(copy_string(buffer, num_chars));
   inc_ref(AS_OBJ(result));
   return result;
 }
@@ -2425,7 +2425,7 @@ Value str_blank(Value string) {
 
 Value str_lower(Value string) {
   ObjString* s = AS_STRING(string);
-  ObjString* s_lower = copyString(s->chars, s->length);
+  ObjString* s_lower = copy_string(s->chars, s->length);
   for (int i=0; s_lower->chars[i] != '\\0'; i++) {
     s_lower->chars[i] = (char) tolower((int) s_lower->chars[i]);
   }
@@ -2439,7 +2439,7 @@ Value str_split(Value string) {
   int split_start_index = 0;
   for (int i=0; s->chars[i] != '\\0'; i++) {
     if (s->chars[i] == ' ') {
-      ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
+      ObjString* split = copy_string(&(s->chars[split_start_index]), split_length);
       list_add(splits, OBJ_VAL(split));
       split_start_index = i + 1;
       split_length = 0;
@@ -2448,7 +2448,7 @@ Value str_split(Value string) {
       split_length++;
     }
   }
-  ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
+  ObjString* split = copy_string(&(s->chars[split_start_index]), split_length);
   list_add(splits, OBJ_VAL(split));
   return OBJ_VAL(splits);
 }
@@ -2463,25 +2463,25 @@ Value str_str(Value v) {
   Value s;
   if (IS_BOOL(v)) {
     if (AS_BOOL(v)) {
-      s = OBJ_VAL(copyString("true", 4));
+      s = OBJ_VAL(copy_string("true", 4));
     }
     else {
-      s = OBJ_VAL(copyString("false", 5));
+      s = OBJ_VAL(copy_string("false", 5));
     }
   }
   else if (IS_NUMBER(v)) {
     char str[100];
     int32_t num_chars = sprintf(str, "%g", AS_NUMBER(v));
-    s = OBJ_VAL(copyString(str, (uint32_t) num_chars));
+    s = OBJ_VAL(copy_string(str, (uint32_t) num_chars));
   }
   else if (IS_LIST(v)) {
-    s = OBJ_VAL(copyString("[]", 2));
+    s = OBJ_VAL(copy_string("[]", 2));
   }
   else if (IS_MAP(v)) {
-    s = OBJ_VAL(copyString("{}", 2));
+    s = OBJ_VAL(copy_string("{}", 2));
   }
   else {
-    s = OBJ_VAL(copyString("", 0));
+    s = OBJ_VAL(copy_string("", 0));
   }
   inc_ref(AS_OBJ(s));
   return s;
@@ -2512,7 +2512,7 @@ Value str_join(Value list_val) {
     start_char = start_char + s->length;
   }
   heapChars[num_bytes] = 0;
-  uint32_t hash = hashString(heapChars, num_bytes);
+  uint32_t hash = hash_string(heapChars, num_bytes);
   return OBJ_VAL(allocate_string(heapChars, num_bytes, hash));
 }
 
@@ -2532,7 +2532,7 @@ Value file_read(Value file) {
   if ((ch == EOF) && (num_chars == 0)) {
     return NIL_VAL;
   }
-  Value result = OBJ_VAL(copyString(buffer, num_chars));
+  Value result = OBJ_VAL(copy_string(buffer, num_chars));
   inc_ref(AS_OBJ(result));
   return result;
 }
@@ -2639,7 +2639,7 @@ def _compile(source):
 
     for name, value in env['user_globals'].items():
         if value['type'] == 'var':
-            c_code += f'\n  map_set(user_globals, OBJ_VAL(copyString("{name}", {len(name)})), {value["code"]});\n'
+            c_code += f'\n  map_set(user_globals, OBJ_VAL(copy_string("{name}", {len(name)})), {value["code"]});\n'
 
     c_code += '\n' + '\n'.join(env['pre'])
 
