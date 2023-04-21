@@ -768,6 +768,14 @@ def less_equal_c(params, envs):
     return {'code': f'less_equal({c_params[0]}, {c_params[1]})'}
 
 
+def hash_c(params, envs):
+    result = compile_form(params[0], envs=envs)
+    hash_result = _get_generated_name('hash_result', envs=envs)
+    envs[-1]['temps'].add(hash_result)
+    envs[-1]['pre'].append(f'  Value {hash_result} = hash({result["code"]});')
+    return {'code': hash_result}
+
+
 def def_c(params, envs):
     name = params[0].name
     local_env = {'temps': envs[-1]['temps'], 'pre': [], 'post': [], 'bindings': {}}
@@ -1355,6 +1363,7 @@ global_compile_env = {
     '>=': {'function': greater_equal_c},
     '<': {'function': less_c},
     '<=': {'function': less_equal_c},
+    'hash': {'function': hash_c},
     'print': {'function': print_c},
     'println': {'function': println_c},
     'count': {'function': count_c},
@@ -1832,11 +1841,23 @@ void dec_ref_and_free(Obj* object) {
 
 static uint32_t hash_string(const char* key, uint32_t length) {
   uint32_t hash = 2166136261u;
+
+  char prefix = 's';
+  hash ^= (uint8_t) prefix;
+  hash *= 16777619;
+
   for (uint32_t i = 0; i < length; i++) {
     hash ^= (uint8_t)key[i];
     hash *= 16777619;
   }
   return hash;
+}
+
+Value hash(Value v) {
+  if (IS_STRING(v)) {
+    return NUMBER_VAL((double) (AS_STRING(v)->hash));
+  }
+  return NIL_VAL;
 }
 
 Value map_set(ObjMap* map, Value key, Value value);
@@ -2141,7 +2162,7 @@ static int32_t find_indices_index(int32_t* indices, MapEntry* entries, uint32_t 
 
   ObjString* key_string = AS_STRING(key);
 
-  uint32_t index = key_string->hash % (uint32_t) capacity;
+  uint32_t index = key_string->hash % capacity;
   for (;;) {
     if (indices[index] == MAP_EMPTY) {
       return (int32_t) index;
@@ -2153,7 +2174,7 @@ static int32_t find_indices_index(int32_t* indices, MapEntry* entries, uint32_t 
       return (int32_t) index;
     }
 
-    index = (index + 1) % (uint32_t)capacity;
+    index = (index + 1) % capacity;
   }
 }
 

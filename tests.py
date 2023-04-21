@@ -494,6 +494,18 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
+    def test_hash(self):
+        tests = [
+            {'src': '(print (hash "abc"))', 'output': '2.60239e+09'},
+            {'src': '(print (hash "def"))', 'output': '1.35685e+08'},
+            {'src': '(print (hash "abcdef"))', 'output': '5.03165e+08'},
+            {'src': '(print (hash "123"))', 'output': '1.06428e+07'},
+            {'src': '(print (hash "1"))', 'output': '1.39573e+08'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
     def test_maps(self):
         tests = [
             {'src': '(print {})', 'output': '{}'},
