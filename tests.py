@@ -379,7 +379,7 @@ def _run_test(test, assert_equal):
             print(f'  ({env_name})')
             program_filename = os.path.join(tmp, env_name)
 
-            compile_cmd = cc_cmd + ['-o', program_filename, c_filename]
+            compile_cmd = cc_cmd + ['-o', program_filename, c_filename, '-lm']
             try:
                 subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
             except subprocess.CalledProcessError as e:
@@ -496,11 +496,11 @@ class CompileTests(unittest.TestCase):
 
     def test_hash(self):
         tests = [
-            {'src': '(print (hash "abc"))', 'output': '2.60239e+09'},
-            {'src': '(print (hash "def"))', 'output': '1.35685e+08'},
-            {'src': '(print (hash "abcdef"))', 'output': '5.03165e+08'},
-            {'src': '(print (hash "123"))', 'output': '1.06428e+07'},
-            {'src': '(print (hash "1"))', 'output': '1.39573e+08'},
+            {'src': '(print (hash "abc"))', 'output': '2602386598'},
+            {'src': '(print (hash "def"))', 'output': '135684681'},
+            {'src': '(print (hash "abcdef"))', 'output': '503164941'},
+            {'src': '(print (hash "123"))', 'output': '10642774'},
+            {'src': '(print (hash "1"))', 'output': '139573449'},
         ]
         for test in tests:
             with self.subTest(test=test):

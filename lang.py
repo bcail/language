@@ -1855,7 +1855,8 @@ static uint32_t hash_string(const char* key, uint32_t length) {
 
 Value hash(Value v) {
   if (IS_STRING(v)) {
-    return NUMBER_VAL((double) (AS_STRING(v)->hash));
+    ObjString* s = AS_STRING(v);
+    return NUMBER_VAL((double) (s->hash));
   }
   return NIL_VAL;
 }
@@ -2366,7 +2367,12 @@ Value print(Value value) {
     }
   }
   else if IS_NUMBER(value) {
-    printf("%g", AS_NUMBER(value));
+    double n = AS_NUMBER(value);
+    if (ceil(n) == n) {
+      printf("%.f", n);
+    } else {
+      printf("%g", n);
+    }
   }
   else if (IS_LIST(value)) {
     Value num_items = list_count(value);
@@ -2819,7 +2825,7 @@ def build_executable(file_name, output_file_name, with_checks=False):
     else:
         compiler.extend(['-O2'])
 
-    compile_cmd = compiler + ['-o', output_file_name, file_name]
+    compile_cmd = compiler + ['-o', output_file_name, file_name, '-lm']
     try:
         subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
     except subprocess.CalledProcessError as e:
