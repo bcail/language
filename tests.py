@@ -379,7 +379,10 @@ def _run_test(test, assert_equal):
             print(f'  ({env_name})')
             program_filename = os.path.join(tmp, env_name)
 
-            compile_cmd = cc_cmd + ['-o', program_filename, c_filename, '-lm']
+            if platform.system() == 'Windows':
+                compile_cmd = cc_cmd + ['-v', '-Wlm', '-o', program_filename, c_filename]
+            else:
+                compile_cmd = cc_cmd + ['-o', program_filename, c_filename, '-lm']
             try:
                 subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
             except subprocess.CalledProcessError as e:
