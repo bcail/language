@@ -1870,12 +1870,12 @@ static uint32_t hash_string(const char* key, uint32_t length) {
   return hash;
 }
 
-Value hash(Value v) {
+uint32_t _hash(Value v) {
   if (IS_NIL(v)) {
     uint32_t hash = 2166136261u;
     hash ^= (uint8_t) 0;
     hash *= 16777619;
-    return NUMBER_VAL((double) (hash));
+    return hash;
   }
   else if (IS_BOOL(v)) {
     uint32_t hash = 2166136261u;
@@ -1885,16 +1885,22 @@ Value hash(Value v) {
       hash ^= (uint8_t) 2;
     }
     hash *= 16777619;
-    return NUMBER_VAL((double) (hash));
+    return hash;
   }
   else if (IS_NUMBER(v)) {
-    return NUMBER_VAL((double) (hash_number(AS_NUMBER(v))));
+    return hash_number(AS_NUMBER(v));
   }
   else if (IS_STRING(v)) {
     ObjString* s = AS_STRING(v);
-    return NUMBER_VAL((double) (s->hash));
+    return s->hash;
   }
-  return NIL_VAL;
+  else {
+    return 0;
+  }
+}
+
+Value hash(Value v) {
+  return NUMBER_VAL((double) (_hash(v)));
 }
 
 Value map_set(ObjMap* map, Value key, Value value);
