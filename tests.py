@@ -496,6 +496,11 @@ class CompileTests(unittest.TestCase):
 
     def test_hash(self):
         tests = [
+            {'src': '(print (hash nil))', 'output': '84696351'},
+            {'src': '(print (hash false))', 'output': '67918732'},
+            {'src': '(print (hash true))', 'output': '118251589'},
+            {'src': '(print (hash 1))', 'output': '70638592'},
+            {'src': '(print (hash 2))', 'output': '120971449'},
             {'src': '(print (hash "abc"))', 'output': '2602386598'},
             {'src': '(print (hash "def"))', 'output': '135684681'},
             {'src': '(print (hash "abcdef"))', 'output': '503164941'},
@@ -509,7 +514,12 @@ class CompileTests(unittest.TestCase):
     def test_maps(self):
         tests = [
             {'src': '(print {})', 'output': '{}'},
+            {'src': '(print {"a" nil})', 'output': '{a nil}'},
+            {'src': '(print {"a" true})', 'output': '{a true}'},
+            {'src': '(print {"a" false})', 'output': '{a false}'},
             {'src': '(print {"a" 1})', 'output': '{a 1}'},
+            {'src': '(print {"a" "1"})', 'output': '{a 1}'},
+            {'src': '(print {"a" {"1" "value"}})', 'output': '{a {1 value}}'},
             {'src': '(print {"a" 1 "b" 2})', 'output': '{a 1, b 2}'},
             {'src': '(print {"a" [1] "b" [2]})', 'output': '{a [1], b [2]}'},
             {'src': '(print {"1" 1 "2" 2 "3" 3 "4" 4 "5" 5 "6" 6 "7" 7})',

@@ -1839,6 +1839,23 @@ void dec_ref_and_free(Obj* object) {
   }
 }
 
+static uint32_t hash_number(double number) {
+  uint32_t hash = 2166136261u;
+
+  char prefix = 'n';
+  hash ^= (uint8_t) prefix;
+  hash *= 16777619;
+
+  char str[100];
+  int32_t num_chars = sprintf(str, "%g", number);
+
+  for (int32_t i = 0; i < num_chars; i++) {
+    hash ^= (uint8_t) str[i];
+    hash *= 16777619;
+  }
+  return hash;
+}
+
 static uint32_t hash_string(const char* key, uint32_t length) {
   uint32_t hash = 2166136261u;
 
@@ -1854,7 +1871,26 @@ static uint32_t hash_string(const char* key, uint32_t length) {
 }
 
 Value hash(Value v) {
-  if (IS_STRING(v)) {
+  if (IS_NIL(v)) {
+    uint32_t hash = 2166136261u;
+    hash ^= (uint8_t) 0;
+    hash *= 16777619;
+    return NUMBER_VAL((double) (hash));
+  }
+  else if (IS_BOOL(v)) {
+    uint32_t hash = 2166136261u;
+    if (AS_BOOL(v) == false) {
+      hash ^= (uint8_t) 1;
+    } else {
+      hash ^= (uint8_t) 2;
+    }
+    hash *= 16777619;
+    return NUMBER_VAL((double) (hash));
+  }
+  else if (IS_NUMBER(v)) {
+    return NUMBER_VAL((double) (hash_number(AS_NUMBER(v))));
+  }
+  else if (IS_STRING(v)) {
     ObjString* s = AS_STRING(v);
     return NUMBER_VAL((double) (s->hash));
   }
