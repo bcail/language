@@ -2825,7 +2825,7 @@ def build_executable(file_name, output_file_name, with_checks=False):
     else:
         compiler.extend(['-O2'])
 
-    compile_cmd = compiler + ['-Wl,lm', '-o', output_file_name, file_name]
+    compile_cmd = compiler + ['-Wl,-lm', '-o', output_file_name, file_name]
     try:
         subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
     except subprocess.CalledProcessError as e:
