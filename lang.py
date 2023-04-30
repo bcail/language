@@ -2203,17 +2203,12 @@ static int32_t find_indices_index(int32_t* indices, MapEntry* entries, uint32_t 
    * - if indices[index] points to an entry in entries with a hash that matches our hash, return index
    * Otherwise, keep adding one till we get to the correct key or an empty slot. */
 
-  ObjString* key_string = AS_STRING(key);
-
-  uint32_t index = key_string->hash % capacity;
+  uint32_t index = _hash(key) % capacity;
   for (;;) {
     if (indices[index] == MAP_EMPTY) {
       return (int32_t) index;
     }
-    ObjString* entry_key_string = AS_STRING(entries[indices[index]].key);
-    if (key_string->length == entry_key_string->length &&
-        key_string->hash == entry_key_string->hash &&
-        memcmp(key_string->chars, entry_key_string->chars, (size_t)key_string->length) == 0) {
+    if (AS_BOOL(equal(key, entries[indices[index]].key))) {
       return (int32_t) index;
     }
 
