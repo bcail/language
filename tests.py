@@ -364,6 +364,14 @@ else:
     ]
 
 
+def _build_sqlite(cc_cmd):
+    compile_cmd = cc_cmd + ['--shared', '-fPIC', '-o', 'libsqlite3.so', os.path.join('lib', 'sqlite3.c')]
+    try:
+        subprocess.run(compile_cmd, check=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        raise Exception(f'error building libsqlite.so: {e.stderr.decode("utf8")}')
+
+
 def _run_test(test, assert_equal):
     print(f'*** c test: {test["src"]}')
     c_code = _compile(test['src'])
@@ -818,6 +826,7 @@ class CompileTests(unittest.TestCase):
             _run_test(test, self.assertEqual)
 
     def test_sqlite(self):
+        _build_sqlite([clang_cmd])
         tests = [
             {'src': '(print (sqlite3/version))', 'output': f'3.34.1'},
         ]

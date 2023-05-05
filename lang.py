@@ -1677,7 +1677,7 @@ c_includes = [
     '<stdbool.h>',
     '<string.h>',
     '<math.h>',
-    '<sqlite3.h>',
+    '"%s"' % os.path.join('include', 'sqlite3.h'),
 ]
 
 
