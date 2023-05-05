@@ -379,10 +379,11 @@ def _run_test(test, assert_equal):
             print(f'  ({env_name})')
             program_filename = os.path.join(tmp, env_name)
 
-            compile_cmd = cc_cmd + ['-Wl,-lm', '-o', program_filename, c_filename]
+            compile_cmd = cc_cmd + ['-o', program_filename, c_filename, '-Wl,-lm,-lsqlite3']
             try:
                 subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
             except subprocess.CalledProcessError as e:
+                print(f'compile_cmd: {compile_cmd}')
                 print(f'bad c code:\n{custom_code}')
                 print(f'err: {e.stderr.decode("utf8")}')
                 if SAVE_FAILED:
@@ -815,6 +816,14 @@ class CompileTests(unittest.TestCase):
             file_name = file_name.replace('\\', '\\\\')
             test = {'src': f'(let [f (file/open "{file_name}" "w")] (file/write f "asdf") (file/close f)) (print (let [f (file/open "{file_name}") data (file/read f)] data))', 'input': '', 'output': 'asdf'}
             _run_test(test, self.assertEqual)
+
+    def test_sqlite(self):
+        tests = [
+            {'src': '(print (sqlite3/version))', 'output': f'3.34.1'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
 
 
 if __name__ == '__main__':

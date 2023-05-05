@@ -1352,6 +1352,14 @@ def file_close_c(params, envs):
     return {'code': result_name}
 
 
+def sqlite3_version_c(params, envs):
+    result_name = _get_generated_name('sqlite3_version_s', envs=envs)
+    envs[-1]['temps'].add(result_name)
+    envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_version();')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({result_name}));')
+    return {'code': result_name}
+
+
 global_compile_env = {
     'nil?': {'function': nil_c},
     '+': {'function': add_c},
@@ -1391,6 +1399,7 @@ global_compile_env = {
     'file/read': {'function': file_read_c},
     'file/write': {'function': file_write_c},
     'file/close': {'function': file_close_c},
+    'sqlite3/version': {'function': sqlite3_version_c},
 }
 
 
@@ -1668,6 +1677,7 @@ c_includes = [
     '<stdbool.h>',
     '<string.h>',
     '<math.h>',
+    '<sqlite3.h>',
 ]
 
 
@@ -2655,6 +2665,13 @@ void free_object(Obj* object) {
       break;
     }
   }
+}
+
+Value lang_sqlite3_version(void) {
+  const char* version = sqlite3_libversion();
+  Value s = OBJ_VAL(copy_string(version, (uint32_t) strlen(version)));
+  inc_ref(AS_OBJ(s));
+  return s;
 }'''
 
 
