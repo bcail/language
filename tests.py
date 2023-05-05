@@ -514,6 +514,10 @@ class CompileTests(unittest.TestCase):
     def test_maps(self):
         tests = [
             {'src': '(print {})', 'output': '{}'},
+            {'src': '(print {nil "a"})', 'output': '{nil a}'},
+            {'src': '(print {true "a"})', 'output': '{true a}'},
+            {'src': '(print {false "a"})', 'output': '{false a}'},
+            {'src': '(print {1 nil})', 'output': '{1 nil}'},
             {'src': '(print {"a" nil})', 'output': '{a nil}'},
             {'src': '(print {"a" true})', 'output': '{a true}'},
             {'src': '(print {"a" false})', 'output': '{a false}'},

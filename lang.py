@@ -1803,7 +1803,6 @@ typedef struct {
  */
 
 typedef struct {
-  uint32_t hash;
   Value key;
   Value value;
 } MapEntry;
@@ -2238,7 +2237,6 @@ static void adjustCapacity(ObjMap* map, uint32_t capacity) {
 
   // fill in remaining entries with nil values
   for (; entries_index < capacity; entries_index++) {
-    entries[entries_index].hash = 0;
     entries[entries_index].key = NIL_VAL;
     entries[entries_index].value = NIL_VAL;
   }
@@ -2285,7 +2283,6 @@ Value map_set(ObjMap* map, Value key, Value value) {
     dec_ref_and_free(AS_OBJ(entry->value));
   }
 
-  entry->hash = AS_STRING(key)->hash;
   entry->key = key;
   entry->value = value;
   return OBJ_VAL(map);
