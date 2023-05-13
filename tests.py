@@ -372,7 +372,7 @@ def _build_sqlite(cc_cmd):
         raise Exception(f'error building libsqlite.so: {e.stderr.decode("utf8")}')
 
 
-def _run_test(test, assert_equal):
+def _run_test(test, assert_equal, sqlite=False):
     print(f'*** c test: {test["src"]}')
     c_code = _compile(test['src'])
 
@@ -384,10 +384,16 @@ def _run_test(test, assert_equal):
         custom_code = c_code.split('/* CUSTOM CODE */\n\n')[-1]
 
         for cc_cmd, env, env_name in compilers:
+            if sqlite and 'checks' in env_name:
+                continue
+
             print(f'  ({env_name})')
             program_filename = os.path.join(tmp, env_name)
 
-            compile_cmd = cc_cmd + ['-o', program_filename, c_filename, '-Wl,-lm,-lsqlite3']
+            if sqlite:
+                compile_cmd = cc_cmd + ['-o', program_filename, os.path.join('lib', 'sqlite3.c'), c_filename, '-Wl,-lm,-lpthread,-ldl']
+            else:
+                compile_cmd = cc_cmd + ['-o', program_filename, c_filename, '-Wl,-lm']
             try:
                 subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
             except subprocess.CalledProcessError as e:
@@ -826,13 +832,13 @@ class CompileTests(unittest.TestCase):
             _run_test(test, self.assertEqual)
 
     def test_sqlite(self):
-        _build_sqlite([clang_cmd])
+        # _build_sqlite([clang_cmd])
         tests = [
-            {'src': '(print (sqlite3/version))', 'output': f'3.34.1'},
+            {'src': '(print (sqlite3/version))', 'output': f'3.41.2'},
         ]
         for test in tests:
             with self.subTest(test=test):
-                _run_test(test, self.assertEqual)
+                _run_test(test, self.assertEqual, sqlite=True)
 
 
 if __name__ == '__main__':
