@@ -1352,9 +1352,19 @@ def file_close_c(params, envs):
     return {'code': result_name}
 
 
+LANG_SQLITE3_VERSION = '''
+Value lang_sqlite3_version(void) {
+  const char* version = sqlite3_libversion();
+  Value s = OBJ_VAL(copy_string(version, (uint32_t) strlen(version)));
+  inc_ref(AS_OBJ(s));
+  return s;
+}'''
+
+
 def sqlite3_version_c(params, envs):
     result_name = _get_generated_name('sqlite3_version_s', envs=envs)
     envs[-1]['temps'].add(result_name)
+    envs[0]['functions']['lang_sqlite3_version'] = LANG_SQLITE3_VERSION
     envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_version();')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({result_name}));')
     return {'code': result_name}
@@ -2665,13 +2675,7 @@ void free_object(Obj* object) {
     }
   }
 }
-
-Value lang_sqlite3_version(void) {
-  const char* version = sqlite3_libversion();
-  Value s = OBJ_VAL(copy_string(version, (uint32_t) strlen(version)));
-  inc_ref(AS_OBJ(s));
-  return s;
-}'''
+'''
 
 
 def _compile(source):
