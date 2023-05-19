@@ -2855,6 +2855,56 @@ CLANG_CHECK_ENV = {
     'ASAN_OPTIONS': 'strict_string_checks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1:detect_invalid_pointer_pairs=2',
     'PATH': os.environ.get('PATH', ''),
 }
+SQLITE3_CLANG_CHECK_OPTIONS = [
+    '-O2',
+    '-std=c99',
+    # '-Werror',
+    '-Walloca',
+    # '-Wcast-qual',
+    '-Wconversion',
+    '-Wformat=2',
+    '-Wformat-security',
+    '-Wnull-dereference',
+    '-Wstack-protector',
+    '-Wvla',
+    '-Warray-bounds',
+    '-Warray-bounds-pointer-arithmetic',
+    '-Wassign-enum',
+    '-Wbad-function-cast',
+    '-Wconditional-uninitialized',
+    # '-Wconversion',
+    '-Wfloat-equal',
+    '-Wformat-type-confusion',
+    '-Widiomatic-parentheses',
+    # '-Wimplicit-fallthrough',
+    '-Wloop-analysis',
+    '-Wpointer-arith',
+    '-Wshift-sign-overflow',
+    '-Wshorten-64-to-32',
+    '-Wswitch-enum',
+    '-Wtautological-constant-in-range-compare',
+    '-Wunreachable-code-aggressive',
+    '-Wthread-safety',
+    '-Wthread-safety-beta',
+    '-Wcomma',
+    '-D_FORTIFY_SOURCE=3',
+    '-fstack-protector-strong',
+    '-fPIE',
+    '-fstack-clash-protection',
+    '-fsanitize=bounds',
+    '-fsanitize-undefined-trap-on-error',
+    '-Wl,-z,relro',
+    '-Wl,-z,now',
+    '-Wl,-z,noexecstack',
+    '-Wl,-z,separate-code',
+    '-fsanitize=address',
+    '-fsanitize=leak',
+    '-fno-omit-frame-pointer',
+    '-fsanitize=undefined',
+    '-fsanitize=float-divide-by-zero',
+    '-fsanitize=float-cast-overflow',
+    '-fsanitize=integer',
+]
 
 
 def build_executable(file_name, output_file_name, with_checks=False):
@@ -2879,7 +2929,7 @@ def build_executable(file_name, output_file_name, with_checks=False):
     else:
         compiler.extend(['-O2'])
 
-    compile_cmd = compiler + ['-Wl,-lm', '-o', output_file_name, file_name]
+    compile_cmd = compiler + ['-o', output_file_name, os.path.join('lib', 'sqlite3.c'), file_name, '-Wl,-lm,-lpthread,-ldl']
     try:
         subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
     except subprocess.CalledProcessError as e:

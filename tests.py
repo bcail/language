@@ -9,7 +9,7 @@ from unittest.mock import patch
 from lang import TokenType, scan_tokens, parse, evaluate, Keyword, Symbol, Var, Vector, run, _compile
 from lang import (
         GCC_CMD, GCC_CHECK_OPTIONS, GCC_CHECK_ENV,
-        CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV,
+        CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, SQLITE3_CLANG_CHECK_OPTIONS,
     )
 
 
@@ -346,23 +346,6 @@ counts'''
 gcc_cmd = os.environ.get('GCC', GCC_CMD)
 clang_cmd = os.environ.get('CLANG', CLANG_CMD)
 
-if platform.system() == 'Darwin':
-    compilers = [
-        ([clang_cmd, '-std=c99'], None, 'clang_regular'),
-        ([gcc_cmd, '-std=c99'], None, 'gcc_regular'),
-    ]
-elif platform.system() == 'Windows':
-    cc_path = 'clang.exe'
-    compilers = [
-        ([cc_path, '-std=c99'], None, 'clang_regular'),
-    ]
-else:
-    compilers = [
-        ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
-        ([clang_cmd], None, 'clang_regular'),
-        ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
-    ]
-
 
 def _build_sqlite(cc_cmd):
     compile_cmd = cc_cmd + ['--shared', '-fPIC', '-o', 'libsqlite3.so', os.path.join('lib', 'sqlite3.c')]
@@ -376,6 +359,29 @@ def _run_test(test, assert_equal, sqlite=False):
     print(f'*** c test: {test["src"]}')
     c_code = _compile(test['src'])
 
+    if platform.system() == 'Darwin':
+        compilers = [
+            ([clang_cmd, '-std=c99'], None, 'clang_regular'),
+            ([gcc_cmd, '-std=c99'], None, 'gcc_regular'),
+        ]
+    elif platform.system() == 'Windows':
+        cc_path = 'clang.exe'
+        compilers = [
+            ([cc_path, '-std=c99'], None, 'clang_regular'),
+        ]
+    else:
+        if sqlite:
+            compilers = [
+                ([clang_cmd] + SQLITE3_CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
+                ([clang_cmd], None, 'clang_regular'),
+            ]
+        else:
+            compilers = [
+                ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
+                ([clang_cmd], None, 'clang_regular'),
+                ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
+            ]
+
     with tempfile.TemporaryDirectory() as tmp:
         c_filename = os.path.join(tmp, 'code.c')
         with open(c_filename, 'wb') as f:
@@ -384,9 +390,6 @@ def _run_test(test, assert_equal, sqlite=False):
         custom_code = c_code.split('/* CUSTOM CODE */\n\n')[-1]
 
         for cc_cmd, env, env_name in compilers:
-            if sqlite and 'checks' in env_name:
-                continue
-
             print(f'  ({env_name})')
             program_filename = os.path.join(tmp, env_name)
 
