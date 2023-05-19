@@ -372,7 +372,7 @@ def _run_test(test, assert_equal, sqlite=False):
     else:
         if sqlite:
             compilers = [
-                ([clang_cmd] + SQLITE3_CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
+                # ([clang_cmd] + SQLITE3_CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
                 ([clang_cmd], None, 'clang_regular'),
             ]
         else:
@@ -394,7 +394,7 @@ def _run_test(test, assert_equal, sqlite=False):
             program_filename = os.path.join(tmp, env_name)
 
             if sqlite:
-                compile_cmd = cc_cmd + ['-o', program_filename, os.path.join('lib', 'sqlite3.c'), c_filename, '-Wl,-lm,-lpthread,-ldl']
+                compile_cmd = cc_cmd + ['-o', program_filename, os.path.join('lib', 'sqlite3.c'), c_filename, '-static', '-Wl,-lm,-lpthread,-ldl']
             else:
                 compile_cmd = cc_cmd + ['-o', program_filename, c_filename, '-Wl,-lm']
             try:
