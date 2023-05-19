@@ -1363,6 +1363,7 @@ Value lang_sqlite3_version(void) {
 
 def sqlite3_version_c(params, envs):
     result_name = _get_generated_name('sqlite3_version_s', envs=envs)
+    c_includes.append('"sqlite3.h"')
     envs[-1]['temps'].add(result_name)
     envs[0]['functions']['lang_sqlite3_version'] = LANG_SQLITE3_VERSION
     envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_version();')
