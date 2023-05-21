@@ -1363,8 +1363,8 @@ Value lang_sqlite3_version(void) {
 
 def sqlite3_version_c(params, envs):
     result_name = _get_generated_name('sqlite3_version_s', envs=envs)
-    c_includes.append('"sqlite3.h"')
     envs[-1]['temps'].add(result_name)
+    envs[0]['includes'].append('"sqlite3.h"')
     envs[0]['functions']['lang_sqlite3_version'] = LANG_SQLITE3_VERSION
     envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_version();')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({result_name}));')
@@ -2686,6 +2686,7 @@ def _compile(source):
     compiled_forms = []
     env = {
         'global': copy.deepcopy(global_compile_env),
+        'includes': c_includes[:],
         'functions': {},
         'user_globals': {},
         'temps': set(),
@@ -2703,7 +2704,7 @@ def _compile(source):
                 c = f'{c};'
             compiled_forms.append(f'  {c}')
 
-    c_code = '\n'.join([f'#include {i}' for i in c_includes])
+    c_code = '\n'.join([f'#include {i}' for i in env['includes']])
     c_code += '\n\n'
     c_code += c_types
 
