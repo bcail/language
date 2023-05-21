@@ -395,7 +395,7 @@ def _run_test(test, assert_equal, sqlite=False):
             program_filename = os.path.join(tmp, env_name)
 
             if sqlite:
-                compile_cmd = cc_cmd + ['-o', program_filename, os.path.join('lib', 'sqlite3.c'), c_filename, '-I %s' % os.path.join('.', 'include'), '-Wl,-lm,-lpthread,-ldl']
+                compile_cmd = cc_cmd + ['-I %s' % os.path.join('.', 'include'), '-o', program_filename, os.path.join('lib', 'sqlite3.c'), c_filename, '-Wl,-lm,-lpthread,-ldl']
             else:
                 compile_cmd = cc_cmd + ['-o', program_filename, c_filename, '-Wl,-lm']
             try:
