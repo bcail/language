@@ -839,6 +839,7 @@ class CompileTests(unittest.TestCase):
         # _build_sqlite([clang_cmd])
         tests = [
             {'src': '(print (sqlite3/version))', 'output': f'3.41.2'},
+            {'src': '(let [db (sqlite3/open ":memory:")] (sqlite3/close db) (print "closed"))', 'output': f'closed'},
         ]
         for test in tests:
             with self.subTest(test=test):

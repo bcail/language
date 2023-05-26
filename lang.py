@@ -1352,22 +1352,33 @@ def file_close_c(params, envs):
     return {'code': result_name}
 
 
-LANG_SQLITE3_VERSION = '''
-Value lang_sqlite3_version(void) {
-  const char* version = sqlite3_libversion();
-  Value s = OBJ_VAL(copy_string(version, (uint32_t) strlen(version)));
-  inc_ref(AS_OBJ(s));
-  return s;
-}'''
-
-
 def sqlite3_version_c(params, envs):
     result_name = _get_generated_name('sqlite3_version_s', envs=envs)
     envs[-1]['temps'].add(result_name)
     envs[0]['includes'].append('"sqlite3.h"')
-    envs[0]['functions']['lang_sqlite3_version'] = LANG_SQLITE3_VERSION
+    envs[0]['local_includes'].append('"lang_sqlite3.h"')
     envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_version();')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({result_name}));')
+    return {'code': result_name}
+
+
+def sqlite3_open_c(params, envs):
+    file_name = compile_form(params[0], envs=envs)['code']
+    result_name = _get_generated_name('sqlite3_db', envs=envs)
+    envs[-1]['temps'].add(result_name)
+    envs[0]['includes'].append('"sqlite3.h"')
+    envs[0]['local_includes'].append('"lang_sqlite3.h"')
+    envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_open({file_name});')
+    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({result_name}));')
+    return {'code': result_name}
+
+
+def sqlite3_close_c(params, envs):
+    db = compile_form(params[0], envs=envs)['code']
+    result_name = _get_generated_name('sqlite3_close_result', envs=envs)
+    envs[0]['includes'].append('"sqlite3.h"')
+    envs[0]['local_includes'].append('"lang_sqlite3.h"')
+    envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_close({db});')
     return {'code': result_name}
 
 
@@ -1411,6 +1422,8 @@ global_compile_env = {
     'file/write': {'function': file_write_c},
     'file/close': {'function': file_close_c},
     'sqlite3/version': {'function': sqlite3_version_c},
+    'sqlite3/open': {'function': sqlite3_open_c},
+    'sqlite3/close': {'function': sqlite3_close_c},
 }
 
 
@@ -1754,6 +1767,7 @@ typedef enum {
   OBJ_STRING,
   OBJ_LIST,
   OBJ_MAP,
+  OBJ_SQLITE3_DB,
 } ObjType;
 
 typedef struct {
@@ -1835,6 +1849,11 @@ typedef struct {
   int32_t* indices; /* start with always using int32 for now */
   MapEntry* entries;
 } ObjMap;
+
+typedef struct {
+  Obj obj;
+  sqlite3* db;
+} ObjSqlite3;
 
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, size);
@@ -2671,6 +2690,10 @@ void free_object(Obj* object) {
       FREE(ObjMap, object);
       break;
     }
+    case OBJ_SQLITE3_DB: {
+      FREE(ObjSqlite3, object);
+      break;
+    }
     default: {
       break;
     }
@@ -2687,6 +2710,7 @@ def _compile(source):
     env = {
         'global': copy.deepcopy(global_compile_env),
         'includes': c_includes[:],
+        'local_includes': [],
         'functions': {},
         'user_globals': {},
         'temps': set(),
@@ -2709,6 +2733,10 @@ def _compile(source):
     c_code += c_types
 
     c_code += '\n\n/* CUSTOM CODE */\n\n'
+
+    local_includes = sorted(list(set(env['local_includes'])))
+    c_code += '\n'.join([f'#include {i}' for i in local_includes])
+    c_code += '\n\n'
 
     if env['functions']:
         c_code += '\n\n'.join([f for f in env['functions'].values()]) + '\n\n'
