@@ -9,13 +9,11 @@ Value lang_sqlite3_version(void) {
 Value lang_sqlite3_open(Value file_name) {
   sqlite3* db;
   sqlite3_open(AS_CSTRING(file_name), &db);
-  ObjSqlite3* sqlite3_obj = ALLOCATE_OBJ(ObjSqlite3, OBJ_SQLITE3_DB);
-  sqlite3_obj->db = db;
-  inc_ref(sqlite3_obj);
-  return OBJ_VAL(sqlite3_obj);
+  return SQLITE3_VAL(db);
 }
 
 
 Value lang_sqlite3_close(Value db) {
+  sqlite3_close(AS_SQLITE3(db));
   return NIL_VAL;
 }

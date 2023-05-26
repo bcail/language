@@ -1355,8 +1355,7 @@ def file_close_c(params, envs):
 def sqlite3_version_c(params, envs):
     result_name = _get_generated_name('sqlite3_version_s', envs=envs)
     envs[-1]['temps'].add(result_name)
-    envs[0]['includes'].append('"sqlite3.h"')
-    envs[0]['local_includes'].append('"lang_sqlite3.h"')
+    envs[0]['use_sqlite3'] = True
     envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_version();')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({result_name}));')
     return {'code': result_name}
@@ -1366,8 +1365,7 @@ def sqlite3_open_c(params, envs):
     file_name = compile_form(params[0], envs=envs)['code']
     result_name = _get_generated_name('sqlite3_db', envs=envs)
     envs[-1]['temps'].add(result_name)
-    envs[0]['includes'].append('"sqlite3.h"')
-    envs[0]['local_includes'].append('"lang_sqlite3.h"')
+    envs[0]['use_sqlite3'] = True
     envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_open({file_name});')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({result_name}));')
     return {'code': result_name}
@@ -1376,8 +1374,7 @@ def sqlite3_open_c(params, envs):
 def sqlite3_close_c(params, envs):
     db = compile_form(params[0], envs=envs)['code']
     result_name = _get_generated_name('sqlite3_close_result', envs=envs)
-    envs[0]['includes'].append('"sqlite3.h"')
-    envs[0]['local_includes'].append('"lang_sqlite3.h"')
+    envs[0]['use_sqlite3'] = True
     envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_close({db});')
     return {'code': result_name}
 
@@ -1693,18 +1690,16 @@ def main(file_name):
         _run_prompt()
 
 
-c_includes = [
-    '<stdio.h>',
-    '<stdint.h>',
-    '<ctype.h>',
-    '<stdlib.h>',
-    '<stdbool.h>',
-    '<string.h>',
-    '<math.h>',
-]
-
-
 c_types = '''
+#include <stdio.h>
+#include <stdint.h>
+#include <ctype.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <math.h>
+
+
 #define ALLOCATE(type, count) \
     (type*)reallocate(NULL, sizeof(type) * (count))
 
@@ -1748,6 +1743,11 @@ c_types = '''
 #define IS_STRING(value)  isObjType(value, OBJ_STRING)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
 #define IS_MAP(value)  isObjType(value, OBJ_MAP)
+#if defined(USE_SQLITE3)
+  #define SQLITE3_VAL(value)   ((Value){SQLITE3_DB, {.db = (sqlite3*)value}})
+  #define IS_SQLITE3(value)  ((value).type == SQLITE3_DB)
+  #define AS_SQLITE3(value)      ((value).data.db)
+#endif
 #define MAP_EMPTY (-1)
 #define MAP_TOMBSTONE (-2)
 #define MAP_MAX_LOAD 0.75
@@ -1767,7 +1767,6 @@ typedef enum {
   OBJ_STRING,
   OBJ_LIST,
   OBJ_MAP,
-  OBJ_SQLITE3_DB,
 } ObjType;
 
 typedef struct {
@@ -1783,6 +1782,9 @@ typedef enum {
   TOMBSTONE,
   FILE_HANDLE,
   OBJ,
+#if defined(USE_SQLITE3)
+  SQLITE3_DB,
+#endif
 } ValueType;
 
 typedef struct Recur Recur;
@@ -1795,6 +1797,9 @@ typedef struct {
     Obj* obj;
     Recur* recur;
     FILE* file;
+#if defined(USE_SQLITE3)
+    sqlite3* db;
+#endif
   } data;
 } Value;
 
@@ -1849,11 +1854,6 @@ typedef struct {
   int32_t* indices; /* start with always using int32 for now */
   MapEntry* entries;
 } ObjMap;
-
-typedef struct {
-  Obj obj;
-  sqlite3* db;
-} ObjSqlite3;
 
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, size);
@@ -2690,10 +2690,6 @@ void free_object(Obj* object) {
       FREE(ObjMap, object);
       break;
     }
-    case OBJ_SQLITE3_DB: {
-      FREE(ObjSqlite3, object);
-      break;
-    }
     default: {
       break;
     }
@@ -2709,8 +2705,6 @@ def _compile(source):
     compiled_forms = []
     env = {
         'global': copy.deepcopy(global_compile_env),
-        'includes': c_includes[:],
-        'local_includes': [],
         'functions': {},
         'user_globals': {},
         'temps': set(),
@@ -2718,6 +2712,7 @@ def _compile(source):
         'pre': [],
         'post': [],
         'bindings': {},
+        'use_sqlite3': False,
     }
     for f in ast.forms:
         result = compile_form(f, envs=[env])
@@ -2728,15 +2723,17 @@ def _compile(source):
                 c = f'{c};'
             compiled_forms.append(f'  {c}')
 
-    c_code = '\n'.join([f'#include {i}' for i in env['includes']])
-    c_code += '\n\n'
+    c_code = ''
+
+    if env['use_sqlite3']:
+        c_code += f'#include "sqlite3.h"\n\n'
+        c_code += '#define USE_SQLITE3 1'
     c_code += c_types
 
-    c_code += '\n\n/* CUSTOM CODE */\n\n'
+    if env['use_sqlite3']:
+        c_code += f'#include "lang_sqlite3.h"\n\n'
 
-    local_includes = sorted(list(set(env['local_includes'])))
-    c_code += '\n'.join([f'#include {i}' for i in local_includes])
-    c_code += '\n\n'
+    c_code += '\n\n/* CUSTOM CODE */\n\n'
 
     if env['functions']:
         c_code += '\n\n'.join([f for f in env['functions'].values()]) + '\n\n'
