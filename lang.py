@@ -1367,7 +1367,6 @@ def sqlite3_open_c(params, envs):
     envs[-1]['temps'].add(result_name)
     envs[0]['use_sqlite3'] = True
     envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_open({file_name});')
-    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({result_name}));')
     return {'code': result_name}
 
 
