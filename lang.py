@@ -1373,8 +1373,19 @@ def sqlite3_open_c(params, envs):
 def sqlite3_close_c(params, envs):
     db = compile_form(params[0], envs=envs)['code']
     result_name = _get_generated_name('sqlite3_close_result', envs=envs)
+    envs[-1]['temps'].add(result_name)
     envs[0]['use_sqlite3'] = True
     envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_close({db});')
+    return {'code': result_name}
+
+
+def sqlite3_execute_c(params, envs):
+    db = compile_form(params[0], envs=envs)['code']
+    sql_code = compile_form(params[1], envs=envs)['code']
+    result_name = _get_generated_name('sqlite3_execute_result', envs=envs)
+    envs[-1]['temps'].add(result_name)
+    envs[0]['use_sqlite3'] = True
+    envs[-1]['pre'].append(f'  Value {result_name} = lang_sqlite3_execute({db}, {sql_code});')
     return {'code': result_name}
 
 
@@ -1420,6 +1431,7 @@ global_compile_env = {
     'sqlite3/version': {'function': sqlite3_version_c},
     'sqlite3/open': {'function': sqlite3_open_c},
     'sqlite3/close': {'function': sqlite3_close_c},
+    'sqlite3/execute': {'function': sqlite3_execute_c},
 }
 
 
