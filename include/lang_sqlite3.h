@@ -18,6 +18,9 @@ Value lang_sqlite3_close(Value db) {
 
 int process_row(ObjList* results, int num_columns, char** result_strings, char** result_columns) {
   ObjList* row = allocate_list((uint32_t) num_columns);
+  for (int i=0; i < num_columns; i++) {
+    list_add(row, OBJ_VAL(copy_string(result_strings[i], (uint32_t) strlen(result_strings[i]))));
+  }
   list_add(results, OBJ_VAL(row));
   inc_ref(row);
   return 0;
@@ -25,8 +28,13 @@ int process_row(ObjList* results, int num_columns, char** result_strings, char**
 
 Value lang_sqlite3_execute(Value db, Value sql_code) {
   ObjList* results = allocate_list(0);
-  sqlite3_exec(AS_SQLITE3(db), AS_CSTRING(sql_code), process_row, results, NULL);
-  sqlite3_exec(AS_SQLITE3(db), "COMMIT", NULL, NULL, NULL);
+  char* error = NULL;
+  int exec_result = sqlite3_exec(AS_SQLITE3(db), AS_CSTRING(sql_code), process_row, results, &error);
+  if (exec_result != 0) {
+    printf("error: %s", error);
+    fflush(stdout);
+    sqlite3_free(error);
+  }
   if (results->count == 0) {
     FREE(ObjList, results);
     return NIL_VAL;

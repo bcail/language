@@ -837,13 +837,13 @@ class CompileTests(unittest.TestCase):
 
     def test_sqlite(self):
         # _build_sqlite([clang_cmd])
-        CREATE = 'CREATE TABLE data (id INTEGER PRIMARY KEY, data TEXT)'
-        INSERT = 'INSERT INTO data VALUES (1, "something")'
-        SELECT = 'SELECT * FROM data'
+        CREATE = 'CREATE TABLE data (id INTEGER PRIMARY KEY, col1 TEXT)'
+        INSERT = 'INSERT INTO data (id, col1) VALUES (1, \'something\');'
+        SELECT = 'SELECT * FROM data;'
         tests = [
             {'src': '(print (sqlite3/version))', 'output': f'3.41.2'},
             {'src': '(let [db (sqlite3/open ":memory:")] (print (sqlite3/close db))', 'output': f'nil'},
-            {'src': f'(let [db (sqlite3/open ":memory:")] (sqlite3/execute db "{CREATE}") (sqlite3/execute db "{INSERT}") (print (sqlite3/execute db "{SELECT}")) (sqlite3/close db))', 'output': f'[1 some]'},
+            {'src': f'(let [db (sqlite3/open ":memory:")] (sqlite3/execute db "{CREATE}") (sqlite3/execute db "{INSERT}") (print (sqlite3/execute db "{SELECT}")) (sqlite3/close db))', 'output': f'[[1 something]]'},
         ]
         for test in tests:
             with self.subTest(test=test):
