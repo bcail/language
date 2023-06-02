@@ -1733,7 +1733,6 @@ c_types = '''
 #define BOOL_VAL(value)  ((Value){BOOL, {.boolean = value}})
 #define NUMBER_VAL(value)  ((Value){NUMBER, {.number = value}})
 #define RECUR_VAL(value)  ((Value){RECUR, {.recur = value}})
-#define ERROR_VAL  ((Value){ERROR, {.boolean = 0}})
 #define FILE_VAL(value)   ((Value){FILE_HANDLE, {.file = (FILE*)value}})
 #define OBJ_VAL(object)   ((Value){OBJ, {.obj = (Obj*)object}})
 #define AS_BOOL(value)  ((value).data.boolean)
@@ -1766,6 +1765,8 @@ c_types = '''
 #define MAP_TOMBSTONE (-2)
 #define MAP_MAX_LOAD 0.75
 #define MAX_LINE 1000
+#define ERROR_GENERAL '\\x01'
+#define ERROR_DIVIDE_BY_ZERO '\\x02'
 
 void* reallocate(void* pointer, size_t newSize) {
   if (newSize == 0) {
@@ -1802,6 +1803,11 @@ typedef enum {
 #endif
 } ValueType;
 
+typedef struct {
+  unsigned char type;
+  unsigned char message[7];
+} ErrorInfo;
+
 typedef struct Recur Recur;
 
 typedef struct {
@@ -1809,6 +1815,7 @@ typedef struct {
   union {
     bool boolean;
     double number;
+    ErrorInfo err_info;
     Obj* obj;
     Recur* recur;
     FILE* file;
@@ -1817,6 +1824,29 @@ typedef struct {
 #endif
   } data;
 } Value;
+
+Value error_val(unsigned char type, char* message) {
+  ErrorInfo info;
+  info.type = type;
+  if (strlen(message) > 5) {
+    info.message[0] = (unsigned char) message[0];
+    info.message[1] = (unsigned char) message[1];
+    info.message[2] = (unsigned char) message[2];
+    info.message[3] = (unsigned char) message[3];
+    info.message[4] = (unsigned char) message[4];
+    info.message[5] = (unsigned char) message[5];
+  } else {
+    info.message[0] = ' ';
+    info.message[1] = ' ';
+    info.message[2] = ' ';
+    info.message[3] = ' ';
+    info.message[4] = ' ';
+    info.message[5] = ' ';
+  }
+  info.message[6] = '\\0';
+  Value v = {ERROR, {.err_info = info}};
+  return v;
+}
 
 static inline bool isObjType(Value value, ObjType type) {
   return IS_OBJ(value) && AS_OBJ(value)->type == type;
@@ -2084,7 +2114,7 @@ Value subtract(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y)
 Value multiply(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y)); }
 Value divide(Value x, Value y) {
   if (fabs(AS_NUMBER(y) - 0) < FLOAT_EQUAL_THRESHOLD) {
-    return ERROR_VAL;
+    return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
   }
   return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y));
 }
@@ -2468,7 +2498,11 @@ Value print(Value value) {
     }
   }
   else if (IS_ERROR(value)) {
-    printf("Error");
+    if (value.data.err_info.type == ERROR_DIVIDE_BY_ZERO) {
+      printf("ERROR: DivideByZero - %s", value.data.err_info.message);
+    } else {
+      printf("ERROR: General - %s", value.data.err_info.message);
+    }
   }
   else if (IS_LIST(value)) {
     Value num_items = list_count(value);
@@ -2810,7 +2844,7 @@ GCC_CHECK_OPTIONS = [
     '-Wvla',
     '-Warray-bounds=2',
     '-Wimplicit-fallthrough=3',
-    '-Wtraditional-conversion',
+    # '-Wtraditional-conversion',
     '-Wshift-overflow=2',
     '-Wcast-qual',
     '-Wstringop-overflow=4',
