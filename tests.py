@@ -461,6 +461,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (* 3.6 2.5))', 'output': '9'},
             {'src': '(print (/ 6 2))', 'output': '3'},
             {'src': '(print (/ 7.5 2.5))', 'output': '3'},
+            {'src': '(print (/ 1 0))', 'output': 'Error'},
         ]
         for test in tests:
             with self.subTest(test=test):

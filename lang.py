@@ -1733,6 +1733,7 @@ c_types = '''
 #define BOOL_VAL(value)  ((Value){BOOL, {.boolean = value}})
 #define NUMBER_VAL(value)  ((Value){NUMBER, {.number = value}})
 #define RECUR_VAL(value)  ((Value){RECUR, {.recur = value}})
+#define ERROR_VAL  ((Value){ERROR, {.boolean = 0}})
 #define FILE_VAL(value)   ((Value){FILE_HANDLE, {.file = (FILE*)value}})
 #define OBJ_VAL(object)   ((Value){OBJ, {.obj = (Obj*)object}})
 #define AS_BOOL(value)  ((value).data.boolean)
@@ -1749,6 +1750,7 @@ c_types = '''
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
 #define IS_RECUR(value)  ((value).type == RECUR)
+#define IS_ERROR(value)  ((value).type == ERROR)
 #define IS_FILE(value)  ((value).type == FILE_HANDLE)
 #define IS_OBJ(value)  ((value).type == OBJ)
 #define IS_STRING(value)  isObjType(value, OBJ_STRING)
@@ -1759,6 +1761,7 @@ c_types = '''
   #define IS_SQLITE3(value)  ((value).type == SQLITE3_DB)
   #define AS_SQLITE3(value)      ((value).data.db)
 #endif
+#define FLOAT_EQUAL_THRESHOLD 1e-7
 #define MAP_EMPTY (-1)
 #define MAP_TOMBSTONE (-2)
 #define MAP_MAX_LOAD 0.75
@@ -1791,6 +1794,7 @@ typedef enum {
   NUMBER,
   RECUR,
   TOMBSTONE,
+  ERROR,
   FILE_HANDLE,
   OBJ,
 #if defined(USE_SQLITE3)
@@ -2078,7 +2082,12 @@ Value nil_Q_(Value value) {
 Value add(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y)); }
 Value subtract(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y)); }
 Value multiply(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y)); }
-Value divide(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y)); }
+Value divide(Value x, Value y) {
+  if (fabs(AS_NUMBER(y) - 0) < FLOAT_EQUAL_THRESHOLD) {
+    return ERROR_VAL;
+  }
+  return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y));
+}
 Value greater(ObjMap* user_globals, Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) > AS_NUMBER(y)); }
 Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBER(y)); }
 Value less_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) <= AS_NUMBER(y)); }
@@ -2194,7 +2203,7 @@ Value equal(Value x, Value y) {
     double x_double = AS_NUMBER(x);
     double y_double = AS_NUMBER(y);
     double diff = fabs(x_double - y_double);
-    return BOOL_VAL(diff < 1e-7);
+    return BOOL_VAL(diff < FLOAT_EQUAL_THRESHOLD);
   }
   else if (IS_STRING(x)) {
     ObjString* xString = AS_STRING(x);
@@ -2457,6 +2466,9 @@ Value print(Value value) {
     } else {
       printf("%g", n);
     }
+  }
+  else if (IS_ERROR(value)) {
+    printf("Error");
   }
   else if (IS_LIST(value)) {
     Value num_items = list_count(value);
