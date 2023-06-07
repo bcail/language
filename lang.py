@@ -717,15 +717,21 @@ def nil_c(params, envs):
 
 def add_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'add({c_params[0]}, {c_params[1]})'}
+    name = _get_generated_name('add_result', envs=envs)
+    envs[-1]['temps'].add(name)
+    num_params = len(c_params)
+    if num_params == 2:
+        envs[-1]['pre'].append(f'  Value {name} = add_two({c_params[0]}, {c_params[1]});')
+    else:
+        numbers_list_name = _get_generated_name('numbers', envs=envs)
+        envs[-1]['temps'].add(numbers_list_name)
+        envs[-1]['pre'].append(f'  Value {numbers_list_name} = OBJ_VAL(allocate_list((uint32_t) {num_params}));\n  inc_ref(AS_OBJ({numbers_list_name}));')
+        for param in c_params:
+            envs[-1]['pre'].append(f'  list_add(AS_LIST({numbers_list_name}), {param});')
 
-    # TODO - probably need to use this style for all functions?
-    #   even functions that could only return nil/true/false could still take time to run,
-    #   and I don't want them to be run multiple times for conditional IS_OBJ ref-counting checks?
-    # name = _get_generated_name('add_result', envs=envs)
-    # envs[-1]['pre'].append(f'  Value {name} = add({c_params[0]}, {c_params[1]});')
-    # envs[-1]['temps'].add(name)
-    # return {'code': name}
+        envs[-1]['pre'].append(f'  Value {name} = add_list({numbers_list_name});')
+        envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({numbers_list_name}));')
+    return {'code': name}
 
 
 def subtract_c(params, envs):
@@ -2109,7 +2115,20 @@ Value nil_Q_(Value value) {
   return BOOL_VAL(IS_NIL(value));
 }
 
-Value add(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y)); }
+Value add_two(Value x, Value y) {
+  return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y));
+}
+
+Value add_list(Value numbers) {
+  ObjList* numbers_list = AS_LIST(numbers);
+  double sum = 0;
+  for (uint32_t i = 0; i < numbers_list->count; i++) {
+    Value item = list_get(numbers, (int32_t) i);
+    sum += AS_NUMBER(item);
+  }
+  return NUMBER_VAL(sum);
+}
+
 Value subtract(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y)); }
 Value multiply(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y)); }
 Value divide(Value x, Value y) {

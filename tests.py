@@ -454,6 +454,7 @@ class CompileTests(unittest.TestCase):
     def test_math_operations(self):
         tests = [
             {'src': '(print (+ 1 3))', 'output': '4'},
+            {'src': '(print (+ 1 3 2))', 'output': '6'},
             {'src': '(print (+ 1.5 2.3))', 'output': '3.8'},
             {'src': '(print (- 3 2))', 'output': '1'},
             {'src': '(print (- 3.5 2.1))', 'output': '1.4'},
