@@ -1814,7 +1814,8 @@ c_types = '''
 #define MAP_MAX_LOAD 0.75
 #define MAX_LINE 1000
 #define ERROR_GENERAL '\\x01'
-#define ERROR_DIVIDE_BY_ZERO '\\x02'
+#define ERROR_TYPE '\\x02'
+#define ERROR_DIVIDE_BY_ZERO '\\x03'
 
 void* reallocate(void* pointer, size_t newSize) {
   if (newSize == 0) {
@@ -2158,6 +2159,9 @@ Value nil_Q_(Value value) {
 }
 
 Value add_two(Value x, Value y) {
+  if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
   return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y));
 }
 
@@ -2166,12 +2170,18 @@ Value add_list(Value numbers) {
   double sum = 0;
   for (uint32_t i = 0; i < numbers_list->count; i++) {
     Value item = list_get(numbers, (int32_t) i);
+    if (!IS_NUMBER(item)) {
+      return error_val(ERROR_TYPE, "      ");
+    }
     sum += AS_NUMBER(item);
   }
   return NUMBER_VAL(sum);
 }
 
 Value subtract_two(Value x, Value y) {
+  if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
   return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y));
 }
 
@@ -2180,12 +2190,18 @@ Value subtract_list(Value numbers) {
   double result = AS_NUMBER(list_get(numbers, 0));
   for (uint32_t i = 1; i < numbers_list->count; i++) {
     Value item = list_get(numbers, (int32_t) i);
+    if (!IS_NUMBER(item)) {
+      return error_val(ERROR_TYPE, "      ");
+    }
     result = result - AS_NUMBER(item);
   }
   return NUMBER_VAL(result);
 }
 
 Value multiply_two(Value x, Value y) {
+  if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
   return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y));
 }
 
@@ -2194,12 +2210,18 @@ Value multiply_list(Value numbers) {
   double result = AS_NUMBER(list_get(numbers, 0));
   for (uint32_t i = 1; i < numbers_list->count; i++) {
     Value item = list_get(numbers, (int32_t) i);
+    if (!IS_NUMBER(item)) {
+      return error_val(ERROR_TYPE, "      ");
+    }
     result = result * AS_NUMBER(item);
   }
   return NUMBER_VAL(result);
 }
 
 Value divide_two(Value x, Value y) {
+  if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
   if (fabs(AS_NUMBER(y) - 0) < FLOAT_EQUAL_THRESHOLD) {
     return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
   }
@@ -2211,6 +2233,9 @@ Value divide_list(Value numbers) {
   double result = AS_NUMBER(list_get(numbers, 0));
   for (uint32_t i = 1; i < numbers_list->count; i++) {
     Value item = list_get(numbers, (int32_t) i);
+    if (!IS_NUMBER(item)) {
+      return error_val(ERROR_TYPE, "      ");
+    }
     if (fabs(AS_NUMBER(item) - 0) < FLOAT_EQUAL_THRESHOLD) {
       return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
     }
@@ -2601,6 +2626,8 @@ Value print(Value value) {
   else if (IS_ERROR(value)) {
     if (value.data.err_info.type == ERROR_DIVIDE_BY_ZERO) {
       printf("ERROR: DivideByZero - %s", value.data.err_info.message);
+    } else if (value.data.err_info.type == ERROR_TYPE) {
+      printf("ERROR: Type - %s", value.data.err_info.message);
     } else {
       printf("ERROR: General - %s", value.data.err_info.message);
     }

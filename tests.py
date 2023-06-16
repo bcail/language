@@ -465,6 +465,14 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (/ 6 2))', 'output': '3'},
             {'src': '(print (/ 7.5 2.5))', 'output': '3'},
             {'src': '(print (/ 12 2 3))', 'output': '2'},
+            {'src': '(print (+ 1 "a"))', 'output': 'ERROR: Type -       '},
+            {'src': '(print (+ 1 "a" 2))', 'output': 'ERROR: Type -       '},
+            {'src': '(print (- "a" 1))', 'output': 'ERROR: Type -       '},
+            {'src': '(print (- "a" 1 2))', 'output': 'ERROR: Type -       '},
+            {'src': '(print (* 1 "a"))', 'output': 'ERROR: Type -       '},
+            {'src': '(print (* 1 "a" 2))', 'output': 'ERROR: Type -       '},
+            {'src': '(print (/ "a" 1))', 'output': 'ERROR: Type -       '},
+            {'src': '(print (/ "a" 1 2))', 'output': 'ERROR: Type -       '},
             {'src': '(print (/ 1 0))', 'output': 'ERROR: DivideByZero -       '},
         ]
         for test in tests:
