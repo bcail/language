@@ -458,10 +458,13 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (+ 1.5 2.3))', 'output': '3.8'},
             {'src': '(print (- 3 2))', 'output': '1'},
             {'src': '(print (- 3.5 2.1))', 'output': '1.4'},
+            {'src': '(print (- 6 3 1))', 'output': '2'},
             {'src': '(print (* 3 2))', 'output': '6'},
             {'src': '(print (* 3.6 2.5))', 'output': '9'},
+            {'src': '(print (* 3 2 2))', 'output': '12'},
             {'src': '(print (/ 6 2))', 'output': '3'},
             {'src': '(print (/ 7.5 2.5))', 'output': '3'},
+            {'src': '(print (/ 12 2 3))', 'output': '2'},
             {'src': '(print (/ 1 0))', 'output': 'ERROR: DivideByZero -       '},
         ]
         for test in tests:

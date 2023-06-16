@@ -736,17 +736,59 @@ def add_c(params, envs):
 
 def subtract_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'subtract({c_params[0]}, {c_params[1]})'}
+    name = _get_generated_name('subtract_result', envs=envs)
+    envs[-1]['temps'].add(name)
+    num_params = len(c_params)
+    if num_params == 2:
+        envs[-1]['pre'].append(f'  Value {name} = subtract_two({c_params[0]}, {c_params[1]});')
+    else:
+        numbers_list_name = _get_generated_name('numbers', envs=envs)
+        envs[-1]['temps'].add(numbers_list_name)
+        envs[-1]['pre'].append(f'  Value {numbers_list_name} = OBJ_VAL(allocate_list((uint32_t) {num_params}));\n  inc_ref(AS_OBJ({numbers_list_name}));')
+        for param in c_params:
+            envs[-1]['pre'].append(f'  list_add(AS_LIST({numbers_list_name}), {param});')
+
+        envs[-1]['pre'].append(f'  Value {name} = subtract_list({numbers_list_name});')
+        envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({numbers_list_name}));')
+    return {'code': name}
 
 
 def multiply_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'multiply({c_params[0]}, {c_params[1]})'}
+    name = _get_generated_name('multiply_result', envs=envs)
+    envs[-1]['temps'].add(name)
+    num_params = len(c_params)
+    if num_params == 2:
+        envs[-1]['pre'].append(f'  Value {name} = multiply_two({c_params[0]}, {c_params[1]});')
+    else:
+        numbers_list_name = _get_generated_name('numbers', envs=envs)
+        envs[-1]['temps'].add(numbers_list_name)
+        envs[-1]['pre'].append(f'  Value {numbers_list_name} = OBJ_VAL(allocate_list((uint32_t) {num_params}));\n  inc_ref(AS_OBJ({numbers_list_name}));')
+        for param in c_params:
+            envs[-1]['pre'].append(f'  list_add(AS_LIST({numbers_list_name}), {param});')
+
+        envs[-1]['pre'].append(f'  Value {name} = multiply_list({numbers_list_name});')
+        envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({numbers_list_name}));')
+    return {'code': name}
 
 
 def divide_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'divide({c_params[0]}, {c_params[1]})'}
+    name = _get_generated_name('divide_result', envs=envs)
+    envs[-1]['temps'].add(name)
+    num_params = len(c_params)
+    if num_params == 2:
+        envs[-1]['pre'].append(f'  Value {name} = divide_two({c_params[0]}, {c_params[1]});')
+    else:
+        numbers_list_name = _get_generated_name('numbers', envs=envs)
+        envs[-1]['temps'].add(numbers_list_name)
+        envs[-1]['pre'].append(f'  Value {numbers_list_name} = OBJ_VAL(allocate_list((uint32_t) {num_params}));\n  inc_ref(AS_OBJ({numbers_list_name}));')
+        for param in c_params:
+            envs[-1]['pre'].append(f'  list_add(AS_LIST({numbers_list_name}), {param});')
+
+        envs[-1]['pre'].append(f'  Value {name} = divide_list({numbers_list_name});')
+        envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({numbers_list_name}));')
+    return {'code': name}
 
 
 def equal_c(params, envs):
@@ -2129,14 +2171,54 @@ Value add_list(Value numbers) {
   return NUMBER_VAL(sum);
 }
 
-Value subtract(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y)); }
-Value multiply(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y)); }
-Value divide(Value x, Value y) {
+Value subtract_two(Value x, Value y) {
+  return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y));
+}
+
+Value subtract_list(Value numbers) {
+  ObjList* numbers_list = AS_LIST(numbers);
+  double result = AS_NUMBER(list_get(numbers, 0));
+  for (uint32_t i = 1; i < numbers_list->count; i++) {
+    Value item = list_get(numbers, (int32_t) i);
+    result = result - AS_NUMBER(item);
+  }
+  return NUMBER_VAL(result);
+}
+
+Value multiply_two(Value x, Value y) {
+  return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y));
+}
+
+Value multiply_list(Value numbers) {
+  ObjList* numbers_list = AS_LIST(numbers);
+  double result = AS_NUMBER(list_get(numbers, 0));
+  for (uint32_t i = 1; i < numbers_list->count; i++) {
+    Value item = list_get(numbers, (int32_t) i);
+    result = result * AS_NUMBER(item);
+  }
+  return NUMBER_VAL(result);
+}
+
+Value divide_two(Value x, Value y) {
   if (fabs(AS_NUMBER(y) - 0) < FLOAT_EQUAL_THRESHOLD) {
     return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
   }
   return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y));
 }
+
+Value divide_list(Value numbers) {
+  ObjList* numbers_list = AS_LIST(numbers);
+  double result = AS_NUMBER(list_get(numbers, 0));
+  for (uint32_t i = 1; i < numbers_list->count; i++) {
+    Value item = list_get(numbers, (int32_t) i);
+    if (fabs(AS_NUMBER(item) - 0) < FLOAT_EQUAL_THRESHOLD) {
+      return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
+    }
+    result = result / AS_NUMBER(item);
+  }
+  return NUMBER_VAL(result);
+}
+
 Value greater(ObjMap* user_globals, Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) > AS_NUMBER(y)); }
 Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBER(y)); }
 Value less_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) <= AS_NUMBER(y)); }
