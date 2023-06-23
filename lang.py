@@ -2167,13 +2167,13 @@ Value add_two(Value x, Value y) {
 
 Value add_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
-  Value item = list_get(numbers, 0);
+  Value item = numbers_list->values[0];
   if (!IS_NUMBER(item)) {
     return error_val(ERROR_TYPE, "      ");
   }
   double result = AS_NUMBER(item);
   for (uint32_t i = 1; i < numbers_list->count; i++) {
-    item = list_get(numbers, (int32_t) i);
+    item = numbers_list->values[i];
     if (!IS_NUMBER(item)) {
       return error_val(ERROR_TYPE, "      ");
     }
@@ -2191,13 +2191,13 @@ Value subtract_two(Value x, Value y) {
 
 Value subtract_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
-  Value item = list_get(numbers, 0);
+  Value item = numbers_list->values[0];
   if (!IS_NUMBER(item)) {
     return error_val(ERROR_TYPE, "      ");
   }
   double result = AS_NUMBER(item);
   for (uint32_t i = 1; i < numbers_list->count; i++) {
-    item = list_get(numbers, (int32_t) i);
+    item = numbers_list->values[i];
     if (!IS_NUMBER(item)) {
       return error_val(ERROR_TYPE, "      ");
     }
@@ -2215,13 +2215,13 @@ Value multiply_two(Value x, Value y) {
 
 Value multiply_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
-  Value item = list_get(numbers, 0);
+  Value item = numbers_list->values[0];
   if (!IS_NUMBER(item)) {
     return error_val(ERROR_TYPE, "      ");
   }
   double result = AS_NUMBER(item);
   for (uint32_t i = 1; i < numbers_list->count; i++) {
-    item = list_get(numbers, (int32_t) i);
+    item = numbers_list->values[i];
     if (!IS_NUMBER(item)) {
       return error_val(ERROR_TYPE, "      ");
     }
@@ -2242,13 +2242,13 @@ Value divide_two(Value x, Value y) {
 
 Value divide_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
-  Value item = list_get(numbers, 0);
+  Value item = numbers_list->values[0];
   if (!IS_NUMBER(item)) {
     return error_val(ERROR_TYPE, "      ");
   }
   double result = AS_NUMBER(item);
   for (uint32_t i = 1; i < numbers_list->count; i++) {
-    item = list_get(numbers, (int32_t) i);
+    item = numbers_list->values[i];
     if (!IS_NUMBER(item)) {
       return error_val(ERROR_TYPE, "      ");
     }
