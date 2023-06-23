@@ -2167,15 +2167,19 @@ Value add_two(Value x, Value y) {
 
 Value add_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
-  double sum = 0;
-  for (uint32_t i = 0; i < numbers_list->count; i++) {
-    Value item = list_get(numbers, (int32_t) i);
+  Value item = list_get(numbers, 0);
+  if (!IS_NUMBER(item)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  double result = AS_NUMBER(item);
+  for (uint32_t i = 1; i < numbers_list->count; i++) {
+    item = list_get(numbers, (int32_t) i);
     if (!IS_NUMBER(item)) {
       return error_val(ERROR_TYPE, "      ");
     }
-    sum += AS_NUMBER(item);
+    result += AS_NUMBER(item);
   }
-  return NUMBER_VAL(sum);
+  return NUMBER_VAL(result);
 }
 
 Value subtract_two(Value x, Value y) {
@@ -2187,9 +2191,13 @@ Value subtract_two(Value x, Value y) {
 
 Value subtract_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
-  double result = AS_NUMBER(list_get(numbers, 0));
+  Value item = list_get(numbers, 0);
+  if (!IS_NUMBER(item)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  double result = AS_NUMBER(item);
   for (uint32_t i = 1; i < numbers_list->count; i++) {
-    Value item = list_get(numbers, (int32_t) i);
+    item = list_get(numbers, (int32_t) i);
     if (!IS_NUMBER(item)) {
       return error_val(ERROR_TYPE, "      ");
     }
@@ -2207,9 +2215,13 @@ Value multiply_two(Value x, Value y) {
 
 Value multiply_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
-  double result = AS_NUMBER(list_get(numbers, 0));
+  Value item = list_get(numbers, 0);
+  if (!IS_NUMBER(item)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  double result = AS_NUMBER(item);
   for (uint32_t i = 1; i < numbers_list->count; i++) {
-    Value item = list_get(numbers, (int32_t) i);
+    item = list_get(numbers, (int32_t) i);
     if (!IS_NUMBER(item)) {
       return error_val(ERROR_TYPE, "      ");
     }
@@ -2230,9 +2242,13 @@ Value divide_two(Value x, Value y) {
 
 Value divide_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
-  double result = AS_NUMBER(list_get(numbers, 0));
+  Value item = list_get(numbers, 0);
+  if (!IS_NUMBER(item)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  double result = AS_NUMBER(item);
   for (uint32_t i = 1; i < numbers_list->count; i++) {
-    Value item = list_get(numbers, (int32_t) i);
+    item = list_get(numbers, (int32_t) i);
     if (!IS_NUMBER(item)) {
       return error_val(ERROR_TYPE, "      ");
     }
