@@ -861,6 +861,7 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (sqlite3/version))', 'output': f'3.41.2'},
             {'src': '(let [db (sqlite3/open ":memory:")] (print (sqlite3/close db))', 'output': f'nil'},
             {'src': f'(let [db (sqlite3/open ":memory:")] (sqlite3/execute db "{CREATE}") (sqlite3/execute db "{INSERT}") (print (sqlite3/execute db "{SELECT}")) (sqlite3/close db))', 'output': f'[[1 something]]'},
+            {'src': f'(with [db (sqlite3/open ":memory:")] (sqlite3/execute db "{CREATE}") (sqlite3/execute db "{INSERT}") (print (sqlite3/execute db "{SELECT}")))', 'output': f'[[1 something]]'},
         ]
         for test in tests:
             with self.subTest(test=test):

@@ -1626,6 +1626,42 @@ def compile_form(node, envs):
                 envs[-1]['pre'].append(f_code)
                 envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (do_result, do_result))
                 return {'code': do_result}
+            elif first.name == 'with':
+                bindings = rest[0]
+                paired_bindings = []
+                for i in range(0, len(bindings.items), 2):
+                    paired_bindings.append(bindings.items[i:i+2])
+                for binding in paired_bindings:
+                    print(f'{binding=}')
+                    result = compile_form(binding[1], envs=envs)
+                    binding_name = _get_generated_name(base=binding[0].name, envs=envs)
+                    result['c_name'] = binding_name
+                    envs[-1]['bindings'][binding[0].name] = result
+                    envs[-1]['pre'].append(f'  Value {binding_name} = {result["code"]};\n')
+                exprs = [compile_form(n, envs=envs) for n in rest[1:]]
+                result = _get_generated_name('with_result', envs)
+                f_code = f'  Value {result} = NIL_VAL;'
+                if isinstance(exprs[-1], tuple) and isinstance(exprs[-1][0], Symbol) and exprs[-1][0].name == 'recur':
+                    for e in envs:
+                        for b in e.get('bindings', {}).keys():
+                            if b.startswith('recur'):
+                                recur_name = b
+                    for r in exprs[-1][1:]:
+                        f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
+                    f_code += f'\n  {result} = {recur_name};'
+                else:
+                    f_code += f'\n  {result} = {exprs[-1]["code"]};'
+                    f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (result, result)
+                # add destructors
+                for binding in paired_bindings:
+                    if binding[1][0].name == 'sqlite3/open':
+                        f_code += f'\n  lang_sqlite3_close({envs[-1]["bindings"][binding[0].name]["c_name"]});'
+                    else:
+                        raise Exception(f'unrecognized with constructor: {binding}')
+
+                envs[-1]['pre'].append(f_code)
+                envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result, result))
+                return {'code': result}
             elif first.name == 'not':
                 result = compile_form(rest[0], envs=envs)
                 return {'code': f'BOOL_VAL(!is_truthy({result["code"]}))'}
