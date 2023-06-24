@@ -2,6 +2,7 @@ import copy
 from enum import Enum, auto
 import os
 from pathlib import Path
+import platform
 import re
 import subprocess
 import sys
@@ -1400,6 +1401,14 @@ def file_close_c(params, envs):
     return {'code': result_name}
 
 
+def os_mkdir_c(params, envs):
+    path = compile_form(params[0], envs=envs)['code']
+    result_name = _get_generated_name('dir_name', envs=envs)
+    envs[-1]['temps'].add(result_name)
+    envs[-1]['pre'].append(f'  Value {result_name} = os_mkdir({path});')
+    return {'code': result_name}
+
+
 def sqlite3_version_c(params, envs):
     result_name = _get_generated_name('sqlite3_version_s', envs=envs)
     envs[-1]['temps'].add(result_name)
@@ -1476,6 +1485,7 @@ global_compile_env = {
     'file/read': {'function': file_read_c},
     'file/write': {'function': file_write_c},
     'file/close': {'function': file_close_c},
+    'os/mkdir': {'function': os_mkdir_c},
     'sqlite3/version': {'function': sqlite3_version_c},
     'sqlite3/open': {'function': sqlite3_open_c},
     'sqlite3/close': {'function': sqlite3_close_c},
@@ -1785,7 +1795,7 @@ def main(file_name):
         _run_prompt()
 
 
-c_types = '''
+basic_includes = '''
 #include <stdio.h>
 #include <stdint.h>
 #include <ctype.h>
@@ -1793,7 +1803,10 @@ c_types = '''
 #include <stdbool.h>
 #include <string.h>
 #include <math.h>
+'''
 
+
+c_types = '''
 
 #define ALLOCATE(type, count) \
     (type*)reallocate(NULL, sizeof(type) * (count))
@@ -2886,6 +2899,15 @@ Value file_close(Value file) {
   return NIL_VAL;
 }
 
+Value os_mkdir(Value dir_name) {
+#if defined(WINDOWS)
+  int result = _mkdir(AS_CSTRING(dir_name));
+#else
+  int result = mkdir(AS_CSTRING(dir_name), 0755);
+#endif
+  return NIL_VAL;
+}
+
 void free_object(Obj* object) {
   switch (object->type) {
     case OBJ_STRING: {
@@ -2960,7 +2982,13 @@ def _compile(source):
                 c = f'{c};'
             compiled_forms.append(f'  {c}')
 
-    c_code = ''
+    c_code = basic_includes
+
+    if platform.system() == 'Windows':
+        c_code += '#include <direct.h>\n'
+        c_code += '#define WINDOWS 1\n'
+    else:
+        c_code += '#include <sys/stat.h>\n'
 
     if env['use_sqlite3']:
         c_code += f'#include "sqlite3.h"\n\n'

@@ -852,6 +852,13 @@ class CompileTests(unittest.TestCase):
             test = {'src': f'(let [f (file/open "{file_name}" "w")] (file/write f "asdf") (file/close f)) (print (let [f (file/open "{file_name}") data (file/read f)] data))', 'input': '', 'output': 'asdf'}
             _run_test(test, self.assertEqual)
 
+    def test_mkdir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dir_name = os.path.join(tmp, 'testdir')
+            test = {'src': f'(os/mkdir "{dir_name}")', 'input': '', 'output': ''}
+            _run_test(test, self.assertEqual)
+            self.assertTrue(os.path.exists(dir_name))
+
     def test_sqlite(self):
         # _build_sqlite([clang_cmd])
         CREATE = 'CREATE TABLE data (id INTEGER PRIMARY KEY, col1 TEXT)'
