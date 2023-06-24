@@ -855,6 +855,7 @@ class CompileTests(unittest.TestCase):
     def test_mkdir(self):
         with tempfile.TemporaryDirectory() as tmp:
             dir_name = os.path.join(tmp, 'testdir')
+            dir_name = dir_name.replace('\\', '\\\\')
             test = {'src': f'(os/mkdir "{dir_name}")', 'input': '', 'output': ''}
             _run_test(test, self.assertEqual)
             self.assertTrue(os.path.exists(dir_name))
