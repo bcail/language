@@ -1583,7 +1583,7 @@ def compile_form(node, envs):
                     return envs[0]['global'][first.name]['function'](rest, envs=envs)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
-            for ns in envs[0]['required_namespaces']:
+            for ns in envs[0]['required_namespaces'].values():
                 if first.name in ns:
                     if callable(ns[first.name]['function']):
                         return ns[first.name]['function'](rest, envs=envs)
@@ -1723,7 +1723,22 @@ def compile_form(node, envs):
                 params = [compile_form(r, envs=envs) for r in rest]
                 return (first, *params)
             elif first.name == 'require':
+                module_name = rest[0].name
+                if module_name in envs[0]['required_namespaces']:
+                    return {'code': ''} # already required, nothing to do
+
                 # find the module file
+                if module_name.startswith('language.'):
+                    if module_name == 'language.string':
+                        envs[0]['required_namespaces'][module_name] = copy.deepcopy(language_string_env)
+                    elif module_name == 'language.sqlite3':
+                        envs[0]['required_namespaces'][module_name] = copy.deepcopy(language_sqlite3_env)
+                    elif module_name == 'language.os':
+                        envs[0]['required_namespaces'][module_name] = copy.deepcopy(language_os_env)
+                    else:
+                        raise Exception(f'system module {module_name} not found')
+                else:
+                    raise Exception(f'module {module_name} not found')
                 # evaluate everything in the module, into that namespace
                 # refer it into this namespace if needed
                 return {'code': ''}
@@ -2981,7 +2996,7 @@ def _compile(source):
     compiled_forms = []
     env = {
         'global': copy.deepcopy(global_compile_env),
-        'required_namespaces': [copy.deepcopy(env) for env in [language_string_env, language_os_env, language_sqlite3_env]],
+        'required_namespaces': {},
         'functions': {},
         'user_globals': {},
         'temps': set(),

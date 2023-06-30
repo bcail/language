@@ -791,12 +791,12 @@ class CompileTests(unittest.TestCase):
 
     def test_string_module(self):
         tests = [
-            {'src': '(print (str/blank? "Hello World"))', 'output': 'false'},
-            {'src': '(print (str/blank? ""))', 'output': 'true'},
-            {'src': '(print (str/blank? nil))', 'output': 'true'},
-            {'src': '(print (str/blank? "\\n"))', 'output': 'true'},
-            {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},
-            {'src': '(print (str/split "hello world"))', 'output': '[hello world]'},
+            {'src': '(require language.string) (print (str/blank? "Hello World"))', 'output': 'false'},
+            {'src': '(require language.string) (print (str/blank? ""))', 'output': 'true'},
+            {'src': '(require language.string) (print (str/blank? nil))', 'output': 'true'},
+            {'src': '(require language.string) (print (str/blank? "\\n"))', 'output': 'true'},
+            {'src': '(require language.string) (print (str/lower "Hello World"))', 'output': 'hello world'},
+            {'src': '(require language.string) (print (str/split "hello world"))', 'output': '[hello world]'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -806,7 +806,7 @@ class CompileTests(unittest.TestCase):
         tests = [
             {'src': '(print (str []))', 'output': '[]'},
             {'src': '(print (str {}))', 'output': '{}'},
-            {'src': '(print (if (str/blank? "Hello World") "blank" "not blank"))', 'output': 'not blank'},
+            {'src': '(require language.string) (print (if (str/blank? "Hello World") "blank" "not blank"))', 'output': 'not blank'},
             {'src': '(print (if "Hello World" (read-line) "false"))', 'input': 'line', 'output': 'line'},
             {'src': '(def a 1) (let [b 2] (print (+ a b)))', 'output': '3'},
             {'src': '(print (let [b {"key" (get {"z" 2} "z")}] (+ 1 (get b "key"))))', 'output': '3'},
@@ -863,7 +863,7 @@ class CompileTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             dir_name = os.path.join(tmp, 'testdir')
             dir_name = dir_name.replace('\\', '\\\\')
-            test = {'src': f'(os/mkdir "{dir_name}")', 'input': '', 'output': ''}
+            test = {'src': f'(require language.os) (os/mkdir "{dir_name}")', 'input': '', 'output': ''}
             _run_test(test, self.assertEqual)
             self.assertTrue(os.path.exists(dir_name))
 
@@ -873,10 +873,10 @@ class CompileTests(unittest.TestCase):
         INSERT = 'INSERT INTO data (id, col1) VALUES (1, \'something\');'
         SELECT = 'SELECT * FROM data;'
         tests = [
-            {'src': '(print (sqlite3/version))', 'output': f'3.41.2'},
-            {'src': '(let [db (sqlite3/open ":memory:")] (print (sqlite3/close db))', 'output': f'nil'},
-            {'src': f'(let [db (sqlite3/open ":memory:")] (sqlite3/execute db "{CREATE}") (sqlite3/execute db "{INSERT}") (print (sqlite3/execute db "{SELECT}")) (sqlite3/close db))', 'output': f'[[1 something]]'},
-            {'src': f'(with [db (sqlite3/open ":memory:")] (sqlite3/execute db "{CREATE}") (sqlite3/execute db "{INSERT}") (print (sqlite3/execute db "{SELECT}")))', 'output': f'[[1 something]]'},
+            {'src': '(require language.sqlite3) (print (sqlite3/version))', 'output': f'3.41.2'},
+            {'src': '(require language.sqlite3) (let [db (sqlite3/open ":memory:")] (print (sqlite3/close db))', 'output': f'nil'},
+            {'src': f'(require language.sqlite3) (let [db (sqlite3/open ":memory:")] (sqlite3/execute db "{CREATE}") (sqlite3/execute db "{INSERT}") (print (sqlite3/execute db "{SELECT}")) (sqlite3/close db))', 'output': f'[[1 something]]'},
+            {'src': f'(require language.sqlite3) (with [db (sqlite3/open ":memory:")] (sqlite3/execute db "{CREATE}") (sqlite3/execute db "{INSERT}") (print (sqlite3/execute db "{SELECT}")))', 'output': f'[[1 something]]'},
         ]
         for test in tests:
             with self.subTest(test=test):
