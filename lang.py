@@ -1570,9 +1570,6 @@ def compile_form(node, envs):
             return {'code': result_name}
         elif isinstance(first, Symbol):
             if first.name in envs[0]['global']:
-                if isinstance(envs[0]['global'][first.name]['function'], Var) and isinstance(envs[0]['global'][first.name]['function'].value, Function):
-                    f = envs[0]['global'][first.name]['function'].value
-                    return f(rest)
                 if callable(envs[0]['global'][first.name]['function']):
                     return envs[0]['global'][first.name]['function'](rest, envs=envs)
                 else:
@@ -1710,6 +1707,11 @@ def compile_form(node, envs):
             elif first.name == 'recur':
                 params = [compile_form(r, envs=envs) for r in rest]
                 return (first, *params)
+            elif first.name == 'require':
+                # find the module file
+                # evaluate everything in the module, into that namespace
+                # refer it into this namespace if needed
+                return {'code': ''}
             else:
                 print(f'global: {envs[0]["global"]}')
                 print(f'user globals: {envs[0]["user_globals"]}')

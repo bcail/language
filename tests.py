@@ -483,15 +483,9 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
-    def test_strings(self):
+    def test_core_strings(self):
         tests = [
             {'src': '(print "abc")', 'output': 'abc'},
-            {'src': '(print (str/blank? "Hello World"))', 'output': 'false'},
-            {'src': '(print (str/blank? ""))', 'output': 'true'},
-            {'src': '(print (str/blank? nil))', 'output': 'true'},
-            {'src': '(print (str/blank? "\\n"))', 'output': 'true'},
-            {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},
-            {'src': '(print (str/split "hello world"))', 'output': '[hello world]'},
             {'src': '(print (str))', 'output': ''},
             {'src': '(print (str nil))', 'output': ''},
             {'src': '(print (str true))', 'output': 'true'},
@@ -790,6 +784,19 @@ class CompileTests(unittest.TestCase):
             {'src': '(let [a "1"] (for [w ["one" "two"]] (print w)))', 'output': 'onetwo'},
             {'src': '(let [a "1"] (for [w ["one" "two"]] (print [w a])))', 'output': '[one 1][two 1]'},
             {'src': '(for [w ["one" "two"]] (print "item ") (println w))', 'output': f'item one{LSEP}item two{LSEP}'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
+    def test_string_module(self):
+        tests = [
+            {'src': '(print (str/blank? "Hello World"))', 'output': 'false'},
+            {'src': '(print (str/blank? ""))', 'output': 'true'},
+            {'src': '(print (str/blank? nil))', 'output': 'true'},
+            {'src': '(print (str/blank? "\\n"))', 'output': 'true'},
+            {'src': '(print (str/lower "Hello World"))', 'output': 'hello world'},
+            {'src': '(print (str/split "hello world"))', 'output': '[hello world]'},
         ]
         for test in tests:
             with self.subTest(test=test):
