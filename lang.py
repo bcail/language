@@ -1478,14 +1478,23 @@ global_compile_env = {
     'defn': {'function': defn_c},
     'read-line': {'function': readline_c},
     'str': {'function': str_c},
-    'str/split': {'function': str_split_c},
-    'str/lower': {'function': str_lower_c},
-    'str/blank?': {'function': str_blank_c},
     'file/open': {'function': file_open_c},
     'file/read': {'function': file_read_c},
     'file/write': {'function': file_write_c},
     'file/close': {'function': file_close_c},
+}
+
+language_string_env = {
+    'str/split': {'function': str_split_c},
+    'str/lower': {'function': str_lower_c},
+    'str/blank?': {'function': str_blank_c},
+}
+
+language_os_env = {
     'os/mkdir': {'function': os_mkdir_c},
+}
+
+language_sqlite3_env = {
     'sqlite3/version': {'function': sqlite3_version_c},
     'sqlite3/open': {'function': sqlite3_open_c},
     'sqlite3/close': {'function': sqlite3_close_c},
@@ -1574,7 +1583,13 @@ def compile_form(node, envs):
                     return envs[0]['global'][first.name]['function'](rest, envs=envs)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
-            elif first.name in envs[0]['user_globals']:
+            for ns in envs[0]['required_namespaces']:
+                if first.name in ns:
+                    if callable(ns[first.name]['function']):
+                        return ns[first.name]['function'](rest, envs=envs)
+                    else:
+                        raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
+            if first.name in envs[0]['user_globals']:
                 f_name = envs[0]['user_globals'][first.name]['c_name']
                 results = [compile_form(n, envs=envs) for n in rest]
                 args = 'user_globals'
@@ -2966,6 +2981,7 @@ def _compile(source):
     compiled_forms = []
     env = {
         'global': copy.deepcopy(global_compile_env),
+        'required_namespaces': [copy.deepcopy(env) for env in [language_string_env, language_os_env, language_sqlite3_env]],
         'functions': {},
         'user_globals': {},
         'temps': set(),
