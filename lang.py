@@ -1485,20 +1485,20 @@ global_compile_env = {
 }
 
 language_string_env = {
-    'str/split': {'function': str_split_c},
-    'str/lower': {'function': str_lower_c},
-    'str/blank?': {'function': str_blank_c},
+    'split': {'function': str_split_c},
+    'lower': {'function': str_lower_c},
+    'blank?': {'function': str_blank_c},
 }
 
 language_os_env = {
-    'os/mkdir': {'function': os_mkdir_c},
+    'mkdir': {'function': os_mkdir_c},
 }
 
 language_sqlite3_env = {
-    'sqlite3/version': {'function': sqlite3_version_c},
-    'sqlite3/open': {'function': sqlite3_open_c},
-    'sqlite3/close': {'function': sqlite3_close_c},
-    'sqlite3/execute': {'function': sqlite3_execute_c},
+    'version': {'function': sqlite3_version_c},
+    'open': {'function': sqlite3_open_c},
+    'close': {'function': sqlite3_close_c},
+    'execute': {'function': sqlite3_execute_c},
 }
 
 
@@ -1583,12 +1583,6 @@ def compile_form(node, envs):
                     return envs[0]['global'][first.name]['function'](rest, envs=envs)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
-            for ns in envs[0]['required_namespaces'].values():
-                if first.name in ns:
-                    if callable(ns[first.name]['function']):
-                        return ns[first.name]['function'](rest, envs=envs)
-                    else:
-                        raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             if first.name in envs[0]['user_globals']:
                 f_name = envs[0]['user_globals'][first.name]['c_name']
                 results = [compile_form(n, envs=envs) for n in rest]
@@ -1600,7 +1594,17 @@ def compile_form(node, envs):
                 envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({args});')
                 envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
                 return {'code': result_name}
-            elif first.name == 'for':
+            if '/' in first.name:
+                refer, name = first.name.split('/')
+                if refer:
+                    for referred_as, ns in envs[0]['required_namespaces'].items():
+                        if refer == referred_as:
+                            if name in ns:
+                                if callable(ns[name]['function']):
+                                    return ns[name]['function'](rest, envs=envs)
+                                else:
+                                    raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
+            if first.name == 'for':
                 bindings = rest[0]
                 binding_name = bindings[0].name
                 c_name = _get_generated_name(f'u_{binding_name}', envs=envs)
@@ -1723,18 +1727,23 @@ def compile_form(node, envs):
                 params = [compile_form(r, envs=envs) for r in rest]
                 return (first, *params)
             elif first.name == 'require':
-                module_name = rest[0].name
-                if module_name in envs[0]['required_namespaces']:
+                if isinstance(rest[0], Vector):
+                    module_name = rest[0].items[0].name
+                    referred_as = rest[0].items[1].name
+                else:
+                    module_name = rest[0].name
+                    referred_as = rest[0].name
+                if referred_as in envs[0]['required_namespaces']:
                     return {'code': ''} # already required, nothing to do
 
                 # find the module file
                 if module_name.startswith('language.'):
                     if module_name == 'language.string':
-                        envs[0]['required_namespaces'][module_name] = copy.deepcopy(language_string_env)
+                        envs[0]['required_namespaces'][referred_as] = copy.deepcopy(language_string_env)
                     elif module_name == 'language.sqlite3':
-                        envs[0]['required_namespaces'][module_name] = copy.deepcopy(language_sqlite3_env)
+                        envs[0]['required_namespaces'][referred_as] = copy.deepcopy(language_sqlite3_env)
                     elif module_name == 'language.os':
-                        envs[0]['required_namespaces'][module_name] = copy.deepcopy(language_os_env)
+                        envs[0]['required_namespaces'][referred_as] = copy.deepcopy(language_os_env)
                     else:
                         raise Exception(f'system module {module_name} not found')
                 else:
@@ -1745,6 +1754,7 @@ def compile_form(node, envs):
             else:
                 print(f'global: {envs[0]["global"]}')
                 print(f'user globals: {envs[0]["user_globals"]}')
+                print(f'required namespaces: {envs[0]["required_namespaces"]}')
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
             return if_form_c(rest, envs=envs)
