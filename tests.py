@@ -882,6 +882,16 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual, sqlite=True)
 
+    def test_run_program(self):
+        program_file = os.path.join('test_files', 'test_program.clj')
+        cmd = f'{sys.executable} lang.py -r {program_file}'
+        input_ = f'one{LSEP}two{LSEP}one'
+        try:
+            result = subprocess.run(cmd.split(), check=True, input=input_.encode('utf8'), capture_output=True)
+            self.assertEqual(result.stdout.decode('utf8'), '{one 2, two 1}')
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f'run_program test failed: {e}\n{e.stderr.decode("utf8")}')
+
 
 if __name__ == '__main__':
     unittest.main()
