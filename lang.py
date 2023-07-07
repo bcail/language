@@ -175,7 +175,7 @@ def scan_tokens(source):
             else:
                 token_buffer += c
         elif inside_comment:
-            if c == '\n':
+            if c in ['\n', '\r']:
                 inside_comment = False
         elif c == '(':
             tokens.append({'type': TokenType.LEFT_PAREN})
@@ -200,7 +200,7 @@ def scan_tokens(source):
             tokens.append({'type': TokenType.RIGHT_BRACE})
         elif c in ['+', '-', '*', '/', '=', '>', '<']:
             token_buffer += c
-        elif c in [',', '\n']:
+        elif c in [',', '\n', '\r']:
             pass
         elif c == ':':
             if token_buffer:
