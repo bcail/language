@@ -831,7 +831,8 @@ def def_c(params, envs):
     envs.append(local_env)
     result = compile_form(params[1], envs=envs)
     c_name = _get_generated_name(base=f'u_{name}', envs=envs)
-    envs[0]['user_globals'][name] = {'type': 'var', 'c_name': c_name, 'code': result['code']}
+    current_ns = envs[0]['current_ns']
+    envs[0]['namespaces'][current_ns][name] = {'type': 'var', 'c_name': c_name, 'code': result['code']}
     if local_env['pre']:
         envs[0]['init'].extend(local_env['pre'])
     if local_env['post']:
@@ -1348,7 +1349,8 @@ def defn_c(params, envs):
     name = params[0].name
     f_name = _get_generated_name(base=f'u_{name}', envs=envs)
 
-    envs[0]['user_globals'][name] = {'type': 'function', 'c_name': f_name}
+    current_ns = envs[0]['current_ns']
+    envs[0]['namespaces'][current_ns][name] = {'type': 'function', 'c_name': f_name}
 
     fn_result = fn_c(params[1:], envs, f_name=f_name)
 
@@ -1514,12 +1516,12 @@ def _get_generated_name(base, envs):
         base = base.replace(c, replacement)
 
     env = envs[0]
-    if base not in env['functions'] and base not in env['temps'] and base not in env['user_globals'] and base not in envs[-1].get('temps', set()):
+    if base not in env['functions'] and base not in env['temps'] and base not in env['namespaces']['user'] and base not in envs[-1].get('temps', set()):
         return base
     i = 1
     while True:
         name = f'{base}_{i}'
-        if name not in env['functions'] and name not in env['temps'] and base not in env['user_globals'] and name not in envs[-1].get('temps', set()):
+        if name not in env['functions'] and name not in env['temps'] and base not in env['namespaces']['user'] and name not in envs[-1].get('temps', set()):
             return name
         i += 1
 
@@ -1578,13 +1580,14 @@ def compile_form(node, envs):
             envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
             return {'code': result_name}
         elif isinstance(first, Symbol):
+            current_ns = envs[0]['current_ns']
             if first.name in envs[0]['global']:
                 if callable(envs[0]['global'][first.name]['function']):
                     return envs[0]['global'][first.name]['function'](rest, envs=envs)
                 else:
                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
-            if first.name in envs[0]['user_globals']:
-                f_name = envs[0]['user_globals'][first.name]['c_name']
+            if first.name in envs[0]['namespaces'][current_ns]:
+                f_name = envs[0]['namespaces'][current_ns][first.name]['c_name']
                 results = [compile_form(n, envs=envs) for n in rest]
                 args = 'user_globals'
                 if results:
@@ -1597,7 +1600,7 @@ def compile_form(node, envs):
             if '/' in first.name:
                 refer, name = first.name.split('/')
                 if refer:
-                    for referred_as, ns in envs[0]['required_namespaces'].items():
+                    for referred_as, ns in envs[0]['namespaces'].items():
                         if refer == referred_as:
                             if name in ns:
                                 if callable(ns[name]['function']):
@@ -1727,42 +1730,50 @@ def compile_form(node, envs):
                 params = [compile_form(r, envs=envs) for r in rest]
                 return (first, *params)
             elif first.name == 'require':
-                if isinstance(rest[0], Vector):
-                    module_name = rest[0].items[0].name
-                    referred_as = rest[0].items[1].name
-                else:
-                    module_name = rest[0].name
-                    referred_as = rest[0].name
-                if referred_as in envs[0]['required_namespaces']:
-                    return {'code': ''} # already required, nothing to do
-
-                # find the module file
-                if module_name.startswith('language.'):
-                    if module_name == 'language.string':
-                        envs[0]['required_namespaces'][referred_as] = copy.deepcopy(language_string_env)
-                    elif module_name == 'language.sqlite3':
-                        envs[0]['required_namespaces'][referred_as] = copy.deepcopy(language_sqlite3_env)
-                    elif module_name == 'language.os':
-                        envs[0]['required_namespaces'][referred_as] = copy.deepcopy(language_os_env)
+                for require in rest:
+                    if isinstance(require, Vector):
+                        if isinstance(require.items[0], Symbol):
+                            module_name = require.items[0].name
+                        else:
+                            module_name = require.items[0]
+                        referred_as = require.items[1].name
                     else:
-                        raise Exception(f'system module {module_name} not found')
-                else:
-                    raise Exception(f'module {module_name} not found')
-                # evaluate everything in the module, into that namespace
-                # refer it into this namespace if needed
+                        module_name = require.name
+                        referred_as = require.name
+                    if referred_as in envs[0]['namespaces']:
+                        continue # already required, nothing to do
+
+                    # find the module file
+                    if module_name.startswith('language.'):
+                        if module_name == 'language.string':
+                            envs[0]['namespaces'][referred_as] = copy.deepcopy(language_string_env)
+                        elif module_name == 'language.sqlite3':
+                            envs[0]['namespaces'][referred_as] = copy.deepcopy(language_sqlite3_env)
+                        elif module_name == 'language.os':
+                            envs[0]['namespaces'][referred_as] = copy.deepcopy(language_os_env)
+                        else:
+                            raise Exception(f'system module {module_name} not found')
+                    else:
+                        module_file_name = f'{module_name}.clj'
+                        if os.path.exists(module_file_name):
+                            with open(module_file_name, 'rb') as module_file:
+                                module_code = module_file.read().decode('utf8')
+                        else:
+                            raise Exception(f'module {module_name} not found')
+                    # evaluate everything in the module, into that namespace
+                    # refer it into this namespace if needed
                 return {'code': ''}
             else:
                 print(f'global: {envs[0]["global"]}')
-                print(f'user globals: {envs[0]["user_globals"]}')
-                print(f'required namespaces: {envs[0]["required_namespaces"]}')
+                print(f'namespaces: {envs[0]["namespaces"]}')
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
             return if_form_c(rest, envs=envs)
         else:
             raise Exception(f'unhandled list: {node}')
     if isinstance(node, Symbol):
-        if node.name in envs[0]['user_globals']:
-            if envs[0]['user_globals'][node.name]['type'] == 'var':
+        if node.name in envs[0]['namespaces']['user']:
+            if envs[0]['namespaces']['user'][node.name]['type'] == 'var':
                 name = _get_generated_name('user_global_lookup', envs=envs)
                 envs[0]['temps'].add(name)
                 code = f'  Value {name} = OBJ_VAL(copy_string("{node.name}", {len(node.name)}));'
@@ -1771,7 +1782,7 @@ def compile_form(node, envs):
                 envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
                 return {'code': f'map_get(user_globals, {name}, NIL_VAL)'}
             else:
-                return {'code': envs[0]['user_globals'][node.name]['c_name']}
+                return {'code': envs[0]['namespaces']['user'][node.name]['c_name']}
         else:
             for env in envs:
                 if node.name in env.get('bindings', {}):
@@ -3005,16 +3016,17 @@ def _compile(source):
 
     compiled_forms = []
     env = {
+        # might want to combine these namespaces in one list/map at some point?
         'global': copy.deepcopy(global_compile_env),
-        'required_namespaces': {},
+        'namespaces': {'user': {}}, #including required & default user ns
         'functions': {},
-        'user_globals': {},
         'temps': set(),
         'init': [],
         'pre': [],
         'post': [],
         'bindings': {},
         'use_sqlite3': False,
+        'current_ns': 'user',
     }
     for f in ast.forms:
         result = compile_form(f, envs=[env])
@@ -3053,7 +3065,7 @@ def _compile(source):
     if env['init']:
         c_code += '\n'.join(env['init'])
 
-    for name, value in env['user_globals'].items():
+    for name, value in env['namespaces']['user'].items():
         if value['type'] == 'var':
             c_code += f'\n  map_set(user_globals, OBJ_VAL(copy_string("{name}", {len(name)})), {value["code"]});\n'
 
