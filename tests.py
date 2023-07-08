@@ -791,7 +791,7 @@ class CompileTests(unittest.TestCase):
 
     def test_string_module(self):
         tests = [
-            {'src': '(require language.string) (print (language.string/blank? "Hello World"))', 'output': 'false'},
+            {'src': '(require [language.string str]) (print (str/blank? "Hello World"))', 'output': 'false'},
             {'src': '(require [language.string str]) (print (str/blank? ""))', 'output': 'true'},
             {'src': '(require [language.string str]) (print (str/blank? nil))', 'output': 'true'},
             {'src': '(require [language.string str]) (print (str/blank? "\\n"))', 'output': 'true'},
@@ -873,7 +873,7 @@ class CompileTests(unittest.TestCase):
         INSERT = 'INSERT INTO data (id, col1) VALUES (1, \'something\');'
         SELECT = 'SELECT * FROM data;'
         tests = [
-            {'src': '(require language.sqlite3) (print (language.sqlite3/version))', 'output': f'3.41.2'},
+            {'src': '(require [language.sqlite3 s]) (print (s/version))', 'output': f'3.41.2'},
             {'src': '(require [language.sqlite3 s]) (let [db (s/open ":memory:")] (print (s/close db))', 'output': f'nil'},
             {'src': f'(require [language.sqlite3 sqlite3]) (let [db (sqlite3/open ":memory:")] (sqlite3/execute db "{CREATE}") (sqlite3/execute db "{INSERT}") (print (sqlite3/execute db "{SELECT}")) (sqlite3/close db))', 'output': f'[[1 something]]'},
             {'src': f'(require [language.sqlite3 sqlite3]) (with [db (sqlite3/open ":memory:")] (sqlite3/execute db "{CREATE}") (sqlite3/execute db "{INSERT}") (print (sqlite3/execute db "{SELECT}")))', 'output': f'[[1 something]]'},

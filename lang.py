@@ -1749,8 +1749,7 @@ def compile_form(node, envs):
                             module_name = require.items[0]
                         referred_as = require.items[1].name
                     else:
-                        module_name = require.name
-                        referred_as = require.name
+                        raise Exception(f'require argument needs to a vector')
                     if referred_as in envs[0]['namespaces']:
                         continue # already required, nothing to do
 
