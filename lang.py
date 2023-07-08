@@ -1603,8 +1603,19 @@ def compile_form(node, envs):
                     for referred_as, ns in envs[0]['namespaces'].items():
                         if refer == referred_as:
                             if name in ns:
-                                if callable(ns[name]['function']):
+                                if 'function' in ns[name] and callable(ns[name]['function']):
                                     return ns[name]['function'](rest, envs=envs)
+                                elif 'c_name' in ns[name]:
+                                    f_name = ns[name]['c_name']
+                                    results = [compile_form(n, envs=envs) for n in rest]
+                                    args = 'user_globals'
+                                    if results:
+                                        args += ', ' + ', '.join([r['code'] for r in results])
+                                    result_name = _get_generated_name('u_f_result', envs=envs)
+                                    envs[-1]['temps'].add(result_name)
+                                    envs[-1]['pre'].append(f'  Value {result_name} = {f_name}({args});')
+                                    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+                                    return {'code': result_name}
                                 else:
                                     raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
             if first.name == 'for':
@@ -1758,6 +1769,14 @@ def compile_form(node, envs):
                         if os.path.exists(module_file_name):
                             with open(module_file_name, 'rb') as module_file:
                                 module_code = module_file.read().decode('utf8')
+                            tokens = scan_tokens(module_code)
+                            ast = parse(tokens)
+                            old_ns = envs[0]['current_ns']
+                            envs[0]['current_ns'] = referred_as
+                            envs[0]['namespaces'][referred_as] = {}
+                            for f in ast.forms:
+                                result = compile_form(f, envs=envs)
+                            envs[0]['current_ns'] = old_ns
                         else:
                             raise Exception(f'module {module_name} not found')
                     # evaluate everything in the module, into that namespace
