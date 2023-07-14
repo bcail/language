@@ -1318,7 +1318,7 @@ def fn_c(params, envs, f_name=None):
     envs.append(local_env)
 
     for binding in bindings:
-        local_env['bindings'][binding.name] = None
+        local_env['bindings'][binding.name] = {'c_name': binding.name}
 
     loop_code = _loop(envs, list(local_env['bindings'].keys()), exprs)
 
@@ -1558,6 +1558,28 @@ def new_map_c(node, envs):
     return name
 
 
+def _find_symbol(symbol, envs):
+    current_ns = envs[0]['current_ns']
+    if symbol.name in global_ns:
+        return global_ns[symbol.name]
+    elif symbol.name in envs[0]['namespaces'][current_ns]:
+        return envs[0]['namespaces'][current_ns][symbol.name]
+    elif '/' in symbol.name:
+        refer, name = symbol.name.split('/')
+        if refer:
+            for referred_as, ns in envs[0]['namespaces'].items():
+                if refer == referred_as:
+                    if name in ns:
+                        return ns[name]
+    for env in envs:
+        if symbol.name in env.get('bindings', {}):
+            if env['bindings'][symbol.name]:
+                return env['bindings'][symbol.name]
+            else:
+                # show that we found it, but all we have to return is the symbol itself
+                return symbol
+
+
 def compile_form(node, envs):
     if isinstance(node, list):
         first = node[0]
@@ -1572,44 +1594,24 @@ def compile_form(node, envs):
             envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
             return {'code': result_name}
         elif isinstance(first, Symbol):
-            current_ns = envs[0]['current_ns']
-            if first.name in global_ns:
-                if callable(global_ns[first.name]['function']):
-                    return global_ns[first.name]['function'](rest, envs=envs)
+            symbol = _find_symbol(first, envs)
+            if symbol and isinstance(symbol, dict):
+                if 'function' in symbol and callable(symbol['function']):
+                    return symbol['function'](rest, envs=envs)
+                elif 'c_name' in symbol:
+                    f_name = symbol['c_name']
+                    results = [compile_form(n, envs=envs) for n in rest]
+                    args = 'user_globals'
+                    if results:
+                        args += ', ' + ', '.join([r['code'] for r in results])
+                    result_name = _get_generated_name('u_f_result', envs=envs)
+                    envs[-1]['temps'].add(result_name)
+                    envs[-1]['code'].append(f'  Value {result_name} = {f_name}({args});')
+                    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+                    return {'code': result_name}
                 else:
-                    raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
-            if first.name in envs[0]['namespaces'][current_ns]:
-                f_name = envs[0]['namespaces'][current_ns][first.name]['c_name']
-                results = [compile_form(n, envs=envs) for n in rest]
-                args = 'user_globals'
-                if results:
-                    args += ', ' + ', '.join([r['code'] for r in results])
-                result_name = _get_generated_name('u_f_result', envs=envs)
-                envs[-1]['temps'].add(result_name)
-                envs[-1]['code'].append(f'  Value {result_name} = {f_name}({args});')
-                envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
-                return {'code': result_name}
-            if '/' in first.name:
-                refer, name = first.name.split('/')
-                if refer:
-                    for referred_as, ns in envs[0]['namespaces'].items():
-                        if refer == referred_as:
-                            if name in ns:
-                                if 'function' in ns[name] and callable(ns[name]['function']):
-                                    return ns[name]['function'](rest, envs=envs)
-                                elif 'c_name' in ns[name]:
-                                    f_name = ns[name]['c_name']
-                                    results = [compile_form(n, envs=envs) for n in rest]
-                                    args = 'user_globals'
-                                    if results:
-                                        args += ', ' + ', '.join([r['code'] for r in results])
-                                    result_name = _get_generated_name('u_f_result', envs=envs)
-                                    envs[-1]['temps'].add(result_name)
-                                    envs[-1]['code'].append(f'  Value {result_name} = {f_name}({args});')
-                                    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
-                                    return {'code': result_name}
-                                else:
-                                    raise Exception(f'symbol first in list and not callable: {first.name} -- {env[first.name]}')
+                    raise Exception(f'symbol first in list and not callable: {first.name} -- {symbol}')
+
             if first.name == 'for':
                 bindings = rest[0]
                 binding_name = bindings[0].name
@@ -1768,8 +1770,9 @@ def compile_form(node, envs):
         else:
             raise Exception(f'unhandled list: {node}')
     if isinstance(node, Symbol):
-        if node.name in envs[0]['namespaces']['user']:
-            if envs[0]['namespaces']['user'][node.name]['type'] == 'var':
+        symbol = _find_symbol(node, envs)
+        if symbol:
+            if symbol.get('type') == 'var':
                 name = _get_generated_name('user_global_lookup', envs=envs)
                 envs[0]['temps'].add(name)
                 code = f'  Value {name} = OBJ_VAL(copy_string("{node.name}", {len(node.name)}));'
@@ -1777,17 +1780,8 @@ def compile_form(node, envs):
                 envs[-1]['code'].append(code)
                 envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
                 return {'code': f'map_get(user_globals, {name}, NIL_VAL)'}
-            else:
-                return {'code': envs[0]['namespaces']['user'][node.name]['c_name']}
-        else:
-            for env in envs:
-                if node.name in env.get('bindings', {}):
-                    if env['bindings'][node.name] and 'c_name' in env['bindings'][node.name]:
-                        return {'code': env['bindings'][node.name]['c_name']}
-                    else:
-                        return {'code': node.name}
-        if node.name in global_ns:
-            return {'code': global_ns[node.name]['c_name']}
+            elif 'c_name' in symbol:
+                return {'code': symbol['c_name']}
         raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
         name = new_vector_c(node, envs=envs)
