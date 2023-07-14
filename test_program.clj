@@ -1,5 +1,5 @@
 (require [language.string str]
-         ["test_functions" f])
+         ["test_functions.clj" f])
 
 (let [counts {}]
   (loop [line (read-line)]

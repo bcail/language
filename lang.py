@@ -1753,7 +1753,7 @@ def compile_form(node, envs):
                     if referred_as in envs[0]['namespaces']:
                         continue # already required, nothing to do
 
-                    # find the module file
+                    # find the module
                     if module_name.startswith('language.'):
                         if module_name == 'language.string':
                             envs[0]['namespaces'][referred_as] = copy.deepcopy(language_string_env)
@@ -1764,9 +1764,9 @@ def compile_form(node, envs):
                         else:
                             raise Exception(f'system module {module_name} not found')
                     else:
-                        module_file_name = f'{module_name}.clj'
-                        if os.path.exists(module_file_name):
-                            with open(module_file_name, 'rb') as module_file:
+                        # module_name is the file
+                        if os.path.exists(module_name):
+                            with open(module_name, 'rb') as module_file:
                                 module_code = module_file.read().decode('utf8')
                             tokens = scan_tokens(module_code)
                             ast = parse(tokens)
@@ -1778,8 +1778,6 @@ def compile_form(node, envs):
                             envs[0]['current_ns'] = old_ns
                         else:
                             raise Exception(f'module {module_name} not found')
-                    # evaluate everything in the module, into that namespace
-                    # refer it into this namespace if needed
                 return {'code': ''}
             else:
                 print(f'global: {envs[0]["global"]}')
