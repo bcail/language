@@ -1771,7 +1771,7 @@ def compile_form(node, envs):
                             old_ns = envs[0]['current_ns']
                             envs[0]['current_ns'] = referred_as
                             envs[0]['namespaces'][referred_as] = {}
-                            _compile_forms(module_code, envs=envs)
+                            _compile_forms(module_code, env=envs[0], source_file=module_name)
                             envs[0]['current_ns'] = old_ns
                         else:
                             raise Exception(f'module {module_name} not found')
@@ -3023,33 +3023,31 @@ void free_object(Obj* object) {
 '''
 
 
-def _compile_forms(source, envs=None, source_file=None):
+def _compile_forms(source, env=None, source_file=None):
     tokens = scan_tokens(source)
     ast = parse(tokens)
 
-    if not envs:
-        envs = [
-            {
-                'global': copy.deepcopy(global_compile_env),
-                'namespaces': {'user': {}}, #including required & default user ns
-                'functions': {},
-                'temps': set(),
-                'init': [],
-                'pre': [],
-                'post': [],
-                'bindings': {},
-                'use_sqlite3': False,
-                'current_ns': 'user',
-            }
-        ]
+    if not env:
+        env = {
+            'global': copy.deepcopy(global_compile_env),
+            'namespaces': {'user': {}}, #including required & default user ns
+            'functions': {},
+            'temps': set(),
+            'init': [],
+            'pre': [],
+            'post': [],
+            'bindings': {},
+            'use_sqlite3': False,
+            'current_ns': 'user',
+        }
     for f in ast.forms:
-        compile_form(f, envs=envs)
+        compile_form(f, envs=[env])
 
-    return envs
+    return env
 
 
 def _compile(source, source_file=None):
-    envs = _compile_forms(source, source_file=source_file)
+    env = _compile_forms(source, source_file=source_file)
 
     c_code = basic_includes
 
@@ -3059,34 +3057,34 @@ def _compile(source, source_file=None):
     else:
         c_code += '#include <sys/stat.h>\n'
 
-    if envs[0]['use_sqlite3']:
+    if env['use_sqlite3']:
         c_code += f'#include "sqlite3.h"\n\n'
         c_code += '#define USE_SQLITE3 1'
     c_code += c_types
 
-    if envs[0]['use_sqlite3']:
+    if env['use_sqlite3']:
         c_code += f'#include "lang_sqlite3.h"\n\n'
 
     c_code += '\n\n/* CUSTOM CODE */\n\n'
 
-    if envs[0]['functions']:
-        c_code += '\n\n'.join([f for f in envs[0]['functions'].values()]) + '\n\n'
+    if env['functions']:
+        c_code += '\n\n'.join([f for f in env['functions'].values()]) + '\n\n'
 
     c_code += 'int main(void)\n{'
     c_code += '\n  interned_strings = allocate_map();'
     c_code += '\n  ObjMap* user_globals = allocate_map();\n'
 
-    if envs[0]['init']:
-        c_code += '\n'.join(envs[0]['init'])
+    if env['init']:
+        c_code += '\n'.join(env['init'])
 
-    for name, value in envs[0]['namespaces']['user'].items():
+    for name, value in env['namespaces']['user'].items():
         if value['type'] == 'var':
             c_code += f'\n  map_set(user_globals, OBJ_VAL(copy_string("{name}", {len(name)})), {value["code"]});\n'
 
-    c_code += '\n' + '\n'.join(envs[0]['pre'])
+    c_code += '\n' + '\n'.join(env['pre'])
 
-    if envs[0]['post']:
-        c_code += '\n' + '\n'.join(envs[0]['post'])
+    if env['post']:
+        c_code += '\n' + '\n'.join(env['post'])
     c_code += '\n  free_object((Obj*)user_globals);'
     c_code += '\n  free_object((Obj*)interned_strings);'
     c_code += '\n  return 0;\n}'
@@ -3313,7 +3311,7 @@ def compile_to_c(file_name, output_file_name):
     with open(file_name, 'rb') as f:
         source = f.read().decode('utf8')
 
-    c_program = _compile(source)
+    c_program = _compile(source, source_file=file_name)
 
     with open(output_file_name, mode='wb') as f:
         f.write(c_program.encode('utf8'))
