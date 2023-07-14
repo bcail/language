@@ -1768,13 +1768,10 @@ def compile_form(node, envs):
                         if os.path.exists(module_name):
                             with open(module_name, 'rb') as module_file:
                                 module_code = module_file.read().decode('utf8')
-                            tokens = scan_tokens(module_code)
-                            ast = parse(tokens)
                             old_ns = envs[0]['current_ns']
                             envs[0]['current_ns'] = referred_as
                             envs[0]['namespaces'][referred_as] = {}
-                            for f in ast.forms:
-                                result = compile_form(f, envs=envs)
+                            _compile_forms(module_code, envs=envs)
                             envs[0]['current_ns'] = old_ns
                         else:
                             raise Exception(f'module {module_name} not found')
@@ -3026,32 +3023,33 @@ void free_object(Obj* object) {
 '''
 
 
-def _compile(source):
+def _compile_forms(source, envs=None, source_file=None):
     tokens = scan_tokens(source)
     ast = parse(tokens)
 
-    compiled_forms = []
-    env = {
-        # might want to combine these namespaces in one list/map at some point?
-        'global': copy.deepcopy(global_compile_env),
-        'namespaces': {'user': {}}, #including required & default user ns
-        'functions': {},
-        'temps': set(),
-        'init': [],
-        'pre': [],
-        'post': [],
-        'bindings': {},
-        'use_sqlite3': False,
-        'current_ns': 'user',
-    }
+    if not envs:
+        envs = [
+            {
+                'global': copy.deepcopy(global_compile_env),
+                'namespaces': {'user': {}}, #including required & default user ns
+                'functions': {},
+                'temps': set(),
+                'init': [],
+                'pre': [],
+                'post': [],
+                'bindings': {},
+                'use_sqlite3': False,
+                'current_ns': 'user',
+            }
+        ]
     for f in ast.forms:
-        result = compile_form(f, envs=[env])
-        c = result['code']
-        # hack to check if there's a function call we need to put in
-        if c and '(' in c and ')' in c:
-            if not c.endswith(';'):
-                c = f'{c};'
-            compiled_forms.append(f'  {c}')
+        compile_form(f, envs=envs)
+
+    return envs
+
+
+def _compile(source, source_file=None):
+    envs = _compile_forms(source, source_file=source_file)
 
     c_code = basic_includes
 
@@ -3061,36 +3059,34 @@ def _compile(source):
     else:
         c_code += '#include <sys/stat.h>\n'
 
-    if env['use_sqlite3']:
+    if envs[0]['use_sqlite3']:
         c_code += f'#include "sqlite3.h"\n\n'
         c_code += '#define USE_SQLITE3 1'
     c_code += c_types
 
-    if env['use_sqlite3']:
+    if envs[0]['use_sqlite3']:
         c_code += f'#include "lang_sqlite3.h"\n\n'
 
     c_code += '\n\n/* CUSTOM CODE */\n\n'
 
-    if env['functions']:
-        c_code += '\n\n'.join([f for f in env['functions'].values()]) + '\n\n'
+    if envs[0]['functions']:
+        c_code += '\n\n'.join([f for f in envs[0]['functions'].values()]) + '\n\n'
 
     c_code += 'int main(void)\n{'
     c_code += '\n  interned_strings = allocate_map();'
     c_code += '\n  ObjMap* user_globals = allocate_map();\n'
 
-    if env['init']:
-        c_code += '\n'.join(env['init'])
+    if envs[0]['init']:
+        c_code += '\n'.join(envs[0]['init'])
 
-    for name, value in env['namespaces']['user'].items():
+    for name, value in envs[0]['namespaces']['user'].items():
         if value['type'] == 'var':
             c_code += f'\n  map_set(user_globals, OBJ_VAL(copy_string("{name}", {len(name)})), {value["code"]});\n'
 
-    c_code += '\n' + '\n'.join(env['pre'])
+    c_code += '\n' + '\n'.join(envs[0]['pre'])
 
-    if compiled_forms:
-        c_code += '\n' + '\n'.join(compiled_forms)
-    if env['post']:
-        c_code += '\n' + '\n'.join(env['post'])
+    if envs[0]['post']:
+        c_code += '\n' + '\n'.join(envs[0]['post'])
     c_code += '\n  free_object((Obj*)user_globals);'
     c_code += '\n  free_object((Obj*)interned_strings);'
     c_code += '\n  return 0;\n}'
