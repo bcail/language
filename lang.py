@@ -868,10 +868,7 @@ def if_form_c(params, envs):
     if true_env['code']:
         true_code += '\n  '.join(true_env['code']) + '\n  '
     if isinstance(true_result, tuple) and isinstance(true_result[0], Symbol) and true_result[0].name == 'recur':
-        for e in envs:
-            for b in e.get('bindings', {}).keys():
-                if b.startswith('recur'):
-                    recur_name = b
+        recur_name = envs[0]['recur_points'].pop()
         for r in true_result[1:]:
             true_code += f'  recur_add(AS_RECUR({recur_name}), {r["code"]});\n'
         true_code += f'    {result_name} = {recur_name};'
@@ -895,10 +892,7 @@ def if_form_c(params, envs):
         if false_env['code']:
             false_code += '\n' + '\n  '.join(false_env['code'])
         if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
-            for e in envs:
-                for b in e.get('bindings', {}).keys():
-                    if b.startswith('recur'):
-                        recur_name = b
+            recur_name = envs[0]['recur_points'].pop()
             for r in false_result[1:]:
                 false_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
             false_code += f'\n    {result_name} = {recur_name};'
@@ -966,10 +960,7 @@ def let_c(params, envs):
 
     return_val = ''
     if isinstance(final_result, tuple) and isinstance(final_result[0], Symbol) and final_result[0].name == 'recur':
-        for e in envs:
-            for b in e.get('bindings', {}).keys():
-                if b.startswith('recur'):
-                    recur_name = b
+        recur_name = envs[0]['recur_points'].pop()
         for r in final_result[1:]:
             f_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
         return_val = recur_name
@@ -1020,6 +1011,7 @@ def _loop(envs, bindings, exprs):
 
     if has_recur:
         recur_name = _get_generated_name('recur', envs=envs)
+        envs[0]['recur_points'].append(recur_name)
         envs[-1]['temps'].add(recur_name)
         envs[-1]['bindings'][recur_name] = None
 
@@ -1652,10 +1644,7 @@ def compile_form(node, envs):
 
                 f_code = f'  Value {do_result} = NIL_VAL;'
                 if isinstance(do_exprs[-1], tuple) and isinstance(do_exprs[-1][0], Symbol) and do_exprs[-1][0].name == 'recur':
-                    for e in envs:
-                        for b in e.get('bindings', {}).keys():
-                            if b.startswith('recur'):
-                                recur_name = b
+                    recur_name = envs[0]['recur_points'].pop()
                     for r in do_exprs[-1][1:]:
                         f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
                     f_code += f'\n  {do_result} = {recur_name};'
@@ -1672,7 +1661,6 @@ def compile_form(node, envs):
                 for i in range(0, len(bindings.items), 2):
                     paired_bindings.append(bindings.items[i:i+2])
                 for binding in paired_bindings:
-                    print(f'{binding=}')
                     result = compile_form(binding[1], envs=envs)
                     binding_name = _get_generated_name(base=binding[0].name, envs=envs)
                     result['c_name'] = binding_name
@@ -1682,10 +1670,7 @@ def compile_form(node, envs):
                 result = _get_generated_name('with_result', envs)
                 f_code = f'  Value {result} = NIL_VAL;'
                 if isinstance(exprs[-1], tuple) and isinstance(exprs[-1][0], Symbol) and exprs[-1][0].name == 'recur':
-                    for e in envs:
-                        for b in e.get('bindings', {}).keys():
-                            if b.startswith('recur'):
-                                recur_name = b
+                    recur_name = envs[0]['recur_points'].pop()
                     for r in exprs[-1][1:]:
                         f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
                     f_code += f'\n  {result} = {recur_name};'
@@ -1777,8 +1762,6 @@ def compile_form(node, envs):
                             raise Exception(f'module {module_name} not found')
                 return {'code': ''}
             else:
-                print(f'global: {envs[0]["global"]}')
-                print(f'namespaces: {envs[0]["namespaces"]}')
                 raise Exception(f'unhandled symbol: {first}')
         elif first == TokenType.IF:
             return if_form_c(rest, envs=envs)
@@ -1805,7 +1788,6 @@ def compile_form(node, envs):
                         return {'code': node.name}
         if node.name in global_ns:
             return {'code': global_ns[node.name]['c_name']}
-        print(f'{envs[-1]=}')
         raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Vector):
         name = new_vector_c(node, envs=envs)
@@ -3037,6 +3019,7 @@ def _compile_forms(source, program=None, source_file=None):
             'code': [],
             'post': [],
             'temps': set(),
+            'recur_points': [],
             'bindings': {},
         }
     for f in ast.forms:
