@@ -889,7 +889,7 @@ class CompileTests(unittest.TestCase):
         try:
             result = subprocess.run(cmd.split(), check=True, input=input_.encode('utf8'), capture_output=True)
             result_output = result.stdout.decode('utf8')
-            self.assertEqual(result_output, '{one 2, two 1}')
+            self.assertEqual(result_output, '{one 2, two 1}a')
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f'run_program test failed: {e}\n{e.stderr.decode("utf8")}')
 

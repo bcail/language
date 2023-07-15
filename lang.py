@@ -1773,9 +1773,13 @@ def compile_form(node, envs):
         symbol = _find_symbol(node, envs)
         if symbol:
             if symbol.get('type') == 'var':
+                if '/' in node.name:
+                    full_reference = node.name
+                else:
+                    full_reference = f'{envs[0]["current_ns"]}/{node.name}'
                 name = _get_generated_name('user_global_lookup', envs=envs)
                 envs[0]['temps'].add(name)
-                code = f'  Value {name} = OBJ_VAL(copy_string("{node.name}", {len(node.name)}));'
+                code = f'  Value {name} = OBJ_VAL(copy_string("{full_reference}", {len(full_reference)}));'
                 code += f'\n  inc_ref(AS_OBJ({name}));'
                 envs[-1]['code'].append(code)
                 envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
@@ -3053,9 +3057,11 @@ def _compile(source, source_file=None):
     if program['init']:
         c_code += '\n'.join(program['init'])
 
-    for name, value in program['namespaces']['user'].items():
-        if value['type'] == 'var':
-            c_code += f'\n  map_set(user_globals, OBJ_VAL(copy_string("{name}", {len(name)})), {value["code"]});\n'
+    for referred_as, ns in program['namespaces'].items():
+        for name, value in ns.items():
+            if value.get('type') == 'var':
+                full_reference = f'{referred_as}/{name}'
+                c_code += f'\n  map_set(user_globals, OBJ_VAL(copy_string("{full_reference}", {len(full_reference)})), {value["code"]});\n'
 
     c_code += '\n' + '\n'.join(program['code'])
 

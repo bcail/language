@@ -9,3 +9,5 @@
           (f/process-line counts line))
         (recur (read-line)))))
   (print counts))
+
+(print f/value)
