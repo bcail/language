@@ -3059,7 +3059,7 @@ def _compile(source, source_file=None):
 
     c_code += 'int main(int argc, char *argv[])\n{'
     c_code += '\n  cli_args = allocate_list((uint32_t) argc);'
-    c_code += '\n  for (int i = 0; i < argc; i++) {\n    list_add(cli_args, OBJ_VAL(copy_string(argv[i], strlen(argv[i]))));\n  }'
+    c_code += '\n  for (int i = 0; i < argc; i++) {\n    list_add(cli_args, OBJ_VAL(copy_string(argv[i], (uint32_t) strlen(argv[i]))));\n  }'
     c_code += '\n  interned_strings = allocate_map();'
     c_code += '\n  ObjMap* user_globals = allocate_map();\n'
 
