@@ -1357,6 +1357,10 @@ def readline_c(params, envs):
     return {'code': result_name}
 
 
+def cli_args_c(params, envs):
+    return {'code': 'OBJ_VAL(cli_args)'}
+
+
 def file_open_c(params, envs):
     path = compile_form(params[0], envs=envs)['code']
     mode = 'r'
@@ -1471,6 +1475,7 @@ global_ns = {
     'fn': {'function': fn_c},
     'defn': {'function': defn_c},
     'read-line': {'function': readline_c},
+    'cli-args': {'function': cli_args_c},
     'str': {'function': str_c},
     'file/open': {'function': file_open_c},
     'file/read': {'function': file_read_c},
@@ -2787,6 +2792,8 @@ Value println(Value value) {
   return NIL_VAL;
 }
 
+ObjList* cli_args;
+
 Value readline(void) {
   /* K&R p29 */
   int ch = 0;
@@ -3050,7 +3057,9 @@ def _compile(source, source_file=None):
     if program['functions']:
         c_code += '\n\n'.join([f for f in program['functions'].values()]) + '\n\n'
 
-    c_code += 'int main(void)\n{'
+    c_code += 'int main(int argc, char *argv[])\n{'
+    c_code += '\n  cli_args = allocate_list((uint32_t) argc);'
+    c_code += '\n  for (int i = 0; i < argc; i++) {\n    list_add(cli_args, OBJ_VAL(copy_string(argv[i], strlen(argv[i]))));\n  }'
     c_code += '\n  interned_strings = allocate_map();'
     c_code += '\n  ObjMap* user_globals = allocate_map();\n'
 
@@ -3069,6 +3078,7 @@ def _compile(source, source_file=None):
         c_code += '\n' + '\n'.join(program['post'])
     c_code += '\n  free_object((Obj*)user_globals);'
     c_code += '\n  free_object((Obj*)interned_strings);'
+    c_code += '\n  free_object((Obj*)cli_args);'
     c_code += '\n  return 0;\n}'
 
     return c_code
@@ -3281,9 +3291,12 @@ def build_executable(file_name, output_file_name, with_checks=False):
         sys.exit(1)
 
 
-def run_executable(file_name):
+def run_executable(file_name, cli_args=None):
+    cmd = [f'./{file_name}']
+    if cli_args:
+        cmd.extend(cli_args)
     try:
-        subprocess.run([f'./{file_name}'], check=True)
+        subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
         print(e)
         sys.exit(1)
@@ -3309,6 +3322,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', action='store', dest='output', help='output file')
     parser.add_argument('--with-checks', action='store_true', dest='with_checks', help='build with compiler checks')
     parser.add_argument('file', type=str, nargs='?', help='file to interpret')
+    parser.add_argument('cli_args', type=str, nargs='*', default=[], help='args for running the compiled/built executable')
 
     args = parser.parse_args()
 
@@ -3347,12 +3361,12 @@ if __name__ == '__main__':
                 executable = os.path.join(tmp, 'program')
                 if args.file.endswith('.c'):
                     build_executable(args.file, output_file_name=executable, with_checks=args.with_checks)
-                    run_executable(executable)
+                    run_executable(executable, cli_args=args.cli_args)
                 else:
                     c_file_name = os.path.join(tmp, 'code.c')
                     compile_to_c(Path(args.file), c_file_name)
                     build_executable(c_file_name, output_file_name=executable, with_checks=args.with_checks)
-                    run_executable(executable)
+                    run_executable(executable, cli_args=args.cli_args)
         else:
             print('no file to run')
     else:

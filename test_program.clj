@@ -11,3 +11,6 @@
   (print counts))
 
 (print f/value)
+
+(print (nth (cli-args) 1))
+(print (nth (cli-args) 2))
