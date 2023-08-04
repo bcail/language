@@ -56,6 +56,12 @@ class Symbol:
         return str(self)
 
 
+class Ratio:
+
+    def __init__(self, string):
+        self.numerator, self.denominator = string.split('/')
+
+
 class Var:
 
     def __init__(self, name, value=None):
@@ -129,6 +135,7 @@ class TokenType(Enum):
     STRING = auto()
     NUMBER = auto()
     DOUBLE = auto()
+    RATIO = auto()
     TRUE = auto()
     FALSE = auto()
     NIL = auto()
@@ -136,11 +143,14 @@ class TokenType(Enum):
 
 
 DOUBLE_RE = re.compile('-?\d+\.?\d*')
+RATIO_RE = re.compile('-?\d+/\d+')
 
 
 def _get_token(token_buffer):
     if token_buffer.isdigit() or (token_buffer.startswith('-') and token_buffer[1:].isdigit()):
         return {'type': TokenType.NUMBER, 'lexeme': token_buffer}
+    elif RATIO_RE.match(token_buffer):
+        return {'type': TokenType.RATIO, 'lexeme': token_buffer}
     elif DOUBLE_RE.match(token_buffer):
         return {'type': TokenType.DOUBLE, 'lexeme': token_buffer}
     elif token_buffer == 'true':
@@ -198,15 +208,13 @@ def scan_tokens(source):
                 tokens.append(_get_token(token_buffer))
                 token_buffer = ''
             tokens.append({'type': TokenType.RIGHT_BRACE})
-        elif c in ['+', '-', '*', '/', '=', '>', '<']:
-            token_buffer += c
         elif c in [',', '\n', '\r']:
             pass
         elif c == ':':
             if token_buffer:
                 raise Exception('invalid ":" char')
             token_buffer += c
-        elif c.isalnum() or c in ['?', '.']:
+        elif c.isalnum() or c in ['?', '.', '+', '-', '*', '/', '=', '>', '<']:
             token_buffer += c
         elif c == ' ':
             if token_buffer:
@@ -240,6 +248,8 @@ def _get_node(token):
         return float(token['lexeme'])
     elif token['type'] == TokenType.STRING:
         return token['lexeme']
+    elif token['type'] == TokenType.RATIO:
+        return Ratio(string=token['lexeme'])
     elif token['type'] == TokenType.SYMBOL:
         return Symbol(name=token['lexeme'])
     elif token['type'] == TokenType.KEYWORD:
@@ -1792,6 +1802,8 @@ def compile_form(node, envs):
             elif 'c_name' in symbol:
                 return {'code': symbol['c_name']}
         raise Exception(f'unhandled symbol: {node}')
+    if isinstance(node, Ratio):
+        return {'code': f'ratio_val({node.numerator}, {node.denominator})'}
     if isinstance(node, Vector):
         name = new_vector_c(node, envs=envs)
         return {'code': name}
@@ -1885,6 +1897,7 @@ c_types = '''
 #define OBJ_VAL(object)   ((Value){OBJ, {.obj = (Obj*)object}})
 #define AS_BOOL(value)  ((value).data.boolean)
 #define AS_NUMBER(value)  ((value).data.number)
+#define AS_RATIO(value)  ((value).data.ratio)
 #define AS_RECUR(value)       ((value).data.recur)
 #define AS_FILE(value)       ((value).data.file)
 #define AS_OBJ(value)  ((value).data.obj)
@@ -1896,6 +1909,7 @@ c_types = '''
 #define IS_TOMBSTONE(value)  ((value).type == TOMBSTONE)
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
+#define IS_RATIO(value)  ((value).type == RATIO)
 #define IS_RECUR(value)  ((value).type == RECUR)
 #define IS_ERROR(value)  ((value).type == ERROR)
 #define IS_FILE(value)  ((value).type == FILE_HANDLE)
@@ -1942,6 +1956,7 @@ typedef enum {
   NIL,
   BOOL,
   NUMBER,
+  RATIO,
   RECUR,
   TOMBSTONE,
   ERROR,
@@ -1957,6 +1972,11 @@ typedef struct {
   unsigned char message[7];
 } ErrorInfo;
 
+typedef struct {
+  int32_t numerator;
+  int32_t denominator;
+} Ratio;
+
 typedef struct Recur Recur;
 
 typedef struct {
@@ -1965,6 +1985,7 @@ typedef struct {
     bool boolean;
     double number;
     ErrorInfo err_info;
+    Ratio ratio;
     Obj* obj;
     Recur* recur;
     FILE* file;
@@ -1994,6 +2015,14 @@ Value error_val(unsigned char type, char* message) {
   }
   info.message[6] = '\\0';
   Value v = {ERROR, {.err_info = info}};
+  return v;
+}
+
+Value ratio_val(int32_t numer, int32_t denom) {
+  Ratio ratio;
+  ratio.numerator = numer;
+  ratio.denominator = denom;
+  Value v = {RATIO, {.ratio = ratio}};
   return v;
 }
 
@@ -2738,6 +2767,12 @@ Value print(Value value) {
     } else {
       printf("%g", n);
     }
+  }
+  else if IS_RATIO(value) {
+    Ratio r = AS_RATIO(value);
+    printf("%d", r.numerator);
+    printf("/");
+    printf("%d", r.denominator);
   }
   else if (IS_ERROR(value)) {
     if (value.data.err_info.type == ERROR_DIVIDE_BY_ZERO) {
