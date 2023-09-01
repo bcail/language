@@ -2287,28 +2287,52 @@ Value nil_Q_(Value value) {
   return BOOL_VAL(IS_NIL(value));
 }
 
-Value add_two(Value x, Value y) {
-  if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
-    return error_val(ERROR_TYPE, "      ");
+Value add_two_ratios(Ratio x, Ratio y) {
+  if (x.denominator == y.denominator) {
+    int32_t numerator = x.numerator + y.numerator;
+    return ratio_val(numerator, x.denominator);
+  } else {
+    int32_t numerator = (x.numerator * y.denominator) + (y.numerator * x.denominator);
+    int32_t denominator = x.denominator * y.denominator;
+    return ratio_val(numerator, denominator);
   }
-  return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y));
+}
+
+Value add_two(Value x, Value y) {
+  if (IS_NUMBER(x) && IS_NUMBER(y)) {
+    return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y));
+  }
+  if (IS_RATIO(x) && IS_RATIO(y)) {
+    return add_two_ratios(AS_RATIO(x), AS_RATIO(y));
+  }
+  return error_val(ERROR_TYPE, "      ");
 }
 
 Value add_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
   Value item = numbers_list->values[0];
-  if (!IS_NUMBER(item)) {
-    return error_val(ERROR_TYPE, "      ");
-  }
-  double result = AS_NUMBER(item);
-  for (uint32_t i = 1; i < numbers_list->count; i++) {
-    item = numbers_list->values[i];
-    if (!IS_NUMBER(item)) {
-      return error_val(ERROR_TYPE, "      ");
+  if (IS_NUMBER(item)) {
+    double result = AS_NUMBER(item);
+    for (uint32_t i = 1; i < numbers_list->count; i++) {
+      item = numbers_list->values[i];
+      if (!IS_NUMBER(item)) {
+        return error_val(ERROR_TYPE, "      ");
+      }
+      result += AS_NUMBER(item);
     }
-    result += AS_NUMBER(item);
+    return NUMBER_VAL(result);
+  } else if (IS_RATIO(item)) {
+    Ratio result = AS_RATIO(item);
+    for (uint32_t i = 1; i < numbers_list->count; i++) {
+      item = numbers_list->values[i];
+      if (!IS_RATIO(item)) {
+        return error_val(ERROR_TYPE, "      ");
+      }
+      result = AS_RATIO(add_two_ratios(result, AS_RATIO(item)));
+    }
+    return ratio_val(result.numerator, result.denominator);
   }
-  return NUMBER_VAL(result);
+  return error_val(ERROR_TYPE, "      ");
 }
 
 Value subtract_two(Value x, Value y) {
