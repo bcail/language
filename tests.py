@@ -877,6 +877,14 @@ class CompileTests(unittest.TestCase):
             _run_test(test, self.assertEqual)
             self.assertTrue(os.path.exists(dir_name))
 
+    def test_math_gcd(self):
+        tests = [
+            {'src': '(require [language.math math]) (print (math/gcd 0 0))', 'output': '0'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
     def test_sqlite(self):
         # _build_sqlite([clang_cmd])
         CREATE = 'CREATE TABLE data (id INTEGER PRIMARY KEY, col1 TEXT)'

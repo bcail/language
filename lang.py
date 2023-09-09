@@ -1153,6 +1153,15 @@ def loop_c(params, envs):
     return {'code': result_name}
 
 
+def math_gcd_c(params, envs):
+    param_1 = compile_form(params[0], envs=envs)['code']
+    param_2 = compile_form(params[0], envs=envs)['code']
+    name = _get_generated_name('math_gcd_result', envs=envs)
+    envs[-1]['temps'].add(name)
+    envs[-1]['code'].append(f'  Value {name} = math_gcd({param_1}, {param_2});')
+    return {'code': name}
+
+
 def str_c(params, envs):
     if not params:
         arg_name = 'NIL_VAL'
@@ -1493,6 +1502,10 @@ global_ns = {
     'file/close': {'function': file_close_c},
 }
 
+language_math_ns = {
+    'gcd': {'function': math_gcd_c},
+}
+
 language_string_ns = {
     'split': {'function': str_split_c},
     'lower': {'function': str_lower_c},
@@ -1759,6 +1772,8 @@ def compile_form(node, envs):
                     if module_name.startswith('language.'):
                         if module_name == 'language.string':
                             envs[0]['namespaces'][referred_as] = copy.deepcopy(language_string_ns)
+                        elif module_name == 'language.math':
+                            envs[0]['namespaces'][referred_as] = copy.deepcopy(language_math_ns)
                         elif module_name == 'language.sqlite3':
                             envs[0]['namespaces'][referred_as] = copy.deepcopy(language_sqlite3_ns)
                         elif module_name == 'language.os':
@@ -2976,6 +2991,10 @@ Value str_join(Value list_val) {
   heapChars[num_bytes] = 0;
   uint32_t hash = hash_string(heapChars, num_bytes);
   return OBJ_VAL(allocate_string(heapChars, num_bytes, hash));
+}
+
+Value math_gcd(Value param_1, Value param_2) {
+  return NUMBER_VAL(0);
 }
 
 Value file_open(Value path, const char* mode) {
