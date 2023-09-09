@@ -142,8 +142,8 @@ class TokenType(Enum):
     IF = auto()
 
 
-DOUBLE_RE = re.compile('-?\d+\.?\d*')
-RATIO_RE = re.compile('-?\d+/\d+')
+DOUBLE_RE = re.compile('-?[0-9]+\.?[0-9]*')
+RATIO_RE = re.compile('-?[0-9]+/-?[0-9]+')
 
 
 def _get_token(token_buffer):
