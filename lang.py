@@ -1155,7 +1155,7 @@ def loop_c(params, envs):
 
 def math_gcd_c(params, envs):
     param_1 = compile_form(params[0], envs=envs)['code']
-    param_2 = compile_form(params[0], envs=envs)['code']
+    param_2 = compile_form(params[1], envs=envs)['code']
     name = _get_generated_name('math_gcd_result', envs=envs)
     envs[-1]['temps'].add(name)
     envs[-1]['code'].append(f'  Value {name} = math_gcd({param_1}, {param_2});')
@@ -2302,6 +2302,11 @@ Value nil_Q_(Value value) {
   return BOOL_VAL(IS_NIL(value));
 }
 
+bool double_equal(double x, double y) {
+  double diff = fabs(x - y);
+  return diff < FLOAT_EQUAL_THRESHOLD;
+}
+
 Value add_two_ratios(Ratio x, Ratio y) {
   if (x.denominator == y.denominator) {
     int32_t numerator = x.numerator + y.numerator;
@@ -2402,7 +2407,7 @@ Value divide_two(Value x, Value y) {
   if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
     return error_val(ERROR_TYPE, "      ");
   }
-  if (fabs(AS_NUMBER(y) - 0) < FLOAT_EQUAL_THRESHOLD) {
+  if (double_equal(AS_NUMBER(y), 0)) {
     return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
   }
   return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y));
@@ -2420,7 +2425,7 @@ Value divide_list(Value numbers) {
     if (!IS_NUMBER(item)) {
       return error_val(ERROR_TYPE, "      ");
     }
-    if (fabs(AS_NUMBER(item) - 0) < FLOAT_EQUAL_THRESHOLD) {
+    if (double_equal(AS_NUMBER(item), 0)) {
       return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
     }
     result = result / AS_NUMBER(item);
@@ -2540,10 +2545,7 @@ Value equal(Value x, Value y) {
     return BOOL_VAL(AS_BOOL(x) == AS_BOOL(y));
   }
   else if (IS_NUMBER(x)) {
-    double x_double = AS_NUMBER(x);
-    double y_double = AS_NUMBER(y);
-    double diff = fabs(x_double - y_double);
-    return BOOL_VAL(diff < FLOAT_EQUAL_THRESHOLD);
+    return BOOL_VAL(double_equal(AS_NUMBER(x), AS_NUMBER(y)));
   }
   else if (IS_STRING(x)) {
     ObjString* xString = AS_STRING(x);
@@ -2994,7 +2996,24 @@ Value str_join(Value list_val) {
 }
 
 Value math_gcd(Value param_1, Value param_2) {
-  return NUMBER_VAL(0);
+  double p1 = AS_NUMBER(param_1);
+  double p2 = AS_NUMBER(param_2);
+  if (double_equal(p1, p2)) {
+    return param_1;
+  }
+  // a > b
+  double a = p1;
+  double b = p2;
+  if (p2 > p1) {
+    a = p2;
+    b = p1;
+  }
+  // a - b, b
+  a = a - b;
+  if (double_equal(a, b)) {
+    return NUMBER_VAL(a);
+  }
+  return NUMBER_VAL(1);
 }
 
 Value file_open(Value path, const char* mode) {
