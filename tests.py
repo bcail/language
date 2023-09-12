@@ -881,11 +881,13 @@ class CompileTests(unittest.TestCase):
         tests = [
             {'src': '(require [language.math math]) (print (math/gcd 0 0))', 'output': '0'},
             {'src': '(require [language.math math]) (print (math/gcd 0 1))', 'output': '1'},
+            {'src': '(require [language.math math]) (print (math/gcd 5 0))', 'output': '5'},
             {'src': '(require [language.math math]) (print (math/gcd 1 1))', 'output': '1'},
             {'src': '(require [language.math math]) (print (math/gcd 2 1))', 'output': '1'},
             {'src': '(require [language.math math]) (print (math/gcd 2 2))', 'output': '2'},
             {'src': '(require [language.math math]) (print (math/gcd 2 3))', 'output': '1'},
             {'src': '(require [language.math math]) (print (math/gcd 3 6))', 'output': '3'},
+            {'src': '(require [language.math math]) (print (math/gcd 3 9))', 'output': '3'},
         ]
         for test in tests:
             with self.subTest(test=test):

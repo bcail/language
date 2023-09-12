@@ -3001,6 +3001,12 @@ Value math_gcd(Value param_1, Value param_2) {
   if (double_equal(p1, p2)) {
     return param_1;
   }
+  if (double_equal(p1, 0)) {
+    return param_2;
+  }
+  if (double_equal(p2, 0)) {
+    return param_1;
+  }
   // a > b
   double a = p1;
   double b = p2;
@@ -3009,9 +3015,14 @@ Value math_gcd(Value param_1, Value param_2) {
     b = p1;
   }
   // a - b, b
-  a = a - b;
-  if (double_equal(a, b)) {
-    return NUMBER_VAL(a);
+  while (true) {
+    a = a - b;
+    if (double_equal(a, b)) {
+      return NUMBER_VAL(a);
+    }
+    if (a < b) {
+      break;
+    }
   }
   return NUMBER_VAL(1);
 }
