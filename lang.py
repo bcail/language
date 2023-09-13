@@ -2996,6 +2996,9 @@ Value str_join(Value list_val) {
 }
 
 Value math_gcd(Value param_1, Value param_2) {
+  if (!IS_NUMBER(param_1) || !IS_NUMBER(param_2)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
   double p1 = AS_NUMBER(param_1);
   double p2 = AS_NUMBER(param_2);
   if (double_equal(p1, p2)) {
