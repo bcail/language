@@ -451,6 +451,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(print 1/-10)', 'output': '1/-10'},
             {'src': '(print 1/-10)', 'output': '1/-10'},
             {'src': '(print -1/-10)', 'output': '-1/-10'},
+            {'src': '(print 5/10)', 'output': '1/2'},
+            {'src': '(print 15/50)', 'output': '3/10'},
             {'src': '(print (nil? 0))', 'output': 'false'},
             {'src': '(print (nil? nil))', 'output': 'true'},
         ]
@@ -464,8 +466,8 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (+ 1.5 2.3))', 'output': '3.8'},
             {'src': '(print (+ 1 3 2))', 'output': '6'},
             {'src': '(print (+ 1/10 2/10))', 'output': '3/10'},
-            {'src': '(print (+ 1/10 1/5))', 'output': '15/50'},
-            {'src': '(print (+ 1/10 2/10 2/10))', 'output': '5/10'},
+            {'src': '(print (+ 1/10 1/5))', 'output': '3/10'},
+            {'src': '(print (+ 1/10 2/10 2/10))', 'output': '1/2'},
             {'src': '(print (- 3 2))', 'output': '1'},
             {'src': '(print (- 3.5 2.1))', 'output': '1.4'},
             {'src': '(print (- 6 3 1))', 'output': '2'},
@@ -890,7 +892,9 @@ class CompileTests(unittest.TestCase):
             {'src': '(require [language.math math]) (print (math/gcd 2 2))', 'output': '2'},
             {'src': '(require [language.math math]) (print (math/gcd 2 3))', 'output': '1'},
             {'src': '(require [language.math math]) (print (math/gcd 3 6))', 'output': '3'},
+            {'src': '(require [language.math math]) (print (math/gcd -3 6))', 'output': '3'},
             {'src': '(require [language.math math]) (print (math/gcd 3 9))', 'output': '3'},
+            {'src': '(require [language.math math]) (print (math/gcd 15 50))', 'output': '5'},
         ]
         for test in tests:
             with self.subTest(test=test):

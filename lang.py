@@ -2033,10 +2033,50 @@ Value error_val(unsigned char type, char* message) {
   return v;
 }
 
+int32_t integer_gcd(int32_t a, int32_t b) {
+  if (a < 0) {
+    a = a * -1;
+  }
+  if (b < 0) {
+    b = b * -1;
+  }
+  if (a == b) {
+    return a;
+  }
+  if (a == 0) {
+    return b;
+  }
+  if (b == 0) {
+    return a;
+  }
+  // a must be greater than b
+  if (b > a) {
+    int32_t c = a;
+    a = b;
+    b = c;
+  }
+  // a - b, b
+  while (true) {
+    a = a - b;
+    if (a == b) {
+      return a;
+    }
+    if (a < b) {
+      return a;
+    }
+  }
+}
+
 Value ratio_val(int32_t numer, int32_t denom) {
   Ratio ratio;
-  ratio.numerator = numer;
-  ratio.denominator = denom;
+  int32_t gcd = integer_gcd(numer, denom);
+  if (gcd > 1) {
+    ratio.numerator = numer / gcd;
+    ratio.denominator = denom / gcd;
+  } else {
+    ratio.numerator = numer;
+    ratio.denominator = denom;
+  }
   Value v = {RATIO, {.ratio = ratio}};
   return v;
 }
@@ -3000,35 +3040,6 @@ Value str_join(Value list_val) {
   heapChars[num_bytes] = 0;
   uint32_t hash = hash_string(heapChars, num_bytes);
   return OBJ_VAL(allocate_string(heapChars, num_bytes, hash));
-}
-
-int32_t integer_gcd(int32_t a, int32_t b) {
-  if (a == b) {
-    return a;
-  }
-  if (a == 0) {
-    return b;
-  }
-  if (b == 0) {
-    return a;
-  }
-  // a must be greater than b
-  if (b > a) {
-    int32_t c = a;
-    a = b;
-    b = c;
-  }
-  // a - b, b
-  while (true) {
-    a = a - b;
-    if (a == b) {
-      return a;
-    }
-    if (a < b) {
-      break;
-    }
-  }
-  return 1;
 }
 
 Value math_gcd(Value param_1, Value param_2) {
