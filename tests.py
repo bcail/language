@@ -881,6 +881,7 @@ class CompileTests(unittest.TestCase):
         tests = [
             {'src': '(require [language.math math]) (print (math/gcd "a" 9))', 'output': 'ERROR: Type -       '},
             {'src': '(require [language.math math]) (print (math/gcd 1 "a"))', 'output': 'ERROR: Type -       '},
+            {'src': '(require [language.math math]) (print (math/gcd 1.5 2))', 'output': 'ERROR: Type -       '},
             {'src': '(require [language.math math]) (print (math/gcd 0 0))', 'output': '0'},
             {'src': '(require [language.math math]) (print (math/gcd 0 1))', 'output': '1'},
             {'src': '(require [language.math math]) (print (math/gcd 5 0))', 'output': '5'},

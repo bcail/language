@@ -2789,6 +2789,13 @@ Value map_pairs(ObjMap* map) {
   return OBJ_VAL(pairs);
 }
 
+bool is_integer(double n) {
+  if (ceil(n) == n) {
+    return true;
+  }
+  return false;
+}
+
 Value print(Value value) {
   if IS_NIL(value) {
     printf("nil");
@@ -2803,7 +2810,7 @@ Value print(Value value) {
   }
   else if IS_NUMBER(value) {
     double n = AS_NUMBER(value);
-    if (ceil(n) == n) {
+    if (is_integer(n)) {
       printf("%.f", n);
     } else {
       printf("%g", n);
@@ -3001,26 +3008,29 @@ Value math_gcd(Value param_1, Value param_2) {
   }
   double p1 = AS_NUMBER(param_1);
   double p2 = AS_NUMBER(param_2);
-  if (double_equal(p1, p2)) {
+  if (!is_integer(p1) || !is_integer(p2)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  int32_t a = (int32_t) p1;
+  int32_t b = (int32_t) p2;
+  if (a == b) {
     return param_1;
   }
-  if (double_equal(p1, 0)) {
+  if (a == 0) {
     return param_2;
   }
-  if (double_equal(p2, 0)) {
+  if (b == 0) {
     return param_1;
   }
-  // a > b
-  double a = p1;
-  double b = p2;
+  // a must be greater than b
   if (p2 > p1) {
-    a = p2;
-    b = p1;
+    a = (int32_t) p2;
+    b = (int32_t) p1;
   }
   // a - b, b
   while (true) {
     a = a - b;
-    if (double_equal(a, b)) {
+    if (a == b) {
       return NUMBER_VAL(a);
     }
     if (a < b) {
