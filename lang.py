@@ -3002,6 +3002,35 @@ Value str_join(Value list_val) {
   return OBJ_VAL(allocate_string(heapChars, num_bytes, hash));
 }
 
+int32_t integer_gcd(int32_t a, int32_t b) {
+  if (a == b) {
+    return a;
+  }
+  if (a == 0) {
+    return b;
+  }
+  if (b == 0) {
+    return a;
+  }
+  // a must be greater than b
+  if (b > a) {
+    int32_t c = a;
+    a = b;
+    b = c;
+  }
+  // a - b, b
+  while (true) {
+    a = a - b;
+    if (a == b) {
+      return a;
+    }
+    if (a < b) {
+      break;
+    }
+  }
+  return 1;
+}
+
 Value math_gcd(Value param_1, Value param_2) {
   if (!IS_NUMBER(param_1) || !IS_NUMBER(param_2)) {
     return error_val(ERROR_TYPE, "      ");
@@ -3013,31 +3042,7 @@ Value math_gcd(Value param_1, Value param_2) {
   }
   int32_t a = (int32_t) p1;
   int32_t b = (int32_t) p2;
-  if (a == b) {
-    return param_1;
-  }
-  if (a == 0) {
-    return param_2;
-  }
-  if (b == 0) {
-    return param_1;
-  }
-  // a must be greater than b
-  if (p2 > p1) {
-    a = (int32_t) p2;
-    b = (int32_t) p1;
-  }
-  // a - b, b
-  while (true) {
-    a = a - b;
-    if (a == b) {
-      return NUMBER_VAL(a);
-    }
-    if (a < b) {
-      break;
-    }
-  }
-  return NUMBER_VAL(1);
+  return NUMBER_VAL(integer_gcd(a, b));
 }
 
 Value file_open(Value path, const char* mode) {
