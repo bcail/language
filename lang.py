@@ -3057,7 +3057,11 @@ Value math_gcd(Value param_1, Value param_2) {
 }
 
 Value file_open(Value path, const char* mode) {
+#if defined(WINDOWS)
+  FILE* fp = fopen_s(AS_CSTRING(path), mode);
+#else
   FILE* fp = fopen(AS_CSTRING(path), mode);
+#endif
   return FILE_VAL(fp);
 }
 
