@@ -16,7 +16,7 @@ Value lang_sqlite3_close(Value db) {
   return NIL_VAL;
 }
 
-int process_row(ObjList* results, int num_columns, char** result_strings, char** result_columns) {
+int process_row(void* results, int num_columns, char** result_strings, char** result_columns) {
   ObjList* row = allocate_list((uint32_t) num_columns);
   for (int i=0; i < num_columns; i++) {
     list_add(row, OBJ_VAL(copy_string(result_strings[i], (uint32_t) strlen(result_strings[i]))));
