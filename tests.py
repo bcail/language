@@ -365,7 +365,7 @@ def _run_test(test, assert_equal, sqlite=False):
             ([clang_cmd, '-std=c99'], None, 'clang_regular'),
         ]
         if not QUICK:
-            compilers.append([gcc_cmd, '-std=c99'], None, 'gcc_regular'),
+            compilers.append(([gcc_cmd, '-std=c99'], None, 'gcc_regular'))
     elif platform.system() == 'Windows':
         cc_path = 'clang.exe'
         compilers = [
