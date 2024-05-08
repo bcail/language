@@ -14,6 +14,7 @@ from lang import (
 
 
 SAVE_FAILED = False
+QUICK = False
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
@@ -362,8 +363,9 @@ def _run_test(test, assert_equal, sqlite=False):
     if platform.system() == 'Darwin':
         compilers = [
             ([clang_cmd, '-std=c99'], None, 'clang_regular'),
-            ([gcc_cmd, '-std=c99'], None, 'gcc_regular'),
         ]
+        if not QUICK:
+            compilers.append([gcc_cmd, '-std=c99'], None, 'gcc_regular'),
     elif platform.system() == 'Windows':
         cc_path = 'clang.exe'
         compilers = [
@@ -378,10 +380,13 @@ def _run_test(test, assert_equal, sqlite=False):
             ]
         else:
             compilers = [
-                ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
                 ([clang_cmd, '-std=c99'], None, 'clang_regular'),
-                ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
             ]
+            if not QUICK:
+                compilers.extend([
+                    ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
+                    ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
+                ])
 
     with tempfile.TemporaryDirectory() as tmp:
         c_filename = os.path.join(tmp, 'code.c')
@@ -928,4 +933,7 @@ class CompileTests(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    if len(sys.argv) > 1 and sys.argv[1] == '-q':
+        QUICK = True
+
     unittest.main()
