@@ -18,6 +18,13 @@ Word Counts Performance
 
 Track the performance of a word counts program (https://benhoyt.com/writings/count-words/).
 
+2024-05-08 (Commit 402e3281283633dbd1a7d013bd9f0bf1850a6907)
+$ ./benchmark.py
+Language      | Simple | Optimized | Notes
+------------- | ------ | --------- | -----
+Python        |   2.05 |      1.34 |
+My language   |   2.17 |           |
+
 2023-04-07 (Commit 5510051d74c4315b3ca6fb08ca067d26ec9bb9ea)
 $ ./benchmark.py
 Language      | Simple | Optimized | Notes

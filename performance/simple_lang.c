@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdint.h>
 #include <ctype.h>
@@ -5,6 +6,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <math.h>
+#include <sys/stat.h>
 
 
 #define ALLOCATE(type, count)     (type*)reallocate(NULL, sizeof(type) * (count))
@@ -28,6 +30,7 @@
 #define OBJ_VAL(object)   ((Value){OBJ, {.obj = (Obj*)object}})
 #define AS_BOOL(value)  ((value).data.boolean)
 #define AS_NUMBER(value)  ((value).data.number)
+#define AS_RATIO(value)  ((value).data.ratio)
 #define AS_RECUR(value)       ((value).data.recur)
 #define AS_FILE(value)       ((value).data.file)
 #define AS_OBJ(value)  ((value).data.obj)
@@ -39,16 +42,27 @@
 #define IS_TOMBSTONE(value)  ((value).type == TOMBSTONE)
 #define IS_BOOL(value)  ((value).type == BOOL)
 #define IS_NUMBER(value)  ((value).type == NUMBER)
+#define IS_RATIO(value)  ((value).type == RATIO)
 #define IS_RECUR(value)  ((value).type == RECUR)
+#define IS_ERROR(value)  ((value).type == ERROR)
 #define IS_FILE(value)  ((value).type == FILE_HANDLE)
 #define IS_OBJ(value)  ((value).type == OBJ)
 #define IS_STRING(value)  isObjType(value, OBJ_STRING)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
 #define IS_MAP(value)  isObjType(value, OBJ_MAP)
+#if defined(USE_SQLITE3)
+  #define SQLITE3_VAL(value)   ((Value){SQLITE3_DB, {.db = (sqlite3*)value}})
+  #define IS_SQLITE3(value)  ((value).type == SQLITE3_DB)
+  #define AS_SQLITE3(value)      ((value).data.db)
+#endif
+#define FLOAT_EQUAL_THRESHOLD 1e-7
 #define MAP_EMPTY (-1)
 #define MAP_TOMBSTONE (-2)
 #define MAP_MAX_LOAD 0.75
 #define MAX_LINE 1000
+#define ERROR_GENERAL '\x01'
+#define ERROR_TYPE '\x02'
+#define ERROR_DIVIDE_BY_ZERO '\x03'
 
 void* reallocate(void* pointer, size_t newSize) {
   if (newSize == 0) {
@@ -75,11 +89,26 @@ typedef enum {
   NIL,
   BOOL,
   NUMBER,
+  RATIO,
   RECUR,
   TOMBSTONE,
+  ERROR,
   FILE_HANDLE,
   OBJ,
+#if defined(USE_SQLITE3)
+  SQLITE3_DB,
+#endif
 } ValueType;
+
+typedef struct {
+  unsigned char type;
+  unsigned char message[7];
+} ErrorInfo;
+
+typedef struct {
+  int32_t numerator;
+  int32_t denominator;
+} Ratio;
 
 typedef struct Recur Recur;
 
@@ -88,11 +117,87 @@ typedef struct {
   union {
     bool boolean;
     double number;
+    ErrorInfo err_info;
+    Ratio ratio;
     Obj* obj;
     Recur* recur;
     FILE* file;
+#if defined(USE_SQLITE3)
+    sqlite3* db;
+#endif
   } data;
 } Value;
+
+Value error_val(unsigned char type, char* message) {
+  ErrorInfo info;
+  info.type = type;
+  if (strlen(message) > 5) {
+    info.message[0] = (unsigned char) message[0];
+    info.message[1] = (unsigned char) message[1];
+    info.message[2] = (unsigned char) message[2];
+    info.message[3] = (unsigned char) message[3];
+    info.message[4] = (unsigned char) message[4];
+    info.message[5] = (unsigned char) message[5];
+  } else {
+    info.message[0] = ' ';
+    info.message[1] = ' ';
+    info.message[2] = ' ';
+    info.message[3] = ' ';
+    info.message[4] = ' ';
+    info.message[5] = ' ';
+  }
+  info.message[6] = '\0';
+  Value v = {ERROR, {.err_info = info}};
+  return v;
+}
+
+int32_t integer_gcd(int32_t a, int32_t b) {
+  if (a < 0) {
+    a = a * -1;
+  }
+  if (b < 0) {
+    b = b * -1;
+  }
+  if (a == b) {
+    return a;
+  }
+  if (a == 0) {
+    return b;
+  }
+  if (b == 0) {
+    return a;
+  }
+  // a must be greater than b
+  if (b > a) {
+    int32_t c = a;
+    a = b;
+    b = c;
+  }
+  // a - b, b
+  while (true) {
+    a = a - b;
+    if (a == b) {
+      return a;
+    }
+    if (a < b) {
+      return a;
+    }
+  }
+}
+
+Value ratio_val(int32_t numer, int32_t denom) {
+  Ratio ratio;
+  int32_t gcd = integer_gcd(numer, denom);
+  if (gcd > 1) {
+    ratio.numerator = numer / gcd;
+    ratio.denominator = denom / gcd;
+  } else {
+    ratio.numerator = numer;
+    ratio.denominator = denom;
+  }
+  Value v = {RATIO, {.ratio = ratio}};
+  return v;
+}
 
 static inline bool isObjType(Value value, ObjType type) {
   return IS_OBJ(value) && AS_OBJ(value)->type == type;
@@ -100,21 +205,21 @@ static inline bool isObjType(Value value, ObjType type) {
 
 typedef struct {
   Obj obj;
-  size_t length;
+  uint32_t length;
   uint32_t hash;
   char* chars;
 } ObjString;
 
 struct Recur {
-  size_t count;
-  size_t capacity;
+  uint32_t count;
+  uint32_t capacity;
   Value* values;
 };
 
 typedef struct {
   Obj obj;
-  size_t count;
-  size_t capacity;
+  uint32_t count;
+  uint32_t capacity;
   Value* values;
 } ObjList;
 
@@ -133,16 +238,15 @@ typedef struct {
  */
 
 typedef struct {
-  uint32_t hash;
   Value key;
   Value value;
 } MapEntry;
 
 typedef struct {
   Obj obj;
-  size_t num_entries;
-  size_t indices_capacity;
-  size_t entries_capacity;
+  uint32_t num_entries;
+  uint32_t indices_capacity;
+  uint32_t entries_capacity;
   int32_t* indices; /* start with always using int32 for now */
   MapEntry* entries;
 } ObjMap;
@@ -169,18 +273,73 @@ void dec_ref_and_free(Obj* object) {
   }
 }
 
-static uint32_t hashString(const char* key, size_t length) {
+static uint32_t hash_number(double number) {
   uint32_t hash = 2166136261u;
-  for (size_t i = 0; i < length; i++) {
+
+  char prefix = 'n';
+  hash ^= (uint8_t) prefix;
+  hash *= 16777619;
+
+  char str[100];
+  int32_t num_chars = sprintf(str, "%g", number);
+
+  for (int32_t i = 0; i < num_chars; i++) {
+    hash ^= (uint8_t) str[i];
+    hash *= 16777619;
+  }
+  return hash;
+}
+
+static uint32_t hash_string(const char* key, uint32_t length) {
+  uint32_t hash = 2166136261u;
+
+  char prefix = 's';
+  hash ^= (uint8_t) prefix;
+  hash *= 16777619;
+
+  for (uint32_t i = 0; i < length; i++) {
     hash ^= (uint8_t)key[i];
     hash *= 16777619;
   }
   return hash;
 }
 
+uint32_t _hash(Value v) {
+  if (IS_NIL(v)) {
+    uint32_t hash = 2166136261u;
+    hash ^= (uint8_t) 0;
+    hash *= 16777619;
+    return hash;
+  }
+  else if (IS_BOOL(v)) {
+    uint32_t hash = 2166136261u;
+    if (AS_BOOL(v) == false) {
+      hash ^= (uint8_t) 1;
+    } else {
+      hash ^= (uint8_t) 2;
+    }
+    hash *= 16777619;
+    return hash;
+  }
+  else if (IS_NUMBER(v)) {
+    return hash_number(AS_NUMBER(v));
+  }
+  else if (IS_STRING(v)) {
+    ObjString* s = AS_STRING(v);
+    return s->hash;
+  }
+  else {
+    return 0;
+  }
+}
+
+Value hash(Value v) {
+  return NUMBER_VAL((double) (_hash(v)));
+}
+
 Value map_set(ObjMap* map, Value key, Value value);
 
-static ObjString* allocate_string(char* chars, size_t length, uint32_t hash) {
+static ObjString* allocate_string(char* chars, uint32_t length, uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->hash = hash;
@@ -191,7 +350,7 @@ static ObjString* allocate_string(char* chars, size_t length, uint32_t hash) {
   return string;
 }
 
-ObjString* find_interned_string(const char* chars, size_t length, uint32_t hash) {
+ObjString* find_interned_string(const char* chars, uint32_t length, uint32_t hash) {
   if (interned_strings->num_entries == 0) { return NULL; }
   uint32_t index = hash % (uint32_t)interned_strings->indices_capacity;
   for (;;) {
@@ -202,7 +361,7 @@ ObjString* find_interned_string(const char* chars, size_t length, uint32_t hash)
     ObjString* key_string = AS_STRING(entry.key);
     if (key_string->length == length &&
         key_string->hash == hash &&
-        memcmp(key_string->chars, chars, length) == 0) {
+        memcmp(key_string->chars, chars, (size_t)length) == 0) {
       // We found it.
       return key_string;
     }
@@ -213,8 +372,8 @@ ObjString* find_interned_string(const char* chars, size_t length, uint32_t hash)
   return NULL;
 }
 
-ObjString* copyString(const char* chars, size_t length) {
-  uint32_t hash = hashString(chars, length);
+ObjString* copy_string(const char* chars, uint32_t length) {
+  uint32_t hash = hash_string(chars, length);
   if (length < 4) {
     ObjString* interned = find_interned_string(chars, length, hash);
     if (interned != NULL) {
@@ -222,15 +381,15 @@ ObjString* copyString(const char* chars, size_t length) {
     }
   }
   char* heapChars = ALLOCATE(char, length + 1);
-  memcpy(heapChars, chars, length);
+  memcpy(heapChars, chars, (size_t)length);
   heapChars[length] = 0; /* terminate it w/ NULL, so we can pass c-string to functions that need it */
   return allocate_string(heapChars, length, hash);
 }
 
-ObjList* allocate_list(size_t initial_capacity) {
+ObjList* allocate_list(uint32_t initial_capacity) {
   ObjList* list = ALLOCATE_OBJ(ObjList, OBJ_LIST);
   list->count = 0;
-  list->capacity = (size_t) initial_capacity;
+  list->capacity = initial_capacity;
   if (initial_capacity == 0) {
     list->values = NULL;
   } else {
@@ -241,7 +400,7 @@ ObjList* allocate_list(size_t initial_capacity) {
 
 void list_add(ObjList* list, Value item) {
   if (list->capacity < list->count + 1) {
-    size_t oldCapacity = list->capacity;
+    uint32_t oldCapacity = list->capacity;
     list->capacity = GROW_CAPACITY(oldCapacity);
     list->values = GROW_ARRAY(Value, list->values, oldCapacity, list->capacity);
   }
@@ -254,17 +413,16 @@ void list_add(ObjList* list, Value item) {
 }
 
 Value list_count(Value list) {
-  return NUMBER_VAL((int) AS_LIST(list)->count);
+  return NUMBER_VAL((double) AS_LIST(list)->count);
 }
 
-Value list_get(Value list, Value index) {
-  if (AS_NUMBER(index) < 0) {
+Value list_get(Value list, int32_t index) {
+  if (index < 0) {
     return NIL_VAL;
   }
-  /* size_t is the unsigned integer type returned by the sizeof operator */
-  size_t num_index = (size_t) AS_NUMBER(index);
-  if (num_index < AS_LIST(list)->count) {
-    return AS_LIST(list)->values[num_index];
+
+  if ((uint32_t) index < AS_LIST(list)->count) {
+    return AS_LIST(list)->values[index];
   }
   else {
     return NIL_VAL;
@@ -273,10 +431,10 @@ Value list_get(Value list, Value index) {
 
 Value list_remove(Value list, Value index) {
   ObjList* obj_list = AS_LIST(list);
-  if (AS_NUMBER(index) < 0 || (size_t) AS_NUMBER(index) > obj_list->count) {
+  if (AS_NUMBER(index) < 0 || (uint32_t) AS_NUMBER(index) > obj_list->count) {
     return NIL_VAL;
   }
-  size_t i = (size_t) AS_NUMBER(index);
+  uint32_t i = (uint32_t) AS_NUMBER(index);
   while (i < obj_list->count) {
     if ((i+1) == obj_list->count) {
       obj_list->values[i] = NIL_VAL;
@@ -289,7 +447,7 @@ Value list_remove(Value list, Value index) {
   return list;
 }
 
-void swap(Value v[], size_t i, size_t j) {
+void swap(Value v[], uint32_t i, uint32_t j) {
   if (i == j) {
     return;
   }
@@ -302,18 +460,145 @@ Value nil_Q_(Value value) {
   return BOOL_VAL(IS_NIL(value));
 }
 
-Value add(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y)); }
-Value subtract(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y)); }
-Value multiply(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y)); }
-Value divide(Value x, Value y) { return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y)); }
+bool double_equal(double x, double y) {
+  double diff = fabs(x - y);
+  return diff < FLOAT_EQUAL_THRESHOLD;
+}
+
+Value add_two_ratios(Ratio x, Ratio y) {
+  if (x.denominator == y.denominator) {
+    int32_t numerator = x.numerator + y.numerator;
+    return ratio_val(numerator, x.denominator);
+  } else {
+    int32_t numerator = (x.numerator * y.denominator) + (y.numerator * x.denominator);
+    int32_t denominator = x.denominator * y.denominator;
+    return ratio_val(numerator, denominator);
+  }
+}
+
+Value add_two(Value x, Value y) {
+  if (IS_NUMBER(x) && IS_NUMBER(y)) {
+    return NUMBER_VAL(AS_NUMBER(x) + AS_NUMBER(y));
+  }
+  if (IS_RATIO(x) && IS_RATIO(y)) {
+    return add_two_ratios(AS_RATIO(x), AS_RATIO(y));
+  }
+  return error_val(ERROR_TYPE, "      ");
+}
+
+Value add_list(Value numbers) {
+  ObjList* numbers_list = AS_LIST(numbers);
+  Value item = numbers_list->values[0];
+  if (IS_NUMBER(item)) {
+    double result = AS_NUMBER(item);
+    for (uint32_t i = 1; i < numbers_list->count; i++) {
+      item = numbers_list->values[i];
+      if (!IS_NUMBER(item)) {
+        return error_val(ERROR_TYPE, "      ");
+      }
+      result += AS_NUMBER(item);
+    }
+    return NUMBER_VAL(result);
+  } else if (IS_RATIO(item)) {
+    Ratio result = AS_RATIO(item);
+    for (uint32_t i = 1; i < numbers_list->count; i++) {
+      item = numbers_list->values[i];
+      if (!IS_RATIO(item)) {
+        return error_val(ERROR_TYPE, "      ");
+      }
+      result = AS_RATIO(add_two_ratios(result, AS_RATIO(item)));
+    }
+    return ratio_val(result.numerator, result.denominator);
+  }
+  return error_val(ERROR_TYPE, "      ");
+}
+
+Value subtract_two(Value x, Value y) {
+  if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y));
+}
+
+Value subtract_list(Value numbers) {
+  ObjList* numbers_list = AS_LIST(numbers);
+  Value item = numbers_list->values[0];
+  if (!IS_NUMBER(item)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  double result = AS_NUMBER(item);
+  for (uint32_t i = 1; i < numbers_list->count; i++) {
+    item = numbers_list->values[i];
+    if (!IS_NUMBER(item)) {
+      return error_val(ERROR_TYPE, "      ");
+    }
+    result = result - AS_NUMBER(item);
+  }
+  return NUMBER_VAL(result);
+}
+
+Value multiply_two(Value x, Value y) {
+  if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y));
+}
+
+Value multiply_list(Value numbers) {
+  ObjList* numbers_list = AS_LIST(numbers);
+  Value item = numbers_list->values[0];
+  if (!IS_NUMBER(item)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  double result = AS_NUMBER(item);
+  for (uint32_t i = 1; i < numbers_list->count; i++) {
+    item = numbers_list->values[i];
+    if (!IS_NUMBER(item)) {
+      return error_val(ERROR_TYPE, "      ");
+    }
+    result = result * AS_NUMBER(item);
+  }
+  return NUMBER_VAL(result);
+}
+
+Value divide_two(Value x, Value y) {
+  if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  if (double_equal(AS_NUMBER(y), 0)) {
+    return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
+  }
+  return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y));
+}
+
+Value divide_list(Value numbers) {
+  ObjList* numbers_list = AS_LIST(numbers);
+  Value item = numbers_list->values[0];
+  if (!IS_NUMBER(item)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  double result = AS_NUMBER(item);
+  for (uint32_t i = 1; i < numbers_list->count; i++) {
+    item = numbers_list->values[i];
+    if (!IS_NUMBER(item)) {
+      return error_val(ERROR_TYPE, "      ");
+    }
+    if (double_equal(AS_NUMBER(item), 0)) {
+      return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
+    }
+    result = result / AS_NUMBER(item);
+  }
+  return NUMBER_VAL(result);
+}
+
 Value greater(ObjMap* user_globals, Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) > AS_NUMBER(y)); }
 Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBER(y)); }
 Value less_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) <= AS_NUMBER(y)); }
 Value less(ObjMap* user_globals, Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y)); }
 
-void quick_sort(ObjMap* user_globals, Value v[], size_t left, size_t right, Value (*compare) (ObjMap*, Value, Value)) {
+void quick_sort(ObjMap* user_globals, Value v[], uint32_t left, uint32_t right, Value (*compare) (ObjMap*, Value, Value)) {
   /* C Programming Language K&R p87*/
-  size_t i, last;
+  uint32_t i, last;
   if (left >= right) {
     return;
   }
@@ -337,7 +622,7 @@ void quick_sort(ObjMap* user_globals, Value v[], size_t left, size_t right, Valu
 
 Value list_sort(ObjMap* user_globals, Value list, Value (*compare) (ObjMap*, Value, Value)) {
   ObjList* lst = AS_LIST(list);
-  quick_sort(user_globals, lst->values, (size_t)0, (lst->count)-1, *compare);
+  quick_sort(user_globals, lst->values, 0, (lst->count)-1, *compare);
   return OBJ_VAL(lst);
 }
 
@@ -348,7 +633,7 @@ void recur_init(Recur* recur) {
 }
 
 void recur_free(Recur* recur) {
-  for (size_t i = 0; i < recur->count; i++) {
+  for (uint32_t i = 0; i < recur->count; i++) {
     Value v = recur->values[i];
     if (IS_OBJ(v)) {
       dec_ref_and_free(AS_OBJ(v));
@@ -360,7 +645,7 @@ void recur_free(Recur* recur) {
 
 void recur_add(Recur* recur, Value item) {
   if (recur->capacity < recur->count + 1) {
-    size_t oldCapacity = recur->capacity;
+    uint32_t oldCapacity = recur->capacity;
     recur->capacity = GROW_CAPACITY(oldCapacity);
     recur->values = GROW_ARRAY(Value, recur->values, oldCapacity, recur->capacity);
   }
@@ -372,19 +657,13 @@ void recur_add(Recur* recur, Value item) {
   }
 }
 
-Value recur_get(Value recur, Value index) {
-  /* size_t is the unsigned integer type returned by the sizeof operator */
-  size_t num_index = (size_t) AS_NUMBER(index);
-  if (num_index < AS_RECUR(recur)->count) {
-    return AS_RECUR(recur)->values[num_index];
+Value recur_get(Value recur, uint32_t index) {
+  if (index < AS_RECUR(recur)->count) {
+    return AS_RECUR(recur)->values[index];
   }
   else {
     return NIL_VAL;
   }
-}
-
-Value recur_count(Value recur) {
-  return NUMBER_VAL((int) AS_RECUR(recur)->count);
 }
 
 ObjMap* allocate_map(void) {
@@ -398,7 +677,7 @@ ObjMap* allocate_map(void) {
 }
 
 Value map_count(Value map) {
-  return NUMBER_VAL((int) AS_MAP(map)->num_entries);
+  return NUMBER_VAL((double) AS_MAP(map)->num_entries);
 }
 
 bool is_truthy(Value value) {
@@ -424,16 +703,13 @@ Value equal(Value x, Value y) {
     return BOOL_VAL(AS_BOOL(x) == AS_BOOL(y));
   }
   else if (IS_NUMBER(x)) {
-    double x_double = AS_NUMBER(x);
-    double y_double = AS_NUMBER(y);
-    double diff = fabs(x_double - y_double);
-    return BOOL_VAL(diff < 1e-7);
+    return BOOL_VAL(double_equal(AS_NUMBER(x), AS_NUMBER(y)));
   }
   else if (IS_STRING(x)) {
     ObjString* xString = AS_STRING(x);
     ObjString* yString = AS_STRING(y);
     if ((xString->length == yString->length) &&
-        (memcmp(xString->chars, yString->chars, xString->length) == 0)) {
+        (memcmp(xString->chars, yString->chars, (size_t)xString->length) == 0)) {
       return BOOL_VAL(true);
     }
     return BOOL_VAL(false);
@@ -443,9 +719,9 @@ Value equal(Value x, Value y) {
     ObjList* yList = AS_LIST(y);
     if (xList->count == yList->count) {
       Value num_items = list_count(x);
-      for (int i = 0; i < AS_NUMBER(num_items); i++) {
-        Value xItem = list_get(x, NUMBER_VAL(i));
-        Value yItem = list_get(y, NUMBER_VAL(i));
+      for (int32_t i = 0; i < AS_NUMBER(num_items); i++) {
+        Value xItem = list_get(x, i);
+        Value yItem = list_get(y, i);
         if (!AS_BOOL(equal(xItem, yItem))) {
           return BOOL_VAL(false);
         }
@@ -457,13 +733,12 @@ Value equal(Value x, Value y) {
   else if (IS_MAP(x)) {
     ObjMap* xMap = AS_MAP(x);
     ObjMap* yMap = AS_MAP(y);
-    size_t x_num_items = xMap->num_entries;
-    size_t y_num_items = yMap->num_entries;
+    uint32_t x_num_items = xMap->num_entries;
+    uint32_t y_num_items = yMap->num_entries;
     if (x_num_items != y_num_items) {
       return BOOL_VAL(false);
     }
-    size_t x_num_entries = xMap->num_entries;
-    for (size_t i = 0; i < x_num_entries; i++) {
+    for (uint32_t i = 0; i < xMap->num_entries; i++) {
       MapEntry x_entry = xMap->entries[i];
       MapEntry y_entry = yMap->entries[i];
       if (!AS_BOOL(equal(x_entry.key, y_entry.key))) {
@@ -480,43 +755,38 @@ Value equal(Value x, Value y) {
   }
 }
 
-static int32_t find_indices_index(int32_t* indices, MapEntry* entries, size_t capacity, Value key) {
+static int32_t find_indices_index(int32_t* indices, MapEntry* entries, uint32_t capacity, Value key) {
   /* hash the key and get an index
    * - if indices[index] is empty, return it
    * - if indices[index] points to an entry in entries with a hash that matches our hash, return index
    * Otherwise, keep adding one till we get to the correct key or an empty slot. */
 
-  ObjString* key_string = AS_STRING(key);
-
-  uint32_t index = key_string->hash % (uint32_t) capacity;
+  uint32_t index = _hash(key) % capacity;
   for (;;) {
     if (indices[index] == MAP_EMPTY) {
       return (int32_t) index;
     }
-    ObjString* entry_key_string = AS_STRING(entries[indices[index]].key);
-    if (key_string->length == entry_key_string->length &&
-        key_string->hash == entry_key_string->hash &&
-        memcmp(key_string->chars, entry_key_string->chars, key_string->length) == 0) {
+    if (AS_BOOL(equal(key, entries[indices[index]].key))) {
       return (int32_t) index;
     }
 
-    index = (index + 1) % (uint32_t)capacity;
+    index = (index + 1) % capacity;
   }
 }
 
-static void adjustCapacity(ObjMap* map, size_t capacity) {
+static void adjustCapacity(ObjMap* map, uint32_t capacity) {
   // allocate new space
   int32_t* indices = ALLOCATE(int32_t, capacity);
   MapEntry* entries = ALLOCATE(MapEntry, capacity);
 
   // initialize all indices to MAP_EMPTY
-  for (size_t i = 0; i < capacity; i++) {
+  for (uint32_t i = 0; i < capacity; i++) {
     indices[i] = MAP_EMPTY;
   }
 
   // copy entries over to new space, filling in indices slots as well
-  size_t num_entries = map->num_entries;
-  size_t entries_index = 0;
+  uint32_t num_entries = map->num_entries;
+  uint32_t entries_index = 0;
   for (; entries_index < num_entries; entries_index++) {
     // find new index
     int32_t indices_index = find_indices_index(indices, entries, capacity, map->entries[entries_index].key);
@@ -526,7 +796,6 @@ static void adjustCapacity(ObjMap* map, size_t capacity) {
 
   // fill in remaining entries with nil values
   for (; entries_index < capacity; entries_index++) {
-    entries[entries_index].hash = 0;
     entries[entries_index].key = NIL_VAL;
     entries[entries_index].value = NIL_VAL;
   }
@@ -543,7 +812,7 @@ static void adjustCapacity(ObjMap* map, size_t capacity) {
 Value map_set(ObjMap* map, Value key, Value value) {
   /* keep indices & entries same number of entries for now */
   if ((double)map->num_entries + 1 > (double)map->indices_capacity * MAP_MAX_LOAD) {
-    size_t capacity = GROW_CAPACITY(map->indices_capacity);
+    uint32_t capacity = GROW_CAPACITY(map->indices_capacity);
     adjustCapacity(map, capacity);
   }
 
@@ -573,7 +842,6 @@ Value map_set(ObjMap* map, Value key, Value value) {
     dec_ref_and_free(AS_OBJ(entry->value));
   }
 
-  entry->hash = AS_STRING(key)->hash;
   entry->key = key;
   entry->value = value;
   return OBJ_VAL(map);
@@ -648,35 +916,42 @@ Value map_get(ObjMap* map, Value key, Value defaultVal) {
 }
 
 Value map_keys(ObjMap* map) {
-  size_t num_entries = map->num_entries;
-  ObjList* keys = allocate_list(num_entries);
-  for (size_t i = 0; i < num_entries; i++) {
+  uint32_t num_entries = map->num_entries;
+  ObjList* keys = allocate_list((uint32_t) num_entries);
+  for (uint32_t i = 0; i < num_entries; i++) {
     list_add(keys, map->entries[i].key);
   }
   return OBJ_VAL(keys);
 }
 
 Value map_vals(ObjMap* map) {
-  size_t num_entries = map->num_entries;
-  ObjList* vals = allocate_list(num_entries);
-  for (size_t i = 0; i < num_entries; i++) {
+  uint32_t num_entries = map->num_entries;
+  ObjList* vals = allocate_list((uint32_t) num_entries);
+  for (uint32_t i = 0; i < num_entries; i++) {
     list_add(vals, map->entries[i].value);
   }
   return OBJ_VAL(vals);
 }
 
 Value map_pairs(ObjMap* map) {
-  size_t num_entries = map->num_entries;
-  ObjList* pairs = allocate_list(num_entries);
-  for (size_t i = 0; i < num_entries; i++) {
+  uint32_t num_entries = map->num_entries;
+  ObjList* pairs = allocate_list((uint32_t) num_entries);
+  for (uint32_t i = 0; i < num_entries; i++) {
     if (!AS_BOOL(equal(map->entries[i].key, NIL_VAL))) {
-      ObjList* pair = allocate_list((size_t) 2);
+      ObjList* pair = allocate_list((uint32_t) 2);
       list_add(pair, map->entries[i].key);
       list_add(pair, map->entries[i].value);
       list_add(pairs, OBJ_VAL(pair));
     }
   }
   return OBJ_VAL(pairs);
+}
+
+bool is_integer(double n) {
+  if (ceil(n) == n) {
+    return true;
+  }
+  return false;
 }
 
 Value print(Value value) {
@@ -692,26 +967,46 @@ Value print(Value value) {
     }
   }
   else if IS_NUMBER(value) {
-    printf("%g", AS_NUMBER(value));
+    double n = AS_NUMBER(value);
+    if (is_integer(n)) {
+      printf("%.f", n);
+    } else {
+      printf("%g", n);
+    }
+  }
+  else if IS_RATIO(value) {
+    Ratio r = AS_RATIO(value);
+    printf("%d", r.numerator);
+    printf("/");
+    printf("%d", r.denominator);
+  }
+  else if (IS_ERROR(value)) {
+    if (value.data.err_info.type == ERROR_DIVIDE_BY_ZERO) {
+      printf("ERROR: DivideByZero - %s", value.data.err_info.message);
+    } else if (value.data.err_info.type == ERROR_TYPE) {
+      printf("ERROR: Type - %s", value.data.err_info.message);
+    } else {
+      printf("ERROR: General - %s", value.data.err_info.message);
+    }
   }
   else if (IS_LIST(value)) {
     Value num_items = list_count(value);
     printf("[");
     if (AS_NUMBER(num_items) > 0) {
-      print(list_get(value, NUMBER_VAL(0)));
+      print(list_get(value, 0));
     }
     for (int i = 1; i < AS_NUMBER(num_items); i++) {
       printf(" ");
-      print(list_get(value, NUMBER_VAL(i)));
+      print(list_get(value, i));
     }
     printf("]");
   }
   else if (IS_MAP(value)) {
     ObjMap* map = AS_MAP(value);
-    size_t num_entries = map->num_entries;
+    uint32_t num_entries = map->num_entries;
     printf("{");
     bool first_entry = true;
-    for (size_t i = 0; i < num_entries; i++) {
+    for (uint32_t i = 0; i < num_entries; i++) {
       if (IS_TOMBSTONE(map->entries[i].key)) {
         num_entries++;
         continue;
@@ -738,18 +1033,20 @@ Value println(Value value) {
   return NIL_VAL;
 }
 
+ObjList* cli_args;
+
 Value readline(void) {
   /* K&R p29 */
   int ch = 0;
   char buffer[MAX_LINE];
-  int num_chars;
+  uint32_t num_chars;
   for (num_chars=0; num_chars<(MAX_LINE-1) && (ch=getchar()) != EOF && ch != '\n'; num_chars++) {
     buffer[num_chars] = (char) ch;
   }
   if ((ch == EOF) && (num_chars == 0)) {
     return NIL_VAL;
   }
-  Value result = OBJ_VAL(copyString(buffer, (size_t) num_chars));
+  Value result = OBJ_VAL(copy_string(buffer, num_chars));
   inc_ref(AS_OBJ(result));
   return result;
 }
@@ -772,7 +1069,7 @@ Value str_blank(Value string) {
 
 Value str_lower(Value string) {
   ObjString* s = AS_STRING(string);
-  ObjString* s_lower = copyString(s->chars, s->length);
+  ObjString* s_lower = copy_string(s->chars, s->length);
   for (int i=0; s_lower->chars[i] != '\0'; i++) {
     s_lower->chars[i] = (char) tolower((int) s_lower->chars[i]);
   }
@@ -781,12 +1078,12 @@ Value str_lower(Value string) {
 
 Value str_split(Value string) {
   ObjString* s = AS_STRING(string);
-  ObjList* splits = allocate_list((size_t) 0);
-  size_t split_length = 0;
+  ObjList* splits = allocate_list((uint32_t) 0);
+  uint32_t split_length = 0;
   int split_start_index = 0;
   for (int i=0; s->chars[i] != '\0'; i++) {
     if (s->chars[i] == ' ') {
-      ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
+      ObjString* split = copy_string(&(s->chars[split_start_index]), split_length);
       list_add(splits, OBJ_VAL(split));
       split_start_index = i + 1;
       split_length = 0;
@@ -795,7 +1092,7 @@ Value str_split(Value string) {
       split_length++;
     }
   }
-  ObjString* split = copyString(&(s->chars[split_start_index]), split_length);
+  ObjString* split = copy_string(&(s->chars[split_start_index]), split_length);
   list_add(splits, OBJ_VAL(split));
   return OBJ_VAL(splits);
 }
@@ -810,25 +1107,25 @@ Value str_str(Value v) {
   Value s;
   if (IS_BOOL(v)) {
     if (AS_BOOL(v)) {
-      s = OBJ_VAL(copyString("true", (size_t)4));
+      s = OBJ_VAL(copy_string("true", 4));
     }
     else {
-      s = OBJ_VAL(copyString("false", (size_t)5));
+      s = OBJ_VAL(copy_string("false", 5));
     }
   }
   else if (IS_NUMBER(v)) {
     char str[100];
-    int num_chars = sprintf(str, "%g", AS_NUMBER(v));
-    s = OBJ_VAL(copyString(str, (size_t)num_chars));
+    int32_t num_chars = sprintf(str, "%g", AS_NUMBER(v));
+    s = OBJ_VAL(copy_string(str, (uint32_t) num_chars));
   }
   else if (IS_LIST(v)) {
-    s = OBJ_VAL(copyString("[]", (size_t)2));
+    s = OBJ_VAL(copy_string("[]", 2));
   }
   else if (IS_MAP(v)) {
-    s = OBJ_VAL(copyString("{}", (size_t)2));
+    s = OBJ_VAL(copy_string("{}", 2));
   }
   else {
-    s = OBJ_VAL(copyString("", (size_t)0));
+    s = OBJ_VAL(copy_string("", 0));
   }
   inc_ref(AS_OBJ(s));
   return s;
@@ -837,10 +1134,10 @@ Value str_str(Value v) {
 Value str_join(Value list_val) {
   ObjList* list = AS_LIST(list_val);
 
-  size_t num_bytes = 0;
+  uint32_t num_bytes = 0;
 
-  for (size_t i = 0; i < list->count; i++) {
-    Value v = list_get(list_val, NUMBER_VAL((double)i));
+  for (uint32_t i = 0; i < list->count; i++) {
+    Value v = list_get(list_val, (int32_t)i);
     Value v_str = str_str(v);
     num_bytes = num_bytes + AS_STRING(v_str)->length;
     dec_ref_and_free(AS_OBJ(v_str));
@@ -849,18 +1146,32 @@ Value str_join(Value list_val) {
     }
   }
 
-  char* heapChars = ALLOCATE(char, num_bytes+1);
+  char* heapChars = ALLOCATE(char, (size_t)(num_bytes+1));
   char* start_char = heapChars;
 
-  for (size_t i = 0; i < list->count; i++) {
-    Value v = list_get(list_val, NUMBER_VAL((double)i));
+  for (uint32_t i = 0; i < list->count; i++) {
+    Value v = list_get(list_val, (int32_t)i);
     ObjString* s = AS_STRING(str_str(v));
-    memcpy(start_char, s->chars, s->length);
+    memcpy(start_char, s->chars, (size_t)s->length);
     start_char = start_char + s->length;
   }
   heapChars[num_bytes] = 0;
-  uint32_t hash = hashString(heapChars, num_bytes);
+  uint32_t hash = hash_string(heapChars, num_bytes);
   return OBJ_VAL(allocate_string(heapChars, num_bytes, hash));
+}
+
+Value math_gcd(Value param_1, Value param_2) {
+  if (!IS_NUMBER(param_1) || !IS_NUMBER(param_2)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  double p1 = AS_NUMBER(param_1);
+  double p2 = AS_NUMBER(param_2);
+  if (!is_integer(p1) || !is_integer(p2)) {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  int32_t a = (int32_t) p1;
+  int32_t b = (int32_t) p2;
+  return NUMBER_VAL(integer_gcd(a, b));
 }
 
 Value file_open(Value path, const char* mode) {
@@ -871,7 +1182,7 @@ Value file_open(Value path, const char* mode) {
 Value file_read(Value file) {
   int ch = 0;
   char buffer[MAX_LINE];
-  int num_chars;
+  uint32_t num_chars;
   FILE* fp = AS_FILE(file);
   for (num_chars=0; num_chars<(MAX_LINE-1) && (ch=getc(fp)) != EOF; num_chars++) {
     buffer[num_chars] = (char) ch;
@@ -879,7 +1190,7 @@ Value file_read(Value file) {
   if ((ch == EOF) && (num_chars == 0)) {
     return NIL_VAL;
   }
-  Value result = OBJ_VAL(copyString(buffer, (size_t) num_chars));
+  Value result = OBJ_VAL(copy_string(buffer, num_chars));
   inc_ref(AS_OBJ(result));
   return result;
 }
@@ -896,6 +1207,15 @@ Value file_close(Value file) {
   return NIL_VAL;
 }
 
+Value os_mkdir(Value dir_name) {
+#if defined(WINDOWS)
+  int result = _mkdir(AS_CSTRING(dir_name));
+#else
+  int result = mkdir(AS_CSTRING(dir_name), 0755);
+#endif
+  return NIL_VAL;
+}
+
 void free_object(Obj* object) {
   switch (object->type) {
     case OBJ_STRING: {
@@ -906,8 +1226,8 @@ void free_object(Obj* object) {
     }
     case OBJ_LIST: {
       ObjList* list = (ObjList*)object;
-      for (size_t i = 0; i < list->count; i++) {
-        Value v = list_get(OBJ_VAL(object), NUMBER_VAL((double)i));
+      for (uint32_t i = 0; i < list->count; i++) {
+        Value v = list_get(OBJ_VAL(object), (int32_t)i);
         if (IS_OBJ(v)) {
           dec_ref_and_free(AS_OBJ(v));
         }
@@ -918,8 +1238,8 @@ void free_object(Obj* object) {
     }
     case OBJ_MAP: {
       ObjMap* map = (ObjMap*)object;
-      size_t num_entries = map->num_entries;
-      for (size_t i = 0; i < num_entries; i++) {
+      uint32_t num_entries = map->num_entries;
+      for (uint32_t i = 0; i < num_entries; i++) {
         MapEntry entry = map->entries[i];
         if (IS_TOMBSTONE(entry.key)) {
           num_entries++;
@@ -943,16 +1263,18 @@ void free_object(Obj* object) {
   }
 }
 
+
 /* CUSTOM CODE */
 
-Value let(ObjMap* user_globals, Value counts, Value u_word, Value words) {
+Value let(ObjMap* user_globals, Value words, Value counts, Value u_word) {
     Value map_get_ = map_get(AS_MAP(counts), u_word, NUMBER_VAL(0));
   if (IS_OBJ(map_get_)) {
     inc_ref(AS_OBJ(map_get_));
   }
   Value cur_M_count = map_get_;
 
-  Value map_assoc = map_set(AS_MAP(counts), u_word, add(cur_M_count, NUMBER_VAL(1)));
+  Value add_result = add_two(cur_M_count, NUMBER_VAL(1));
+  Value map_assoc = map_set(AS_MAP(counts), u_word, add_result);
 
   if (IS_OBJ(map_assoc)) {
     inc_ref(AS_OBJ(map_assoc));
@@ -966,13 +1288,13 @@ Value let(ObjMap* user_globals, Value counts, Value u_word, Value words) {
 Value u_process_M_words(ObjMap* user_globals, Value counts, Value words) {
   
   ObjList* tmp_lst = AS_LIST(words);
-    for(size_t i=0; i<tmp_lst->count; i++) {
+    for(uint32_t i=0; i<tmp_lst->count; i++) {
 
       Value u_word = tmp_lst->values[i];
     Value if_result = NIL_VAL;
   Value str_blank_ = str_blank(u_word);
   if (is_truthy(BOOL_VAL(!is_truthy(str_blank_)))) {
-    Value let_result = let(user_globals, counts, u_word, words);
+    Value let_result = let(user_globals, words, counts, u_word);
       if_result = let_result;
     if (IS_OBJ(if_result)) {
       inc_ref(AS_OBJ(if_result));
@@ -1030,7 +1352,7 @@ Value u_process_M_line(ObjMap* user_globals, Value counts, Value line) {
 
 Value u_compare(ObjMap* user_globals, Value a, Value b) {
   
-    Value result_2 = greater(user_globals, list_get(a, NUMBER_VAL(1)), list_get(b, NUMBER_VAL(1)));
+    Value result_2 = greater(user_globals, list_get(a, (int32_t) AS_NUMBER(NUMBER_VAL(1))), list_get(b, (int32_t) AS_NUMBER(NUMBER_VAL(1))));
     if (IS_OBJ(result_2)) {
       inc_ref(AS_OBJ(result_2));
     }
@@ -1099,7 +1421,7 @@ Value loop(ObjMap* user_globals, Value counts) {
       if (IS_OBJ(line)) {
       dec_ref_and_free(AS_OBJ(line));
     }
-      line = recur_get(result_3, NUMBER_VAL(0));
+      line = recur_get(result_3, 0);
       if (IS_OBJ(line)) {
       inc_ref(AS_OBJ(line));
     }
@@ -1120,17 +1442,17 @@ Value let_2(ObjMap* user_globals, Value counts) {
   inc_ref(AS_OBJ(map_pairs_));
   Value sortedlist = list_sort(user_globals, map_pairs_, u_compare);
 
-  Value str = OBJ_VAL(copyString(" ", (size_t) 1));
+  Value str = OBJ_VAL(copy_string(" ", 1));
   inc_ref(AS_OBJ(str));
   Value space = str;
 
   ObjList* tmp_lst_1 = AS_LIST(sortedlist);
-  for(size_t i=0; i<tmp_lst_1->count; i++) {
+  for(uint32_t i=0; i<tmp_lst_1->count; i++) {
 
     Value u_entry = tmp_lst_1->values[i];
-  Value print_result = print(list_get(u_entry, NUMBER_VAL(0)));
+  Value print_result = print(list_get(u_entry, (int32_t) AS_NUMBER(NUMBER_VAL(0))));
   Value print_result_1 = print(space);
-  Value println_result = println(list_get(u_entry, NUMBER_VAL(1)));
+  Value println_result = println(list_get(u_entry, (int32_t) AS_NUMBER(NUMBER_VAL(1))));
   }
   dec_ref_and_free(AS_OBJ(map_pairs_));
   dec_ref_and_free(AS_OBJ(str));
@@ -1159,8 +1481,12 @@ Value let_3(ObjMap* user_globals) {
   return let_result_2;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+  cli_args = allocate_list((uint32_t) argc);
+  for (int i = 0; i < argc; i++) {
+    list_add(cli_args, OBJ_VAL(copy_string(argv[i], (uint32_t) strlen(argv[i]))));
+  }
   interned_strings = allocate_map();
   ObjMap* user_globals = allocate_map();
 
@@ -1170,5 +1496,6 @@ int main(void)
   }
   free_object((Obj*)user_globals);
   free_object((Obj*)interned_strings);
+  free_object((Obj*)cli_args);
   return 0;
 }

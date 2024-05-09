@@ -1,3 +1,5 @@
+(require [language.string str])
+
 (defn process-words
   [counts words]
   (for [word words]
