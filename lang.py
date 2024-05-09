@@ -1177,16 +1177,17 @@ def str_c(params, envs):
         for param in params:
             result = compile_form(param, envs=envs)
             envs[-1]['code'].append(f'  list_add(AS_LIST({tmp_list_name}), {result["code"]});')
-        envs[-1]['code'].append(f'  Value {name} = str_join({tmp_list_name});\n  inc_ref(AS_OBJ({name}));')
+        envs[-1]['code'].append(f'  Value {name} = str_join({tmp_list_name});\n')
+        envs[-1]['code'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));\n' + '  }')
         envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({tmp_list_name}));')
-        envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+        envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({name}));\n' + '  }')
         return {'code': name}
 
     name = _get_generated_name('str', envs=envs)
     envs[-1]['temps'].add(name)
     envs[-1]['code'].append(f'  Value {name} = str_str({arg_name});')
     # envs[-1]['code'].append(f'  inc_ref(AS_OBJ({name}));')
-    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+    envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
     return {'code': name}
 
 
@@ -1195,8 +1196,8 @@ def str_lower_c(params, envs):
     param_name = result['code']
     name = _get_generated_name('str_lower_', envs=envs)
     envs[-1]['code'].append(f'  Value {name} = str_lower({param_name});')
-    envs[-1]['code'].append(f'  inc_ref(AS_OBJ({name}));')
-    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+    envs[-1]['code'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }')
+    envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
     return {'code': name}
 
 
@@ -1431,7 +1432,7 @@ def sqlite3_version_c(params, envs):
     envs[-1]['temps'].add(result_name)
     envs[0]['use_sqlite3'] = True
     envs[-1]['code'].append(f'  Value {result_name} = lang_sqlite3_version();')
-    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({result_name}));')
+    envs[-1]['post'].append(f'  if (IS_OBJ({result_name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({result_name}));\n' + '  }')
     return {'code': result_name}
 
 
@@ -1550,9 +1551,9 @@ def new_string_c(s, envs):
     name = _get_generated_name('str', envs=envs)
 
     envs[-1]['temps'].add(name)
-    envs[-1]['code'].append(f'  Value {name} = OBJ_VAL(copy_string("{s}", {len(s)}));')
-    envs[-1]['code'].append(f'  inc_ref(AS_OBJ({name}));')
-    envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+    envs[-1]['code'].append(f'  Value {name} = copy_string("{s}", {len(s)});')
+    envs[-1]['code'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }')
+    envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
     return name
 
 
@@ -1809,10 +1810,10 @@ def compile_form(node, envs):
                     full_reference = f'{envs[0]["current_ns"]}/{node.name}'
                 name = _get_generated_name('user_global_lookup', envs=envs)
                 envs[0]['temps'].add(name)
-                code = f'  Value {name} = OBJ_VAL(copy_string("{full_reference}", {len(full_reference)}));'
-                code += f'\n  inc_ref(AS_OBJ({name}));'
+                code = f'  Value {name} = copy_string("{full_reference}", {len(full_reference)});'
+                code += '\n  ' + f'if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }'
                 envs[-1]['code'].append(code)
-                envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
+                envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'  dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
                 return {'code': f'map_get(user_globals, {name}, NIL_VAL)'}
             elif 'c_name' in symbol:
                 return {'code': symbol['c_name']}
@@ -1909,12 +1910,15 @@ c_types = '''
 #define NUMBER_VAL(value)  ((Value){NUMBER, {.number = value}})
 #define RECUR_VAL(value)  ((Value){RECUR, {.recur = value}})
 #define FILE_VAL(value)   ((Value){FILE_HANDLE, {.file = (FILE*)value}})
+#define SHORT_STRING_VAL(value)  ((Value){SHORT_STRING, {.short_string = value}})
 #define OBJ_VAL(object)   ((Value){OBJ, {.obj = (Obj*)object}})
 #define AS_BOOL(value)  ((value).data.boolean)
 #define AS_NUMBER(value)  ((value).data.number)
 #define AS_RATIO(value)  ((value).data.ratio)
 #define AS_RECUR(value)       ((value).data.recur)
 #define AS_FILE(value)       ((value).data.file)
+#define AS_SHORT_STRING(value)  ((value).data.short_string)
+#define AS_SHORT_CSTRING(value)  ((value).data.short_string.string)
 #define AS_OBJ(value)  ((value).data.obj)
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
@@ -1928,6 +1932,7 @@ c_types = '''
 #define IS_RECUR(value)  ((value).type == RECUR)
 #define IS_ERROR(value)  ((value).type == ERROR)
 #define IS_FILE(value)  ((value).type == FILE_HANDLE)
+#define IS_SHORT_STRING(value)  ((value).type == SHORT_STRING)
 #define IS_OBJ(value)  ((value).type == OBJ)
 #define IS_STRING(value)  isObjType(value, OBJ_STRING)
 #define IS_LIST(value)  isObjType(value, OBJ_LIST)
@@ -1976,6 +1981,7 @@ typedef enum {
   TOMBSTONE,
   ERROR,
   FILE_HANDLE,
+  SHORT_STRING,
   OBJ,
 #if defined(USE_SQLITE3)
   SQLITE3_DB,
@@ -1986,6 +1992,11 @@ typedef struct {
   unsigned char type;
   unsigned char message[7];
 } ErrorInfo;
+
+typedef struct {
+  uint8_t length;
+  char string[7];
+} ShortString;
 
 typedef struct {
   int32_t numerator;
@@ -2004,6 +2015,7 @@ typedef struct {
     Obj* obj;
     Recur* recur;
     FILE* file;
+    ShortString short_string;
 #if defined(USE_SQLITE3)
     sqlite3* db;
 #endif
@@ -2140,7 +2152,6 @@ static Obj* allocateObject(size_t size, ObjType type) {
   return object;
 }
 
-ObjMap* interned_strings;
 void free_object(Obj* object);
 
 // http://www.toccata.io/2019/02/RefCounting.html
@@ -2167,6 +2178,19 @@ static uint32_t hash_number(double number) {
 
   for (int32_t i = 0; i < num_chars; i++) {
     hash ^= (uint8_t) str[i];
+    hash *= 16777619;
+  }
+  return hash;
+}
+
+static uint32_t hash_short_string(ShortString sh) {
+  uint32_t hash = 2166136261u;
+  char prefix = 'x';
+  hash ^= (uint8_t) prefix;
+  hash *= 16777619;
+
+  for (uint32_t i = 0; i < sh.length; i++) {
+    hash ^= (uint8_t) sh.string[i];
     hash *= 16777619;
   }
   return hash;
@@ -2206,6 +2230,9 @@ uint32_t _hash(Value v) {
   else if (IS_NUMBER(v)) {
     return hash_number(AS_NUMBER(v));
   }
+  else if (IS_SHORT_STRING(v)) {
+    return hash_short_string(AS_SHORT_STRING(v));
+  }
   else if (IS_STRING(v)) {
     ObjString* s = AS_STRING(v);
     return s->hash;
@@ -2221,47 +2248,22 @@ Value hash(Value v) {
 
 Value map_set(ObjMap* map, Value key, Value value);
 
-static ObjString* allocate_string(char* chars, uint32_t length, uint32_t hash) {
+static Value allocate_string(char* chars, uint32_t length, uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
   string->hash = hash;
   string->chars = chars;
-  if (length < 4) {
-    map_set(interned_strings, OBJ_VAL(string), NIL_VAL);
-  }
-  return string;
+  return OBJ_VAL(string);
 }
 
-ObjString* find_interned_string(const char* chars, uint32_t length, uint32_t hash) {
-  if (interned_strings->num_entries == 0) { return NULL; }
-  uint32_t index = hash % (uint32_t)interned_strings->indices_capacity;
-  for (;;) {
-    if (interned_strings->indices[index] == MAP_EMPTY) {
-      return NULL;
-    }
-    MapEntry entry = interned_strings->entries[interned_strings->indices[index]];
-    ObjString* key_string = AS_STRING(entry.key);
-    if (key_string->length == length &&
-        key_string->hash == hash &&
-        memcmp(key_string->chars, chars, (size_t)length) == 0) {
-      // We found it.
-      return key_string;
-    }
-
-    index = (index + 1) % (uint32_t)interned_strings->indices_capacity;
+Value copy_string(const char* chars, uint32_t length) {
+  if (length < 7) {
+    ShortString sh;
+    sh.length = (uint8_t) length;
+    strcpy(sh.string, chars);
+    return SHORT_STRING_VAL(sh);
   }
-
-  return NULL;
-}
-
-ObjString* copy_string(const char* chars, uint32_t length) {
   uint32_t hash = hash_string(chars, length);
-  if (length < 4) {
-    ObjString* interned = find_interned_string(chars, length, hash);
-    if (interned != NULL) {
-      return interned;
-    }
-  }
   char* heapChars = ALLOCATE(char, length + 1);
   memcpy(heapChars, chars, (size_t)length);
   heapChars[length] = 0; /* terminate it w/ NULL, so we can pass c-string to functions that need it */
@@ -2587,6 +2589,15 @@ Value equal(Value x, Value y) {
   else if (IS_NUMBER(x)) {
     return BOOL_VAL(double_equal(AS_NUMBER(x), AS_NUMBER(y)));
   }
+  else if (IS_SHORT_STRING(x)) {
+    ShortString xShort = AS_SHORT_STRING(x);
+    ShortString yShort = AS_SHORT_STRING(y);
+    if ((xShort.length == yShort.length) &&
+        (memcmp(xShort.string, yShort.string, (size_t)xShort.length) == 0)) {
+      return BOOL_VAL(true);
+    }
+    return BOOL_VAL(false);
+  }
   else if (IS_STRING(x)) {
     ObjString* xString = AS_STRING(x);
     ObjString* yString = AS_STRING(y);
@@ -2766,9 +2777,6 @@ Value map_contains(ObjMap* map, Value key) {
   if (map->num_entries == 0) {
     return BOOL_VAL(false);
   }
-  if (!IS_STRING(key)) {
-    return BOOL_VAL(false);
-  }
   int32_t indices_index = find_indices_index(map->indices, map->entries, map->indices_capacity, key);
   int32_t entries_index = map->indices[indices_index];
   bool isNewKey = (entries_index == MAP_EMPTY);
@@ -2903,6 +2911,9 @@ Value print(Value value) {
     }
     printf("}");
   }
+  else if (IS_SHORT_STRING(value)) {
+    printf("%s", AS_SHORT_CSTRING(value));
+  }
   else {
     printf("%s", AS_CSTRING(value));
   }
@@ -2928,13 +2939,30 @@ Value readline(void) {
   if ((ch == EOF) && (num_chars == 0)) {
     return NIL_VAL;
   }
-  Value result = OBJ_VAL(copy_string(buffer, num_chars));
-  inc_ref(AS_OBJ(result));
+  if (num_chars < 7) {
+    buffer[num_chars] = 0;
+  }
+  Value result = copy_string(buffer, num_chars);
+  if (IS_OBJ(result)) {
+    inc_ref(AS_OBJ(result));
+  }
   return result;
 }
 
 Value str_blank(Value string) {
   if (IS_NIL(string)) {
+    return BOOL_VAL(true);
+  }
+  if (IS_SHORT_STRING(string)) {
+    ShortString s = AS_SHORT_STRING(string);
+    if (s.length == 0) {
+      return BOOL_VAL(true);
+    }
+    for (int i = 0; s.string[i] != '\\0'; i++) {
+      if (!isspace(s.string[i])) {
+        return BOOL_VAL(false);
+      }
+    }
     return BOOL_VAL(true);
   }
   ObjString* s = AS_STRING(string);
@@ -2950,32 +2978,78 @@ Value str_blank(Value string) {
 }
 
 Value str_lower(Value string) {
-  ObjString* s = AS_STRING(string);
-  ObjString* s_lower = copy_string(s->chars, s->length);
-  for (int i=0; s_lower->chars[i] != '\\0'; i++) {
-    s_lower->chars[i] = (char) tolower((int) s_lower->chars[i]);
+  if (IS_SHORT_STRING(string)) {
+    ShortString s = AS_SHORT_STRING(string);
+    char buffer[7];
+    int i = 0;
+    for (; s.string[i] != 0; i++) {
+      buffer[i] = (char) tolower((int) s.string[i]);
+    }
+    buffer[i] = 0;
+    ShortString s_lower;
+    s_lower.length = s.length;
+    memcpy(s_lower.string, buffer, (size_t) (s.length+1));
+    return SHORT_STRING_VAL(s_lower);
+  } else {
+    ObjString* s = AS_STRING(string);
+    Value s_lower_val = copy_string(s->chars, s->length);
+    ObjString* s_lower = AS_STRING(s_lower_val);
+    for (int i=0; s_lower->chars[i] != '\\0'; i++) {
+      s_lower->chars[i] = (char) tolower((int) s_lower->chars[i]);
+    }
+    return s_lower_val;
   }
-  return OBJ_VAL(s_lower);
 }
 
 Value str_split(Value string) {
-  ObjString* s = AS_STRING(string);
   ObjList* splits = allocate_list((uint32_t) 0);
   uint32_t split_length = 0;
   int split_start_index = 0;
-  for (int i=0; s->chars[i] != '\\0'; i++) {
-    if (s->chars[i] == ' ') {
-      ObjString* split = copy_string(&(s->chars[split_start_index]), split_length);
-      list_add(splits, OBJ_VAL(split));
-      split_start_index = i + 1;
-      split_length = 0;
+
+  if (IS_SHORT_STRING(string)) {
+    ShortString s = AS_SHORT_STRING(string);
+    for (int i=0; s.string[i] != 0; i++) {
+      if (s.string[i] == ' ') {
+        char split_buffer[7];
+        memcpy(split_buffer, &(s.string[split_start_index]), split_length);
+        split_buffer[split_length] = 0;
+        Value split = copy_string(split_buffer, split_length);
+        list_add(splits, split);
+        split_start_index = i + 1;
+        split_length = 0;
+      }
+      else {
+        split_length++;
+      }
     }
-    else {
-      split_length++;
-    }
+    Value split = copy_string(&(s.string[split_start_index]), split_length);
+    list_add(splits, split);
   }
-  ObjString* split = copy_string(&(s->chars[split_start_index]), split_length);
-  list_add(splits, OBJ_VAL(split));
+  // regular string
+  else {
+    ObjString* s = AS_STRING(string);
+    for (int i=0; s->chars[i] != '\\0'; i++) {
+      if (s->chars[i] == ' ') {
+        if (split_length < 7) {
+          char split_buffer[7];
+          memcpy(split_buffer, &(s->chars[split_start_index]), split_length);
+          split_buffer[split_length] = 0;
+          Value split = copy_string(split_buffer, split_length);
+          list_add(splits, split);
+        } else {
+          Value split = copy_string(&(s->chars[split_start_index]), split_length);
+          list_add(splits, split);
+        }
+        split_start_index = i + 1;
+        split_length = 0;
+      }
+      else {
+        split_length++;
+      }
+    }
+    Value split = copy_string(&(s->chars[split_start_index]), split_length);
+    list_add(splits, split);
+  }
   return OBJ_VAL(splits);
 }
 
@@ -2985,31 +3059,36 @@ Value str_str(Value v) {
     inc_ref(AS_OBJ(v));
     return v;
   }
+  if (IS_SHORT_STRING(v)) {
+    return v;
+  }
 
   Value s;
   if (IS_BOOL(v)) {
     if (AS_BOOL(v)) {
-      s = OBJ_VAL(copy_string("true", 4));
+      s = copy_string("true", 4);
     }
     else {
-      s = OBJ_VAL(copy_string("false", 5));
+      s = copy_string("false", 5);
     }
   }
   else if (IS_NUMBER(v)) {
     char str[100];
     int32_t num_chars = sprintf(str, "%g", AS_NUMBER(v));
-    s = OBJ_VAL(copy_string(str, (uint32_t) num_chars));
+    s = copy_string(str, (uint32_t) num_chars);
   }
   else if (IS_LIST(v)) {
-    s = OBJ_VAL(copy_string("[]", 2));
+    s = copy_string("[]", 2);
   }
   else if (IS_MAP(v)) {
-    s = OBJ_VAL(copy_string("{}", 2));
+    s = copy_string("{}", 2);
   }
   else {
-    s = OBJ_VAL(copy_string("", 0));
+    s = copy_string("", 0);
   }
-  inc_ref(AS_OBJ(s));
+  if (IS_OBJ(s)) {
+    inc_ref(AS_OBJ(s));
+  }
   return s;
 }
 
@@ -3021,11 +3100,33 @@ Value str_join(Value list_val) {
   for (uint32_t i = 0; i < list->count; i++) {
     Value v = list_get(list_val, (int32_t)i);
     Value v_str = str_str(v);
-    num_bytes = num_bytes + AS_STRING(v_str)->length;
-    dec_ref_and_free(AS_OBJ(v_str));
+    if (IS_SHORT_STRING(v_str)) {
+      num_bytes = num_bytes + AS_SHORT_STRING(v_str).length;
+    } else {
+      num_bytes = num_bytes + AS_STRING(v_str)->length;
+      dec_ref_and_free(AS_OBJ(v_str));
+    }
     if (IS_OBJ(v)) {
       dec_ref_and_free(AS_OBJ(v));
     }
+  }
+  if (num_bytes < 7) {
+    // construct a short-string instead
+    char buffer[7];
+    char* start_char = buffer;
+    uint32_t i = 0;
+    for (; i < list->count; i++) {
+      Value v = list_get(list_val, (int32_t)i);
+      Value v_str = str_str(v);
+      ShortString v_short_string = AS_SHORT_STRING(v_str);
+      memcpy(start_char, v_short_string.string, (size_t)v_short_string.length);
+      start_char = start_char + v_short_string.length;
+    }
+    buffer[num_bytes] = '\\0';
+    ShortString sh;
+    sh.length = (uint8_t) num_bytes;
+    memcpy(sh.string, buffer, num_bytes + 1);
+    return SHORT_STRING_VAL(sh);
   }
 
   char* heapChars = ALLOCATE(char, (size_t)(num_bytes+1));
@@ -3033,13 +3134,21 @@ Value str_join(Value list_val) {
 
   for (uint32_t i = 0; i < list->count; i++) {
     Value v = list_get(list_val, (int32_t)i);
-    ObjString* s = AS_STRING(str_str(v));
-    memcpy(start_char, s->chars, (size_t)s->length);
-    start_char = start_char + s->length;
+    Value v_str = str_str(v);
+    if (IS_STRING(v_str)) {
+      ObjString* s = AS_STRING(v_str);
+      memcpy(start_char, s->chars, (size_t)s->length);
+      start_char = start_char + s->length;
+    } else {
+      // it's a short string
+      ShortString sh = AS_SHORT_STRING(v_str);
+      memcpy(start_char, sh.string, (size_t)sh.length);
+      start_char = start_char + sh.length;
+    }
   }
   heapChars[num_bytes] = 0;
   uint32_t hash = hash_string(heapChars, num_bytes);
-  return OBJ_VAL(allocate_string(heapChars, num_bytes, hash));
+  return allocate_string(heapChars, num_bytes, hash);
 }
 
 Value math_gcd(Value param_1, Value param_2) {
@@ -3072,14 +3181,23 @@ Value file_read(Value file) {
   if ((ch == EOF) && (num_chars == 0)) {
     return NIL_VAL;
   }
-  Value result = OBJ_VAL(copy_string(buffer, num_chars));
-  inc_ref(AS_OBJ(result));
+  if (num_chars < 7) {
+    buffer[num_chars] = 0;
+  }
+  Value result = copy_string(buffer, num_chars);
+  if (IS_OBJ(result)) {
+    inc_ref(AS_OBJ(result));
+  }
   return result;
 }
 
 Value file_write(Value file, Value data) {
   FILE* fp = AS_FILE(file);
-  fprintf(fp, "%s", AS_CSTRING(data));
+  if (IS_SHORT_STRING(data)) {
+    fprintf(fp, "%s", AS_SHORT_CSTRING(data));
+  } else {
+    fprintf(fp, "%s", AS_CSTRING(data));
+  }
   fflush(fp);
   return NIL_VAL;
 }
@@ -3196,8 +3314,7 @@ def _compile(source, source_file=None):
 
     c_code += 'int main(int argc, char *argv[])\n{'
     c_code += '\n  cli_args = allocate_list((uint32_t) argc);'
-    c_code += '\n  for (int i = 0; i < argc; i++) {\n    list_add(cli_args, OBJ_VAL(copy_string(argv[i], (uint32_t) strlen(argv[i]))));\n  }'
-    c_code += '\n  interned_strings = allocate_map();'
+    c_code += '\n  for (int i = 0; i < argc; i++) {\n    list_add(cli_args, copy_string(argv[i], (uint32_t) strlen(argv[i])));\n  }'
     c_code += '\n  ObjMap* user_globals = allocate_map();\n'
 
     if program['init']:
@@ -3207,14 +3324,13 @@ def _compile(source, source_file=None):
         for name, value in ns.items():
             if value.get('type') == 'var':
                 full_reference = f'{referred_as}/{name}'
-                c_code += f'\n  map_set(user_globals, OBJ_VAL(copy_string("{full_reference}", {len(full_reference)})), {value["code"]});\n'
+                c_code += f'\n  map_set(user_globals, copy_string("{full_reference}", {len(full_reference)}), {value["code"]});\n'
 
     c_code += '\n' + '\n'.join(program['code'])
 
     if program['post']:
         c_code += '\n' + '\n'.join(program['post'])
     c_code += '\n  free_object((Obj*)user_globals);'
-    c_code += '\n  free_object((Obj*)interned_strings);'
     c_code += '\n  free_object((Obj*)cli_args);'
     c_code += '\n  return 0;\n}'
 

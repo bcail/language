@@ -1,7 +1,9 @@
 Value lang_sqlite3_version(void) {
   const char* version = sqlite3_libversion();
-  Value s = OBJ_VAL(copy_string(version, (uint32_t) strlen(version)));
-  inc_ref(AS_OBJ(s));
+  Value s = copy_string(version, (uint32_t) strlen(version));
+  if (IS_OBJ(s)) {
+    inc_ref(AS_OBJ(s));
+  }
   return s;
 }
 
@@ -19,7 +21,7 @@ Value lang_sqlite3_close(Value db) {
 int process_row(void* results, int num_columns, char** result_strings, char** result_columns) {
   ObjList* row = allocate_list((uint32_t) num_columns);
   for (int i=0; i < num_columns; i++) {
-    list_add(row, OBJ_VAL(copy_string(result_strings[i], (uint32_t) strlen(result_strings[i]))));
+    list_add(row, copy_string(result_strings[i], (uint32_t) strlen(result_strings[i])));
   }
   list_add(results, OBJ_VAL(row));
   inc_ref(row);

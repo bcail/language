@@ -503,14 +503,19 @@ class CompileTests(unittest.TestCase):
     def test_core_strings(self):
         tests = [
             {'src': '(print "abc")', 'output': 'abc'},
+            {'src': '(print "abcdefgh")', 'output': 'abcdefgh'},
             {'src': '(print (str))', 'output': ''},
             {'src': '(print (str nil))', 'output': ''},
             {'src': '(print (str true))', 'output': 'true'},
             {'src': '(print (str false))', 'output': 'false'},
             {'src': '(print (str 1))', 'output': '1'},
             {'src': '(print (str "abc"))', 'output': 'abc'},
+            {'src': '(print (str "abcdefgh"))', 'output': 'abcdefgh'},
             {'src': '(print (str "abc" "def"))', 'output': 'abcdef'},
+            {'src': '(print (str "abcd" "efgh"))', 'output': 'abcdefgh'},
+            {'src': '(print (str "abcdefgh" "another1"))', 'output': 'abcdefghanother1'},
             {'src': '(print (str "abc" "abc"))', 'output': 'abcabc'},
+            {'src': '(print (str "abcd" "abcd"))', 'output': 'abcdabcd'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -548,11 +553,12 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (hash true))', 'output': '118251589'},
             {'src': '(print (hash 1))', 'output': '70638592'},
             {'src': '(print (hash 2))', 'output': '120971449'},
-            {'src': '(print (hash "abc"))', 'output': '2602386598'},
-            {'src': '(print (hash "def"))', 'output': '135684681'},
-            {'src': '(print (hash "abcdef"))', 'output': '503164941'},
-            {'src': '(print (hash "123"))', 'output': '10642774'},
-            {'src': '(print (hash "1"))', 'output': '139573449'},
+            {'src': '(print (hash "abc"))', 'output': '4189669961'},
+            {'src': '(print (hash "def"))', 'output': '3033789270'},
+            {'src': '(print (hash "abcdef"))', 'output': '3728255472'},
+            {'src': '(print (hash "abcdefgh"))', 'output': '670277762'},
+            {'src': '(print (hash "123"))', 'output': '1040253977'},
+            {'src': '(print (hash "1"))', 'output': '274927234'},
         ]
         for test in tests:
             with self.subTest(test=test):
@@ -598,6 +604,11 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (contains? {"a" 1} 1))', 'output': 'false'},
             {'src': '(print (contains? {"a" 1} "a"))', 'output': 'true'},
             {'src': '(print (contains? {"a" 1} "z"))', 'output': 'false'},
+            {'src': '(print (contains? {1 2} 1))', 'output': 'true'},
+            {'src': '(print (contains? {1 2} 2))', 'output': 'false'},
+            {'src': '(print (contains? {nil 2} nil))', 'output': 'true'},
+            {'src': '(print (contains? {true 2} true))', 'output': 'true'},
+            {'src': '(print (contains? {false 2} false))', 'output': 'true'},
             {'src': '(print (dissoc {} "1"))', 'output': '{}'},
             {'src': '(print (dissoc {"1" 1} "1"))', 'output': '{}'},
             {'src': '(print (dissoc {"1" 1 "2" 2} "2"))', 'output': '{1 1}'},
@@ -631,7 +642,9 @@ class CompileTests(unittest.TestCase):
             {'src': '(print (= 1 "1"))', 'output': 'false'},
             {'src': '(print (= 1 1.0))', 'output': 'true'}, #different from clojure
             {'src': '(print (= "abc" "abc"))', 'output': 'true'},
+            {'src': '(print (= "abcdefgh" "abcdefgh"))', 'output': 'true'},
             {'src': '(print (= "abc" "def"))', 'output': 'false'},
+            {'src': '(print (= "abcdefgh" "jklmnopq"))', 'output': 'false'},
             {'src': '(print (= [] []))', 'output': 'true'},
             {'src': '(print (= [1] [2]))', 'output': 'false'},
             {'src': '(print (= [1] [1]))', 'output': 'true'},
@@ -812,8 +825,12 @@ class CompileTests(unittest.TestCase):
             {'src': '(require [language.string str]) (print (str/blank? ""))', 'output': 'true'},
             {'src': '(require [language.string str]) (print (str/blank? nil))', 'output': 'true'},
             {'src': '(require [language.string str]) (print (str/blank? "\\n"))', 'output': 'true'},
+            {'src': '(require [language.string str]) (print (str/lower "Hello"))', 'output': 'hello'},
             {'src': '(require [language.string str]) (print (str/lower "Hello World"))', 'output': 'hello world'},
+            {'src': '(require [language.string str]) (print (str/split "hello"))', 'output': '[hello]'},
+            {'src': '(require [language.string str]) (print (str/split "ab cd"))', 'output': '[ab cd]'},
             {'src': '(require [language.string str]) (print (str/split "hello world"))', 'output': '[hello world]'},
+            {'src': '(require [language.string str]) (print (str/split "hellohello worldworld"))', 'output': '[hellohello worldworld]'},
         ]
         for test in tests:
             with self.subTest(test=test):
