@@ -920,6 +920,8 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual, sqlite=True)
 
+
+class ProgramTests(unittest.TestCase):
     def test_run_program(self):
         program_file = 'test_program.clj'
         cmd = f'{sys.executable} lang.py -r {program_file} arg1 arg2'

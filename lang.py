@@ -3394,6 +3394,14 @@ SQLITE3_CLANG_CHECK_OPTIONS = [
 
 
 def build_executable(file_name, output_file_name, with_checks=False):
+    with open(file_name, 'rb') as f:
+        source = f.read().decode('utf8')
+
+    if '#define USE_SQLITE3 1' in source:
+        c_sources = [os.path.join('lib', 'sqlite3.c')]
+    else:
+        c_sources = []
+
     if os.path.exists(output_file_name):
         print(f'{output_file_name} already exists')
         sys.exit(1)
@@ -3415,7 +3423,7 @@ def build_executable(file_name, output_file_name, with_checks=False):
     else:
         compiler.extend(['-O2'])
 
-    compile_cmd = compiler + ['-o', output_file_name, os.path.join('lib', 'sqlite3.c'), file_name, '-Wl,-lm,-lpthread,-ldl']
+    compile_cmd = compiler + ['-o', output_file_name, *c_sources, file_name, '-Wl,-lm,-lpthread,-ldl']
     try:
         subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
     except subprocess.CalledProcessError as e:
