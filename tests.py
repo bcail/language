@@ -9,7 +9,7 @@ from unittest.mock import patch
 from lang import TokenType, scan_tokens, parse, Symbol, _compile
 from lang import (
         GCC_CMD, GCC_CHECK_OPTIONS, GCC_CHECK_ENV,
-        CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, SQLITE3_CLANG_CHECK_OPTIONS,
+        CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV,
     )
 
 
@@ -165,7 +165,6 @@ def _run_test(test, assert_equal, sqlite=False):
     else:
         if sqlite:
             compilers = [
-                # ([clang_cmd] + SQLITE3_CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
                 ([clang_cmd, '-std=c99'], None, 'clang_regular'),
                 ([gcc_cmd, '-std=c99'], None, 'gcc_regular'),
             ]
