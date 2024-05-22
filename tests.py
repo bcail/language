@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import sys
 from unittest.mock import patch
-from lang import TokenType, scan_tokens, parse, Symbol, _compile
+from lang import TokenType, scan_tokens, parse, Symbol, _compile, _get_compile_cmd_env
 from lang import (
         GCC_CMD, GCC_CHECK_OPTIONS, GCC_CHECK_ENV,
         CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV,
@@ -153,29 +153,29 @@ def _run_test(test, assert_equal, sqlite=False):
 
     if platform.system() == 'Darwin':
         compilers = [
-            ([clang_cmd, '-std=c99'], None, 'clang_regular'),
+            (clang_cmd, False, 'clang_regular'),
         ]
         if not QUICK:
-            compilers.append(([gcc_cmd, '-std=c99'], None, 'gcc_regular'))
+            compilers.append( (gcc_cmd, False, 'gcc_regular') )
     elif platform.system() == 'Windows':
         cc_path = 'clang.exe'
         compilers = [
-            ([cc_path, '-std=c99'], None, 'clang_regular'),
+            (cc_path, False, 'clang_regular'),
         ]
     else:
         if sqlite:
             compilers = [
-                ([clang_cmd, '-std=c99'], None, 'clang_regular'),
-                ([gcc_cmd, '-std=c99'], None, 'gcc_regular'),
+                (clang_cmd, False, 'clang_regular'),
+                (gcc_cmd, False, 'gcc_regular'),
             ]
         else:
             compilers = [
-                ([clang_cmd, '-std=c99'], None, 'clang_regular'),
+                (clang_cmd, False, 'clang_regular'),
             ]
             if not QUICK:
                 compilers.extend([
-                    ([clang_cmd] + CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV, 'clang_checks'),
-                    ([gcc_cmd] + GCC_CHECK_OPTIONS, GCC_CHECK_ENV, 'gcc_checks'),
+                    (clang_cmd, True, 'clang_checks'),
+                    (gcc_cmd, True, 'gcc_checks'),
                 ])
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -185,14 +185,11 @@ def _run_test(test, assert_equal, sqlite=False):
 
         custom_code = c_code.split('/* CUSTOM CODE */\n\n')[-1]
 
-        for cc_cmd, env, env_name in compilers:
+        for cc_cmd, with_checks, env_name in compilers:
             print(f'  ({env_name})')
             program_filename = os.path.join(tmp, env_name)
 
-            if sqlite:
-                compile_cmd = cc_cmd + ['-I%s' % os.path.join('.', 'include'), '-o', program_filename, os.path.join('lib', 'sqlite3.c'), c_filename, '-Wl,-lm,-lpthread,-ldl']
-            else:
-                compile_cmd = cc_cmd + ['-o', program_filename, c_filename, '-Wl,-lm']
+            compile_cmd, env = _get_compile_cmd_env(file_name=c_filename, output_file_name=program_filename, with_checks=with_checks)
             try:
                 subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
             except subprocess.CalledProcessError as e:
@@ -736,7 +733,7 @@ class ProgramTests(unittest.TestCase):
         try:
             result = subprocess.run(cmd.split(), check=True, input=input_.encode('utf8'), capture_output=True)
             result_output = result.stdout.decode('utf8')
-            self.assertEqual(result_output, '{one 2, two 1}aarg1arg2')
+            self.assertEqual(result_output, '{one 2, two 1}a%sarg1arg2%s3.41.2' % (LSEP, LSEP))
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f'run_program test failed: {e}\n{e.stderr.decode("utf8")}')
 

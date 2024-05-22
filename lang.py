@@ -3071,20 +3071,22 @@ CLANG_CHECK_ENV = {
 }
 
 
-def build_executable(file_name, output_file_name, with_checks=False):
+def _get_compile_cmd_env(file_name, output_file_name, cc=None, with_checks=False):
     with open(file_name, 'rb') as f:
         source = f.read().decode('utf8')
 
     if '#define USE_SQLITE3 1' in source:
         c_sources = [os.path.join('lib', 'sqlite3.c')]
+        includes = ['-I%s' % os.path.join('.', 'include')]
+        libs = ['-Wl,-lm,-lpthread,-ldl']
     else:
         c_sources = []
+        includes = []
+        libs = ['-Wl,-lm']
 
-    if os.path.exists(output_file_name):
-        print(f'{output_file_name} already exists')
-        sys.exit(1)
-
-    if os.environ.get('CC'):
+    if cc:
+        compiler = [cc]
+    elif os.environ.get('CC'):
         compiler = [os.environ['CC']]
     else:
         compiler = [CLANG_CMD]
@@ -3094,14 +3096,26 @@ def build_executable(file_name, output_file_name, with_checks=False):
     if with_checks:
         if 'clang' in compiler[0]:
             compiler.extend(CLANG_CHECK_OPTIONS)
+            env = CLANG_CHECK_ENV
         elif 'gcc' in compiler[0]:
             compiler.extend(GCC_CHECK_OPTIONS)
+            env = GCC_CHECK_ENV
         else:
             raise RuntimeError(f'no checks to use for building with {compiler[0]}')
     else:
-        compiler.extend(['-O2'])
+        compiler.extend(['-O2', '-std=c99'])
 
-    compile_cmd = compiler + ['-o', output_file_name, *c_sources, file_name, '-Wl,-lm,-lpthread,-ldl']
+    cmd = compiler + [*includes, '-o', output_file_name, *c_sources, file_name, *libs]
+
+    return cmd, env
+
+
+def build_executable(file_name, output_file_name, with_checks=False):
+    if os.path.exists(output_file_name):
+        print(f'{output_file_name} already exists')
+        sys.exit(1)
+
+    compile_cmd, env = _get_compile_cmd_env(file_name, output_file_name, with_checks)
     try:
         subprocess.run(compile_cmd, check=True, env=env, capture_output=True)
     except subprocess.CalledProcessError as e:
