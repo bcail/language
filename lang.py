@@ -861,6 +861,18 @@ def str_split_c(params, envs):
     return {'code': name}
 
 
+def str_index_of_c(params, envs):
+    s_param = compile_form(params[0], envs=envs)['code']
+    value_param = compile_form(params[1], envs=envs)['code']
+    if len(params) > 2:
+        from_index_param = compile_form(params[2], envs=envs)['code']
+    else:
+        from_index_param = compile_form(0, envs=envs)['code']
+    name = _get_generated_name('str_index_of_result', envs=envs)
+    envs[-1]['code'].append(f'  Value {name} = str_index_of({s_param}, {value_param}, {from_index_param});')
+    return {'code': name}
+
+
 def nth_c(params, envs):
     lst = compile_form(params[0], envs=envs)
     index = compile_form(params[1], envs=envs)['code']
@@ -1153,6 +1165,7 @@ language_string_ns = {
     'split': {'function': str_split_c},
     'lower': {'function': str_lower_c},
     'blank?': {'function': str_blank_c},
+    'index-of': {'function': str_index_of_c},
 }
 
 language_os_ns = {
@@ -2761,6 +2774,81 @@ Value str_join(Value list_val) {
   heapChars[num_bytes] = 0;
   uint32_t hash = hash_string(heapChars, num_bytes);
   return allocate_string(heapChars, num_bytes, hash);
+}
+
+Value str_index_of(Value s, Value value, Value from_index) {
+  uint32_t index = 0;
+  if (IS_NUMBER(from_index)) {
+    index = (uint32_t) AS_NUMBER(from_index);
+  }
+  if (IS_SHORT_STRING(s)) {
+    ShortString str = AS_SHORT_STRING(s);
+    if (IS_SHORT_STRING(value)) {
+      ShortString value_str = AS_SHORT_STRING(value);
+      if (value_str.length <= str.length) {
+        for (; index < str.length; index++) {
+          if (str.string[index] == value_str.string[0]) {
+            bool found = true;
+            for (uint8_t j = 1; j < value_str.length; j++) {
+              if (str.string[index+j] != value_str.string[j]) {
+                found = false;
+                break;
+              }
+            }
+            if (found) {
+              return NUMBER_VAL( (double) index);
+            }
+          }
+        }
+      }
+    } else if (IS_STRING(value)) {
+      // strings are longer than short strings, so we don't need to check
+    } else {
+      return error_val(ERROR_TYPE, "      ");
+    }
+  } else if (IS_STRING(s)) {
+    ObjString* str = AS_STRING(s);
+    if (IS_SHORT_STRING(value)) {
+      ShortString value_str = AS_SHORT_STRING(value);
+      for (; index < str->length; index++) {
+        if (str->chars[index] == value_str.string[0]) {
+          bool found = true;
+          for (uint8_t j = 1; j < value_str.length; j++) {
+            if (str->chars[index+j] != value_str.string[j]) {
+              found = false;
+              break;
+            }
+          }
+          if (found) {
+            return NUMBER_VAL( (double) index);
+          }
+        }
+      }
+    } else if (IS_STRING(value)) {
+      ObjString* value_str = AS_STRING(value);
+      if (value_str->length <= str->length) {
+        for (; index < str->length; index++) {
+          if (str->chars[index] == value_str->chars[0]) {
+            bool found = true;
+            for (uint32_t j = 1; j < value_str->length; j++) {
+              if (str->chars[index+j] != value_str->chars[j]) {
+                found = false;
+                break;
+              }
+            }
+            if (found) {
+              return NUMBER_VAL( (double) index);
+            }
+          }
+        }
+      }
+    } else {
+      return error_val(ERROR_TYPE, "      ");
+    }
+  } else {
+    return error_val(ERROR_TYPE, "      ");
+  }
+  return NIL_VAL;
 }
 
 Value math_gcd(Value param_1, Value param_2) {
