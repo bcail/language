@@ -1572,9 +1572,9 @@ c_types = '''
 #define MAP_TOMBSTONE (-2)
 #define MAP_MAX_LOAD 0.75
 #define MAX_LINE 1000
-#define ERROR_GENERAL '\\x01'
-#define ERROR_TYPE '\\x02'
-#define ERROR_DIVIDE_BY_ZERO '\\x03'
+#define ERROR_GENERAL 0
+#define ERROR_TYPE 1
+#define ERROR_DIVIDE_BY_ZERO 2
 
 void* reallocate(void* pointer, size_t newSize) {
   if (newSize == 0) {
@@ -1614,8 +1614,8 @@ typedef enum {
 } ValueType;
 
 typedef struct {
-  unsigned char type;
-  unsigned char message[7];
+  uint8_t type;
+  char message[7];
 } ErrorInfo;
 
 typedef struct {
@@ -1647,25 +1647,13 @@ typedef struct {
   } data;
 } Value;
 
-Value error_val(unsigned char type, char* message) {
+Value error_val(uint8_t type, char* message) {
+  char buf[7];
+  strncpy(buf, message, 6);
+  buf[6] = 0;
   ErrorInfo info;
   info.type = type;
-  if (strlen(message) > 5) {
-    info.message[0] = (unsigned char) message[0];
-    info.message[1] = (unsigned char) message[1];
-    info.message[2] = (unsigned char) message[2];
-    info.message[3] = (unsigned char) message[3];
-    info.message[4] = (unsigned char) message[4];
-    info.message[5] = (unsigned char) message[5];
-  } else {
-    info.message[0] = ' ';
-    info.message[1] = ' ';
-    info.message[2] = ' ';
-    info.message[3] = ' ';
-    info.message[4] = ' ';
-    info.message[5] = ' ';
-  }
-  info.message[6] = '\\0';
+  strncpy(info.message, buf, 7);
   Value v = {ERROR, {.err_info = info}};
   return v;
 }
@@ -1992,7 +1980,7 @@ Value add_two(Value x, Value y) {
   if (IS_RATIO(x) && IS_RATIO(y)) {
     return add_two_ratios(AS_RATIO(x), AS_RATIO(y));
   }
-  return error_val(ERROR_TYPE, "      ");
+  return error_val(ERROR_TYPE, "");
 }
 
 Value add_list(Value numbers) {
@@ -2003,7 +1991,7 @@ Value add_list(Value numbers) {
     for (uint32_t i = 1; i < numbers_list->count; i++) {
       item = numbers_list->values[i];
       if (!IS_NUMBER(item)) {
-        return error_val(ERROR_TYPE, "      ");
+        return error_val(ERROR_TYPE, "");
       }
       result += AS_NUMBER(item);
     }
@@ -2013,18 +2001,18 @@ Value add_list(Value numbers) {
     for (uint32_t i = 1; i < numbers_list->count; i++) {
       item = numbers_list->values[i];
       if (!IS_RATIO(item)) {
-        return error_val(ERROR_TYPE, "      ");
+        return error_val(ERROR_TYPE, "");
       }
       result = AS_RATIO(add_two_ratios(result, AS_RATIO(item)));
     }
     return ratio_val(result.numerator, result.denominator);
   }
-  return error_val(ERROR_TYPE, "      ");
+  return error_val(ERROR_TYPE, "");
 }
 
 Value subtract_two(Value x, Value y) {
   if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
-    return error_val(ERROR_TYPE, "      ");
+    return error_val(ERROR_TYPE, "");
   }
   return NUMBER_VAL(AS_NUMBER(x) - AS_NUMBER(y));
 }
@@ -2033,13 +2021,13 @@ Value subtract_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
   Value item = numbers_list->values[0];
   if (!IS_NUMBER(item)) {
-    return error_val(ERROR_TYPE, "      ");
+    return error_val(ERROR_TYPE, "");
   }
   double result = AS_NUMBER(item);
   for (uint32_t i = 1; i < numbers_list->count; i++) {
     item = numbers_list->values[i];
     if (!IS_NUMBER(item)) {
-      return error_val(ERROR_TYPE, "      ");
+      return error_val(ERROR_TYPE, "");
     }
     result = result - AS_NUMBER(item);
   }
@@ -2048,7 +2036,7 @@ Value subtract_list(Value numbers) {
 
 Value multiply_two(Value x, Value y) {
   if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
-    return error_val(ERROR_TYPE, "      ");
+    return error_val(ERROR_TYPE, "");
   }
   return NUMBER_VAL(AS_NUMBER(x) * AS_NUMBER(y));
 }
@@ -2057,13 +2045,13 @@ Value multiply_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
   Value item = numbers_list->values[0];
   if (!IS_NUMBER(item)) {
-    return error_val(ERROR_TYPE, "      ");
+    return error_val(ERROR_TYPE, "");
   }
   double result = AS_NUMBER(item);
   for (uint32_t i = 1; i < numbers_list->count; i++) {
     item = numbers_list->values[i];
     if (!IS_NUMBER(item)) {
-      return error_val(ERROR_TYPE, "      ");
+      return error_val(ERROR_TYPE, "");
     }
     result = result * AS_NUMBER(item);
   }
@@ -2072,10 +2060,10 @@ Value multiply_list(Value numbers) {
 
 Value divide_two(Value x, Value y) {
   if (!IS_NUMBER(x) || !IS_NUMBER(y)) {
-    return error_val(ERROR_TYPE, "      ");
+    return error_val(ERROR_TYPE, "");
   }
   if (double_equal(AS_NUMBER(y), 0)) {
-    return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
+    return error_val(ERROR_DIVIDE_BY_ZERO, "");
   }
   return NUMBER_VAL(AS_NUMBER(x) / AS_NUMBER(y));
 }
@@ -2084,16 +2072,16 @@ Value divide_list(Value numbers) {
   ObjList* numbers_list = AS_LIST(numbers);
   Value item = numbers_list->values[0];
   if (!IS_NUMBER(item)) {
-    return error_val(ERROR_TYPE, "      ");
+    return error_val(ERROR_TYPE, "");
   }
   double result = AS_NUMBER(item);
   for (uint32_t i = 1; i < numbers_list->count; i++) {
     item = numbers_list->values[i];
     if (!IS_NUMBER(item)) {
-      return error_val(ERROR_TYPE, "      ");
+      return error_val(ERROR_TYPE, "");
     }
     if (double_equal(AS_NUMBER(item), 0)) {
-      return error_val(ERROR_DIVIDE_BY_ZERO, "      ");
+      return error_val(ERROR_DIVIDE_BY_ZERO, "");
     }
     result = result / AS_NUMBER(item);
   }
@@ -2497,11 +2485,11 @@ Value print(Value value) {
   }
   else if (IS_ERROR(value)) {
     if (value.data.err_info.type == ERROR_DIVIDE_BY_ZERO) {
-      printf("ERROR: DivideByZero - %s", value.data.err_info.message);
+      printf("ERROR: DivideByZero");
     } else if (value.data.err_info.type == ERROR_TYPE) {
-      printf("ERROR: Type - %s", value.data.err_info.message);
+      printf("ERROR: Type");
     } else {
-      printf("ERROR: General - %s", value.data.err_info.message);
+      printf("ERROR: General");
     }
   }
   else if (IS_LIST(value)) {
@@ -2804,7 +2792,7 @@ Value str_index_of(Value s, Value value, Value from_index) {
     } else if (IS_STRING(value)) {
       // strings are longer than short strings, so we don't need to check
     } else {
-      return error_val(ERROR_TYPE, "      ");
+      return error_val(ERROR_TYPE, "");
     }
   } else if (IS_STRING(s)) {
     ObjString* str = AS_STRING(s);
@@ -2843,22 +2831,22 @@ Value str_index_of(Value s, Value value, Value from_index) {
         }
       }
     } else {
-      return error_val(ERROR_TYPE, "      ");
+      return error_val(ERROR_TYPE, "");
     }
   } else {
-    return error_val(ERROR_TYPE, "      ");
+    return error_val(ERROR_TYPE, "");
   }
   return NIL_VAL;
 }
 
 Value math_gcd(Value param_1, Value param_2) {
   if (!IS_NUMBER(param_1) || !IS_NUMBER(param_2)) {
-    return error_val(ERROR_TYPE, "      ");
+    return error_val(ERROR_TYPE, "");
   }
   double p1 = AS_NUMBER(param_1);
   double p2 = AS_NUMBER(param_2);
   if (!is_integer(p1) || !is_integer(p2)) {
-    return error_val(ERROR_TYPE, "      ");
+    return error_val(ERROR_TYPE, "");
   }
   int32_t a = (int32_t) p1;
   int32_t b = (int32_t) p2;
