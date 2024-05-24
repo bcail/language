@@ -1543,7 +1543,7 @@ c_types = '''
 #define AS_RECUR(value)       ((value).data.recur)
 #define AS_FILE(value)       ((value).data.file)
 #define AS_SHORT_STRING(value)  ((value).data.short_string)
-#define AS_SHORT_CSTRING(value)  ((value).data.short_string.string)
+#define AS_SHORT_CSTRING(value)  ((value).data.short_string.chars)
 #define AS_OBJ(value)  ((value).data.obj)
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->chars)
@@ -1620,7 +1620,7 @@ typedef struct {
 
 typedef struct {
   uint8_t length;
-  char string[7];
+  char chars[7];
 } ShortString;
 
 typedef struct {
@@ -1815,7 +1815,7 @@ static uint32_t hash_short_string(ShortString sh) {
   hash *= 16777619;
 
   for (uint32_t i = 0; i < sh.length; i++) {
-    hash ^= (uint8_t) sh.string[i];
+    hash ^= (uint8_t) sh.chars[i];
     hash *= 16777619;
   }
   return hash;
@@ -1885,7 +1885,7 @@ Value copy_string(const char* chars, uint32_t length) {
   if (length < 7) {
     ShortString sh;
     sh.length = (uint8_t) length;
-    strcpy(sh.string, chars);
+    strcpy(sh.chars, chars);
     return SHORT_STRING_VAL(sh);
   }
   uint32_t hash = hash_string(chars, length);
@@ -2218,7 +2218,7 @@ Value equal(Value x, Value y) {
     ShortString xShort = AS_SHORT_STRING(x);
     ShortString yShort = AS_SHORT_STRING(y);
     if ((xShort.length == yShort.length) &&
-        (memcmp(xShort.string, yShort.string, (size_t)xShort.length) == 0)) {
+        (memcmp(xShort.chars, yShort.chars, (size_t)xShort.length) == 0)) {
       return BOOL_VAL(true);
     }
     return BOOL_VAL(false);
@@ -2583,8 +2583,8 @@ Value str_blank(Value string) {
     if (s.length == 0) {
       return BOOL_VAL(true);
     }
-    for (int i = 0; s.string[i] != '\\0'; i++) {
-      if (!isspace(s.string[i])) {
+    for (int i = 0; s.chars[i] != '\\0'; i++) {
+      if (!isspace(s.chars[i])) {
         return BOOL_VAL(false);
       }
     }
@@ -2607,13 +2607,13 @@ Value str_lower(Value string) {
     ShortString s = AS_SHORT_STRING(string);
     char buffer[7];
     int i = 0;
-    for (; s.string[i] != 0; i++) {
-      buffer[i] = (char) tolower((int) s.string[i]);
+    for (; s.chars[i] != 0; i++) {
+      buffer[i] = (char) tolower((int) s.chars[i]);
     }
     buffer[i] = 0;
     ShortString s_lower;
     s_lower.length = s.length;
-    memcpy(s_lower.string, buffer, (size_t) (s.length+1));
+    memcpy(s_lower.chars, buffer, (size_t) (s.length+1));
     return SHORT_STRING_VAL(s_lower);
   } else {
     ObjString* s = AS_STRING(string);
@@ -2633,10 +2633,10 @@ Value str_split(Value string) {
 
   if (IS_SHORT_STRING(string)) {
     ShortString s = AS_SHORT_STRING(string);
-    for (int i=0; s.string[i] != 0; i++) {
-      if (s.string[i] == ' ') {
+    for (int i=0; s.chars[i] != 0; i++) {
+      if (s.chars[i] == ' ') {
         char split_buffer[7];
-        memcpy(split_buffer, &(s.string[split_start_index]), split_length);
+        memcpy(split_buffer, &(s.chars[split_start_index]), split_length);
         split_buffer[split_length] = 0;
         Value split = copy_string(split_buffer, split_length);
         list_add(splits, split);
@@ -2647,7 +2647,7 @@ Value str_split(Value string) {
         split_length++;
       }
     }
-    Value split = copy_string(&(s.string[split_start_index]), split_length);
+    Value split = copy_string(&(s.chars[split_start_index]), split_length);
     list_add(splits, split);
   }
   // regular string
@@ -2744,13 +2744,13 @@ Value str_join(Value list_val) {
       Value v = list_get(list_val, (int32_t)i);
       Value v_str = str_str(v);
       ShortString v_short_string = AS_SHORT_STRING(v_str);
-      memcpy(start_char, v_short_string.string, (size_t)v_short_string.length);
+      memcpy(start_char, v_short_string.chars, (size_t)v_short_string.length);
       start_char = start_char + v_short_string.length;
     }
     buffer[num_bytes] = '\\0';
     ShortString sh;
     sh.length = (uint8_t) num_bytes;
-    memcpy(sh.string, buffer, num_bytes + 1);
+    memcpy(sh.chars, buffer, num_bytes + 1);
     return SHORT_STRING_VAL(sh);
   }
 
@@ -2767,7 +2767,7 @@ Value str_join(Value list_val) {
     } else {
       // it's a short string
       ShortString sh = AS_SHORT_STRING(v_str);
-      memcpy(start_char, sh.string, (size_t)sh.length);
+      memcpy(start_char, sh.chars, (size_t)sh.length);
       start_char = start_char + sh.length;
     }
   }
@@ -2787,10 +2787,10 @@ Value str_index_of(Value s, Value value, Value from_index) {
       ShortString value_str = AS_SHORT_STRING(value);
       if (value_str.length <= str.length) {
         for (; index < str.length; index++) {
-          if (str.string[index] == value_str.string[0]) {
+          if (str.chars[index] == value_str.chars[0]) {
             bool found = true;
             for (uint8_t j = 1; j < value_str.length; j++) {
-              if (str.string[index+j] != value_str.string[j]) {
+              if (str.chars[index+j] != value_str.chars[j]) {
                 found = false;
                 break;
               }
@@ -2811,10 +2811,10 @@ Value str_index_of(Value s, Value value, Value from_index) {
     if (IS_SHORT_STRING(value)) {
       ShortString value_str = AS_SHORT_STRING(value);
       for (; index < str->length; index++) {
-        if (str->chars[index] == value_str.string[0]) {
+        if (str->chars[index] == value_str.chars[0]) {
           bool found = true;
           for (uint8_t j = 1; j < value_str.length; j++) {
-            if (str->chars[index+j] != value_str.string[j]) {
+            if (str->chars[index+j] != value_str.chars[j]) {
               found = false;
               break;
             }
