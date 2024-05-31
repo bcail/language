@@ -87,7 +87,8 @@ LANG_C_CODE = '''
 #define MAX_LINE 1000
 #define ERROR_GENERAL 0
 #define ERROR_TYPE 1
-#define ERROR_DIVIDE_BY_ZERO 2
+#define ERROR_OUT_OF_BOUNDS 2
+#define ERROR_DIVIDE_BY_ZERO 3
 
 void* reallocate(void* pointer, size_t newSize) {
   if (newSize == 0) {
@@ -999,6 +1000,8 @@ Value print(Value value) {
   else if (IS_ERROR(value)) {
     if (value.data.err_info.type == ERROR_DIVIDE_BY_ZERO) {
       printf("ERROR: DivideByZero");
+    } else if (value.data.err_info.type == ERROR_OUT_OF_BOUNDS) {
+      printf("ERROR: OutOfBounds");
     } else if (value.data.err_info.type == ERROR_TYPE) {
       printf("ERROR: Type");
     } else {
@@ -1350,6 +1353,93 @@ Value str_index_of(Value s, Value value, Value from_index) {
     return error_val(ERROR_TYPE, "");
   }
   return NIL_VAL;
+}
+
+Value str_subs(Value s, Value start, Value end) {
+  if (IS_NUMBER(start)) {
+    if (AS_NUMBER(start) < 0) {
+      return error_val(ERROR_OUT_OF_BOUNDS, "");
+    }
+    uint32_t start_index = (uint32_t) AS_NUMBER(start);
+    uint32_t num_bytes = 0;
+    if (IS_SHORT_STRING(s)) {
+      ShortString str = AS_SHORT_STRING(s);
+      uint32_t end_index = 0;
+      if (IS_NIL(end)) {
+        end_index = (uint32_t) str.length;
+      } else if (IS_NUMBER(end)) {
+        if (AS_NUMBER(end) >= 0) {
+          end_index = (uint32_t) AS_NUMBER(end);
+        } else {
+          return error_val(ERROR_OUT_OF_BOUNDS, "");
+        }
+      } else {
+        return error_val(ERROR_TYPE, "");
+      }
+      if ((end_index < start_index) || (end_index > str.length)) {
+        return error_val(ERROR_OUT_OF_BOUNDS, "");
+      }
+      char buffer[7];
+      uint32_t i = start_index;
+      uint32_t buf_index = 0;
+      for (; i < end_index; i++) {
+        buffer[buf_index] = str.chars[i];
+        num_bytes = num_bytes + 1;
+        buf_index += 1;
+      }
+      buffer[num_bytes] = 0;
+      ShortString subs;
+      subs.length = (uint8_t) num_bytes;
+      memcpy(subs.chars, buffer, (size_t) (num_bytes+1));
+      return SHORT_STRING_VAL(subs);
+    } else if (IS_STRING(s)) {
+      ObjString* str = AS_STRING(s);
+      uint32_t end_index = 0;
+      if (IS_NIL(end)) {
+        end_index = (uint32_t) str->length;
+      } else if (IS_NUMBER(end)) {
+        if (AS_NUMBER(end) >= 0) {
+          end_index = (uint32_t) AS_NUMBER(end);
+        } else {
+          return error_val(ERROR_OUT_OF_BOUNDS, "");
+        }
+      } else {
+        return error_val(ERROR_TYPE, "");
+      }
+      if ((end_index < start_index) || (end_index > str->length)) {
+        return error_val(ERROR_OUT_OF_BOUNDS, "");
+      }
+      // construct short string if it's a small results
+      if ((end_index - start_index) < 7) {
+        char buffer[7];
+        uint32_t i = start_index;
+        uint32_t buf_index = 0;
+        for (; i < end_index; i++) {
+          buffer[buf_index] = str->chars[i];
+          num_bytes = num_bytes + 1;
+          buf_index += 1;
+        }
+        buffer[num_bytes] = 0;
+        ShortString subs;
+        subs.length = (uint8_t) num_bytes;
+        memcpy(subs.chars, buffer, (size_t) (num_bytes+1));
+        return SHORT_STRING_VAL(subs);
+      }
+      // construct regular string
+      else {
+        size_t num_bytes_to_copy = end_index - start_index;
+        char* heapChars = ALLOCATE(char, (size_t)(num_bytes_to_copy+1));
+        char* start_char = heapChars;
+        char* str_start_char = str->chars;
+        str_start_char = str_start_char + start_index;
+        memcpy(start_char, str_start_char, num_bytes_to_copy);
+        heapChars[num_bytes_to_copy] = 0;
+        uint32_t hash = hash_string(heapChars, num_bytes);
+        return allocate_string(heapChars, num_bytes, hash);
+      }
+    }
+  }
+  return error_val(ERROR_TYPE, "");
 }
 
 Value math_gcd(Value param_1, Value param_2) {
@@ -2319,6 +2409,20 @@ def str_index_of_c(params, envs):
     return {'code': name}
 
 
+def str_subs_c(params, envs):
+    s_param = compile_form(params[0], envs=envs)['code']
+    start_param = compile_form(params[1], envs=envs)['code']
+    if len(params) > 2:
+        end_param = compile_form(params[2], envs=envs)['code']
+    else:
+        end_param = 'NIL_VAL'
+    name = _get_generated_name('str_subs_result', envs=envs)
+    envs[-1]['code'].append(f'  Value {name} = str_subs({s_param}, {start_param}, {end_param});')
+    envs[-1]['code'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }')
+    envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
+    return {'code': name}
+
+
 def nth_c(params, envs):
     lst = compile_form(params[0], envs=envs)
     index = compile_form(params[1], envs=envs)['code']
@@ -2612,6 +2716,7 @@ language_string_ns = {
     'lower': {'function': str_lower_c},
     'blank?': {'function': str_blank_c},
     'index-of': {'function': str_index_of_c},
+    'subs': {'function': str_subs_c},
 }
 
 language_os_ns = {
