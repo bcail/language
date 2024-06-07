@@ -416,6 +416,17 @@ class CompileTests(unittest.TestCase):
             with self.subTest(test=test):
                 _run_test(test, self.assertEqual)
 
+    def test_convert(self):
+        tests = [
+            {'src': '(print (to-number nil))', 'output': 'ERROR: Type'},
+            {'src': '(print (to-number 4))', 'output': '4'},
+            {'src': '(print (to-number "4"))', 'output': '4'},
+            {'src': '(print (to-number "1111111"))', 'output': '1111111'},
+        ]
+        for test in tests:
+            with self.subTest(test=test):
+                _run_test(test, self.assertEqual)
+
     def test_comparisons(self):
         tests = [
             {'src': '(print (= nil nil))', 'output': 'true'},

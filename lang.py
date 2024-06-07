@@ -607,6 +607,23 @@ Value greater_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) >= AS_NUMBE
 Value less_equal(Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) <= AS_NUMBER(y)); }
 Value less(ObjMap* user_globals, Value x, Value y) { return BOOL_VAL(AS_NUMBER(x) < AS_NUMBER(y)); }
 
+Value to_number(Value v) {
+  if (IS_SHORT_STRING(v)) {
+    const char *str = AS_SHORT_CSTRING(v);
+    char* ptr;
+    long int value = strtol(str, &ptr, 10);
+    return NUMBER_VAL((double) value);
+  } else if (IS_STRING(v)) {
+    const char *str = AS_CSTRING(v);
+    char* ptr;
+    long int value = strtol(str, &ptr, 10);
+    return NUMBER_VAL((double) value);
+  } else if (IS_NUMBER(v)) {
+    return v;
+  }
+  return error_val(ERROR_TYPE, "");
+}
+
 void quick_sort(ObjMap* user_globals, Value v[], uint32_t left, uint32_t right, Value (*compare) (ObjMap*, Value, Value)) {
   /* C Programming Language K&R p87*/
   uint32_t i, last;
@@ -2005,6 +2022,11 @@ def less_equal_c(params, envs):
     return {'code': f'less_equal({c_params[0]}, {c_params[1]})'}
 
 
+def to_number_c(params, envs):
+    param = compile_form(params[0], envs=envs)['code']
+    return {'code': f'to_number({param})'}
+
+
 def hash_c(params, envs):
     result = compile_form(params[0], envs=envs)
     hash_result = _get_generated_name('hash_result', envs=envs)
@@ -2679,6 +2701,7 @@ global_ns = {
     '>=': {'function': greater_equal_c},
     '<': {'function': less_c},
     '<=': {'function': less_equal_c},
+    'to-number': {'function': to_number_c},
     'hash': {'function': hash_c},
     'print': {'function': print_c},
     'println': {'function': println_c},
