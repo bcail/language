@@ -15,6 +15,7 @@ from lang import (
 
 SAVE_FAILED = False
 QUICK = False
+CI = False
 
 
 SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
@@ -151,32 +152,27 @@ def _run_test(test, assert_equal, sqlite=False):
     print(f'*** c test: {test["src"]}')
     c_code = _compile(test['src'])
 
-    if platform.system() == 'Darwin':
-        compilers = [
-            (clang_cmd, False, 'clang_regular'),
-        ]
-        if not QUICK:
-            compilers.append( (gcc_cmd, False, 'gcc_regular') )
-    elif platform.system() == 'Windows':
-        cc_path = 'clang.exe'
-        compilers = [
-            (cc_path, False, 'clang_regular'),
-        ]
-    else:
-        if sqlite:
-            compilers = [
-                (clang_cmd, False, 'clang_regular'),
-                (gcc_cmd, False, 'gcc_regular'),
-            ]
+    if CI:
+        if platform.system() == 'Darwin':
+            compilers = [ (gcc_cmd, False, 'gcc_regular') ]
+        elif platform.system() == 'Windows':
+            cc_path = 'clang.exe'
+            compilers = [ (cc_path, False, 'clang_regular') ]
         else:
-            compilers = [
-                (clang_cmd, False, 'clang_regular'),
-            ]
-            if not QUICK:
-                compilers.extend([
+            if sqlite:
+                compilers = [ (gcc_cmd, False, 'gcc_regular') ]
+            else:
+                compilers = [
                     (clang_cmd, True, 'clang_checks'),
                     (gcc_cmd, True, 'gcc_checks'),
-                ])
+                ]
+    else:
+        compilers = [ (clang_cmd, False, 'clang_regular') ]
+        if not QUICK:
+            compilers.extend([
+                (clang_cmd, True, 'clang_checks'),
+                (gcc_cmd, True, 'gcc_checks'),
+            ])
 
     with tempfile.TemporaryDirectory() as tmp:
         c_filename = os.path.join(tmp, 'code.c')
@@ -794,7 +790,12 @@ class ProgramTests(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == '-q':
-        QUICK = True
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '-q':
+            QUICK = True
+            sys.argv.remove('-q')
+        elif sys.argv[1] == '--ci':
+            CI = True
+            sys.argv.remove('--ci')
 
     unittest.main()
