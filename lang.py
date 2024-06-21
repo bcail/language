@@ -2355,6 +2355,8 @@ def loop_c(params, envs):
 
     envs.pop()
 
+    envs[-1]['temps'].add(result_name)
+
     envs[-1]['code'].append(f'  Value {result_name} = {f_name}({c_initial_args});')
     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
 
