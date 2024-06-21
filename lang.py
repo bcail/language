@@ -423,6 +423,14 @@ void list_add(ObjList* list, Value item) {
   }
 }
 
+Value list_conj(Value lst, Value item) {
+  if (IS_LIST(lst)) {
+    list_add(AS_LIST(lst), item);
+    return lst;
+  }
+  return error_val(ERROR_TYPE, "");
+}
+
 Value list_count(Value list) {
   return NUMBER_VAL((double) AS_LIST(list)->count);
 }
@@ -2446,9 +2454,15 @@ def str_subs_c(params, envs):
 
 
 def nth_c(params, envs):
-    lst = compile_form(params[0], envs=envs)
+    lst = compile_form(params[0], envs=envs)['code']
     index = compile_form(params[1], envs=envs)['code']
-    return {'code': f'list_get({lst["code"]}, (int32_t) AS_NUMBER({index}))'}
+    return {'code': f'list_get({lst}, (int32_t) AS_NUMBER({index}))'}
+
+
+def conj_c(params, envs):
+    lst = compile_form(params[0], envs=envs)['code']
+    item = compile_form(params[1], envs=envs)['code']
+    return {'code': f'list_conj({lst}, {item})'}
 
 
 def remove_c(params, envs):
@@ -2707,6 +2721,7 @@ global_ns = {
     'println': {'function': println_c},
     'count': {'function': count_c},
     'nth': {'function': nth_c},
+    'conj': {'function': conj_c},
     'remove': {'function': remove_c},
     'sort': {'function': sort_c},
     'get': {'function': map_get_c},
