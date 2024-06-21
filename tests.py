@@ -291,6 +291,8 @@ class CompileTests(unittest.TestCase):
         tests = [
             {'src': '(print "abc")', 'output': 'abc'},
             {'src': '(print "abcdefgh")', 'output': 'abcdefgh'},
+            {'src': '(print (count "abc"))', 'output': '3'},
+            {'src': '(print (count "abcdefgh"))', 'output': '8'},
             {'src': '(print (str))', 'output': ''},
             {'src': '(print (str nil))', 'output': ''},
             {'src': '(print (str true))', 'output': 'true'},

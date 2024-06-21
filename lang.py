@@ -435,6 +435,17 @@ Value list_count(Value list) {
   return NUMBER_VAL((double) AS_LIST(list)->count);
 }
 
+Value count(Value v) {
+  if (IS_SHORT_STRING(v)) {
+    return NUMBER_VAL((double) AS_SHORT_STRING(v).length);
+  } else if (IS_STRING(v)) {
+    return NUMBER_VAL((double) AS_STRING(v)->length);
+  } else if (IS_LIST(v)) {
+    return list_count(v);
+  }
+  return error_val(ERROR_TYPE, "");
+}
+
 Value list_get(Value list, int32_t index) {
   if (index < 0) {
     return NIL_VAL;
@@ -2484,8 +2495,8 @@ def sort_c(params, envs):
 
 
 def count_c(params, envs):
-    lst = compile_form(params[0], envs=envs)
-    return {'code': f'list_count({lst["code"]})'}
+    value = compile_form(params[0], envs=envs)['code']
+    return {'code': f'count({value})'}
 
 
 def map_get_c(params, envs):
