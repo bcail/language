@@ -1762,8 +1762,8 @@ class TokenType(Enum):
     IF = auto()
 
 
-DOUBLE_RE = re.compile('-?[0-9]+\.?[0-9]*')
-RATIO_RE = re.compile('-?[0-9]+/-?[0-9]+')
+DOUBLE_RE = re.compile(r'-?[0-9]+\.?[0-9]*')
+RATIO_RE = re.compile(r'-?[0-9]+/-?[0-9]+')
 
 
 def _get_token(token_buffer):
@@ -3354,7 +3354,9 @@ def build_executable(file_name, output_file_name, with_checks=False):
 
 
 def run_executable(file_name, cli_args=None):
-    cmd = [f'./{file_name}']
+    if not file_name.startswith('/'):
+        file_name = f'./{file_name}'
+    cmd = [file_name]
     if cli_args:
         cmd.extend(cli_args)
     try:

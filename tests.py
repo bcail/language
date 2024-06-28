@@ -786,7 +786,8 @@ class ProgramTests(unittest.TestCase):
             result_output = result.stdout.decode('utf8')
             self.assertEqual(result_output, '{one 2, two 1}a%sarg1arg2%s3.41.2' % (LSEP, LSEP))
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f'run_program test failed: {e}\n{e.stderr.decode("utf8")}')
+            print(e.stderr.decode("utf8"))
+            raise RuntimeError(f'run_program test failed: {e}')
 
 
 if __name__ == '__main__':
