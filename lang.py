@@ -1645,15 +1645,6 @@ Value lang_sqlite3_execute(Value db, Value sql_code) {
 # COMPILER
 ############################################
 
-class AST:
-
-    def __init__(self):
-        self.forms = []
-
-    def add(self, form):
-        self.forms.append(form)
-
-
 class Keyword:
 
     def __init__(self, name):
@@ -1888,7 +1879,6 @@ class DictBuilder:
 
 
 def parse(tokens):
-    ast_obj = AST()
     ast = []
     stack_of_lists = None
     current_list = ast
@@ -1927,10 +1917,12 @@ def parse(tokens):
 
         index = index + 1
 
-    for a in ast:
-        ast_obj.add(a)
+    main_ast = []
 
-    return ast_obj
+    for a in ast:
+        main_ast.append(a)
+
+    return main_ast
 
 
 ####### COMPILE TO C ##############
@@ -3118,7 +3110,7 @@ def _compile_forms(source, program=None, source_file=None):
             'recur_points': [],
             'bindings': {},
         }
-    for f in ast.forms:
+    for f in ast:
         compile_form(f, envs=[program])
 
     return program

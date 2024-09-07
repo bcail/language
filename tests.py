@@ -85,7 +85,7 @@ class ParseTests(unittest.TestCase):
     def test(self):
         self.maxDiff = None
         ast = parse(EXPECTED_TOKENS)
-        self.assertEqual(ast.forms, EXPECTED_AST_FORMS)
+        self.assertEqual(ast, EXPECTED_AST_FORMS)
 
     def test_2(self):
         tokens = [
@@ -96,7 +96,7 @@ class ParseTests(unittest.TestCase):
             {'type': TokenType.RIGHT_PAREN},
         ]
         ast = parse(tokens)
-        self.assertEqual(ast.forms,
+        self.assertEqual(ast,
             [
                 [
                     Symbol('='),
@@ -120,7 +120,7 @@ class ParseTests(unittest.TestCase):
             {'type': TokenType.RIGHT_PAREN},
         ]
         ast = parse(tokens)
-        self.assertEqual(ast.forms,
+        self.assertEqual(ast,
                 [
                     [
                         Symbol('def'),
