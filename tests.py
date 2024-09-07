@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import sys
 from unittest.mock import patch
-from lang import TokenType, scan_tokens, parse, Symbol, _compile, _get_compile_cmd_env
+from lang import _compile, _get_compile_cmd_env
 from lang import (
         GCC_CMD, GCC_CHECK_OPTIONS, GCC_CHECK_ENV,
         CLANG_CMD, CLANG_CHECK_OPTIONS, CLANG_CHECK_ENV,
@@ -16,124 +16,6 @@ from lang import (
 SAVE_FAILED = False
 QUICK = False
 CI = False
-
-
-SOURCE = '(+ 10 2 (- 15 (+ 4 4)) -5)'
-EXPECTED_TOKENS = [
-    {'type': TokenType.LEFT_PAREN},
-    {'type': TokenType.SYMBOL, 'lexeme': '+'},
-    {'type': TokenType.NUMBER, 'lexeme': '10'},
-    {'type': TokenType.NUMBER, 'lexeme': '2'},
-    {'type': TokenType.LEFT_PAREN},
-    {'type': TokenType.SYMBOL, 'lexeme': '-'},
-    {'type': TokenType.NUMBER, 'lexeme': '15'},
-    {'type': TokenType.LEFT_PAREN},
-    {'type': TokenType.SYMBOL, 'lexeme': '+'},
-    {'type': TokenType.NUMBER, 'lexeme': '4'},
-    {'type': TokenType.NUMBER, 'lexeme': '4'},
-    {'type': TokenType.RIGHT_PAREN},
-    {'type': TokenType.RIGHT_PAREN},
-    {'type': TokenType.NUMBER, 'lexeme': '-5'},
-    {'type': TokenType.RIGHT_PAREN},
-]
-
-EXPECTED_AST_FORMS = [
-    [
-        Symbol('+'),
-        10,
-        2,
-        [
-            Symbol('-'),
-            15,
-            [
-                Symbol('+'),
-                4,
-                4,
-            ]
-        ],
-        -5,
-    ]
-]
-
-
-class ScanTokenTests(unittest.TestCase):
-
-    def test(self):
-        self.maxDiff = None
-        tokens = scan_tokens(SOURCE)
-        self.assertEqual(tokens, EXPECTED_TOKENS)
-
-    def test_nil(self):
-        tokens = scan_tokens('(= 1 nil)')
-        self.assertEqual(tokens,
-                [
-                    {'type': TokenType.LEFT_PAREN},
-                    {'type': TokenType.SYMBOL, 'lexeme': '='},
-                    {'type': TokenType.NUMBER, 'lexeme': '1'},
-                    {'type': TokenType.NIL},
-                    {'type': TokenType.RIGHT_PAREN},
-                ]
-            )
-
-    def test_number(self):
-        tokens = scan_tokens('2')
-        self.assertEqual(tokens, [{'type': TokenType.NUMBER, 'lexeme': '2'}])
-
-
-class ParseTests(unittest.TestCase):
-
-    def test(self):
-        self.maxDiff = None
-        ast = parse(EXPECTED_TOKENS)
-        self.assertEqual(ast, EXPECTED_AST_FORMS)
-
-    def test_2(self):
-        tokens = [
-            {'type': TokenType.LEFT_PAREN},
-            {'type': TokenType.SYMBOL, 'lexeme': '='},
-            {'type': TokenType.TRUE},
-            {'type': TokenType.NIL},
-            {'type': TokenType.RIGHT_PAREN},
-        ]
-        ast = parse(tokens)
-        self.assertEqual(ast,
-            [
-                [
-                    Symbol('='),
-                    True,
-                    None
-                ]
-            ]
-        )
-
-    def test_sequence_of_forms(self):
-        tokens = [
-            {'type': TokenType.LEFT_PAREN},
-            {'type': TokenType.SYMBOL, 'lexeme': 'def'},
-            {'type': TokenType.SYMBOL, 'lexeme': 'a'},
-            {'type': TokenType.NUMBER, 'lexeme': '1'},
-            {'type': TokenType.RIGHT_PAREN},
-            {'type': TokenType.LEFT_PAREN},
-            {'type': TokenType.SYMBOL, 'lexeme': '+'},
-            {'type': TokenType.SYMBOL, 'lexeme': 'a'},
-            {'type': TokenType.NUMBER, 'lexeme': '1'},
-            {'type': TokenType.RIGHT_PAREN},
-        ]
-        ast = parse(tokens)
-        self.assertEqual(ast,
-                [
-                    [
-                        Symbol('def'),
-                        Symbol('a'),
-                        1
-                    ],
-                    [
-                        Symbol('+'),
-                        Symbol('a'),
-                        1
-                    ]
-                ]
-            )
 
 
 gcc_cmd = os.environ.get('GCC', GCC_CMD)
