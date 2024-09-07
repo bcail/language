@@ -1869,13 +1869,8 @@ def _get_node(token):
         return token['type']
 
 
-class DictBuilder:
-
-    def __init__(self):
-        self.items = []
-
-    def append(self, item):
-        self.items.append(item)
+class Map(list):
+    pass
 
 
 def parse(tokens):
@@ -1906,7 +1901,7 @@ def parse(tokens):
             stack_of_lists.pop(-1)
             current_list = stack_of_lists[-1]
         elif token['type'] == TokenType.LEFT_BRACE:
-            new_dict = DictBuilder()
+            new_dict = Map()
             if stack_of_lists is None:
                 stack_of_lists = [ast]
             stack_of_lists[-1].append(new_dict)
@@ -2824,8 +2819,8 @@ def new_map_c(node, envs):
     name = _get_generated_name('map', envs=envs)
     envs[-1]['temps'].add(name)
     c_code = f'  Value {name} = OBJ_VAL(allocate_map());\n  inc_ref(AS_OBJ({name}));'
-    keys = [compile_form(k, envs=envs)['code'] for k in node.items[::2]]
-    values = [compile_form(v, envs=envs)['code'] for v in node.items[1::2]]
+    keys = [compile_form(k, envs=envs)['code'] for k in node[::2]]
+    values = [compile_form(v, envs=envs)['code'] for v in node[1::2]]
     c_items = zip(keys, values)
 
     for key, value in c_items:
@@ -2859,6 +2854,9 @@ def _find_symbol(symbol, envs):
 
 
 def compile_form(node, envs):
+    if isinstance(node, Map):
+        name = new_map_c(node, envs=envs)
+        return {'code': name}
     if isinstance(node, list):
         first = node[0]
         rest = node[1:]
@@ -3087,9 +3085,6 @@ def compile_form(node, envs):
         return {'code': f'NUMBER_VAL({node})'}
     if node is None:
         return {'code': 'NIL_VAL'}
-    if isinstance(node, DictBuilder):
-        name = new_map_c(node, envs=envs)
-        return {'code': name}
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
