@@ -1700,32 +1700,8 @@ class Var:
         return str(self)
 
 
-class Vector:
-
-    def __init__(self, items=None):
-        self.items = items or []
-
-    def __eq__(self, other):
-        if isinstance(other, list):
-            return self.items == other
-        if not isinstance(other, Vector):
-            raise Exception(f'{other} is not a Vector')
-        return self.items == other.items
-
-    def __str__(self):
-        return str(self.items)
-
-    def __repr__(self):
-        return str(self)
-
-    def __len__(self):
-        return len(self.items)
-
-    def __getitem__(self, item):
-        return self.items[item]
-
-    def append(self, item):
-        self.items.append(item)
+class Vector(list):
+    pass
 
 
 class TokenType(Enum):
@@ -2145,8 +2121,8 @@ def let_c(params, envs):
     body = params[1:]
 
     paired_bindings = []
-    for i in range(0, len(bindings.items), 2):
-        paired_bindings.append(bindings.items[i:i+2])
+    for i in range(0, len(bindings), 2):
+        paired_bindings.append(bindings[i:i+2])
 
     f_params = 'ObjMap* user_globals'
     f_args = 'user_globals'
@@ -2300,8 +2276,8 @@ def loop_c(params, envs):
     bindings = params[0]
     exprs = params[1:]
 
-    loop_params = bindings.items[::2]
-    initial_args = bindings.items[1::2]
+    loop_params = bindings[::2]
+    initial_args = bindings[1::2]
 
     previous_bindings = _get_previous_bindings(envs)
 
@@ -2804,9 +2780,9 @@ def new_string_c(s, envs):
 def new_vector_c(v, envs):
     name = _get_generated_name('lst', envs=envs)
     envs[-1]['temps'].add(name)
-    num_items = len(v.items)
+    num_items = len(v)
     c_code = f'  Value {name} = OBJ_VAL(allocate_list((uint32_t) {num_items}));\n  inc_ref(AS_OBJ({name}));'
-    c_items = [compile_form(item, envs=envs)['code'] for item in v.items]
+    c_items = [compile_form(item, envs=envs)['code'] for item in v]
     for c_item in c_items:
         c_code += f'\n  list_add(AS_LIST({name}), {c_item});'
 
@@ -2856,6 +2832,9 @@ def _find_symbol(symbol, envs):
 def compile_form(node, envs):
     if isinstance(node, Map):
         name = new_map_c(node, envs=envs)
+        return {'code': name}
+    if isinstance(node, Vector):
+        name = new_vector_c(node, envs=envs)
         return {'code': name}
     if isinstance(node, list):
         first = node[0]
@@ -2936,8 +2915,8 @@ def compile_form(node, envs):
             elif first.name == 'with':
                 bindings = rest[0]
                 paired_bindings = []
-                for i in range(0, len(bindings.items), 2):
-                    paired_bindings.append(bindings.items[i:i+2])
+                for i in range(0, len(bindings), 2):
+                    paired_bindings.append(bindings[i:i+2])
                 for binding in paired_bindings:
                     result = compile_form(binding[1], envs=envs)
                     binding_name = _get_generated_name(base=binding[0].name, envs=envs)
@@ -3006,11 +2985,11 @@ def compile_form(node, envs):
             elif first.name == 'require':
                 for require in rest:
                     if isinstance(require, Vector):
-                        if isinstance(require.items[0], Symbol):
-                            module_name = require.items[0].name
+                        if isinstance(require[0], Symbol):
+                            module_name = require[0].name
                         else:
-                            module_name = require.items[0]
-                        referred_as = require.items[1].name
+                            module_name = require[0]
+                        referred_as = require[1].name
                     else:
                         raise Exception(f'require argument needs to a vector')
                     if referred_as in envs[0]['namespaces']:
@@ -3067,9 +3046,6 @@ def compile_form(node, envs):
         raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Ratio):
         return {'code': f'ratio_val({node.numerator}, {node.denominator})'}
-    if isinstance(node, Vector):
-        name = new_vector_c(node, envs=envs)
-        return {'code': name}
     if isinstance(node, str):
         name = new_string_c(node, envs=envs)
         return {'code': name}
