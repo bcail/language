@@ -1721,7 +1721,6 @@ class TokenType(Enum):
     SYMBOL = auto()
     STRING = auto()
     NUMBER = auto()
-    DOUBLE = auto()
     RATIO = auto()
     TRUE = auto()
     FALSE = auto()
@@ -1729,17 +1728,15 @@ class TokenType(Enum):
     IF = auto()
 
 
-DOUBLE_RE = re.compile(r'-?[0-9]+\.?[0-9]*')
 RATIO_RE = re.compile(r'-?[0-9]+/-?[0-9]+')
+NUMBER_RE = re.compile(r'-?[0-9]+\.?[0-9]*')
 
 
 def _get_token(token_buffer):
-    if token_buffer.isdigit() or (token_buffer.startswith('-') and token_buffer[1:].isdigit()):
-        return {'type': TokenType.NUMBER, 'lexeme': token_buffer}
-    elif RATIO_RE.match(token_buffer):
+    if RATIO_RE.match(token_buffer):
         return {'type': TokenType.RATIO, 'lexeme': token_buffer}
-    elif DOUBLE_RE.match(token_buffer):
-        return {'type': TokenType.DOUBLE, 'lexeme': token_buffer}
+    elif NUMBER_RE.match(token_buffer):
+        return {'type': TokenType.NUMBER, 'lexeme': token_buffer}
     elif token_buffer == 'true':
         return {'type': TokenType.TRUE}
     elif token_buffer == 'false':
@@ -1824,17 +1821,15 @@ def scan_tokens(source):
 
 def _get_node(token):
     if token['type'] == TokenType.NIL:
-        return None
+        return {'type': 'nil'}
     elif token['type'] == TokenType.TRUE:
-        return True
+        return {'type': 'true'}
     elif token['type'] == TokenType.FALSE:
-        return False
+        return {'type': 'false'}
     elif token['type'] == TokenType.NUMBER:
-        return int(token['lexeme'])
-    elif token['type'] == TokenType.DOUBLE:
-        return float(token['lexeme'])
+        return {'type': 'number', 'lexeme': token['lexeme']}
     elif token['type'] == TokenType.STRING:
-        return token['lexeme']
+        return {'type': 'string', 'lexeme': token['lexeme']}
     elif token['type'] == TokenType.RATIO:
         return Ratio(string=token['lexeme'])
     elif token['type'] == TokenType.SYMBOL:
@@ -2409,7 +2404,7 @@ def str_index_of_c(params, envs):
     if len(params) > 2:
         from_index_param = compile_form(params[2], envs=envs)['code']
     else:
-        from_index_param = compile_form(0, envs=envs)['code']
+        from_index_param = compile_form({'type': 'number', 'lexeme': '0'}, envs=envs)['code']
     name = _get_generated_name('str_index_of_result', envs=envs)
     envs[-1]['code'].append(f'  Value {name} = str_index_of({s_param}, {value_param}, {from_index_param});')
     return {'code': name}
@@ -2601,8 +2596,10 @@ def file_open_c(params, envs):
     path = compile_form(params[0], envs=envs)['code']
     mode = 'r'
     if len(params) > 1:
-        if params[1] == 'w':
+        if params[1]['lexeme'] == 'w':
             mode = 'w'
+        else:
+            raise Exception(f'invalid open mode: {params[1]}')
     result_name = _get_generated_name('file_obj', envs=envs)
     envs[-1]['temps'].add(result_name)
     envs[-1]['code'].append(f'  Value {result_name} = file_open({path}, "{mode}");')
@@ -2830,6 +2827,21 @@ def _find_symbol(symbol, envs):
 
 
 def compile_form(node, envs):
+    if isinstance(node, dict):
+        type_ = node['type']
+        if type_ == 'nil':
+            return {'code': 'NIL_VAL'}
+        elif type_ == 'true':
+            return {'code': 'BOOL_VAL(true)'}
+        elif type_ == 'false':
+            return {'code': 'BOOL_VAL(false)'}
+        elif type_ == 'number':
+            return {'code': f'NUMBER_VAL({node["lexeme"]})'}
+        elif type_ == 'string':
+            name = new_string_c(node['lexeme'], envs=envs)
+            return {'code': name}
+        else:
+            raise Exception(f'unhandled node type: {type_}')
     if isinstance(node, Map):
         name = new_map_c(node, envs=envs)
         return {'code': name}
@@ -2987,6 +2999,11 @@ def compile_form(node, envs):
                     if isinstance(require, Vector):
                         if isinstance(require[0], Symbol):
                             module_name = require[0].name
+                        elif isinstance(require[0], dict):
+                            if require[0]['type'] == 'string':
+                                module_name = require[0]['lexeme']
+                            else:
+                                raise Exception(f'unhandled require type: {require[0]}')
                         else:
                             module_name = require[0]
                         referred_as = require[1].name
@@ -3046,21 +3063,6 @@ def compile_form(node, envs):
         raise Exception(f'unhandled symbol: {node}')
     if isinstance(node, Ratio):
         return {'code': f'ratio_val({node.numerator}, {node.denominator})'}
-    if isinstance(node, str):
-        name = new_string_c(node, envs=envs)
-        return {'code': name}
-    if isinstance(node, bool):
-        if node:
-            val = 'true'
-        else:
-            val = 'false'
-        return {'code': f'BOOL_VAL({val})'}
-    if isinstance(node, int):
-        return {'code': f'NUMBER_VAL({node})'}
-    if isinstance(node, float):
-        return {'code': f'NUMBER_VAL({node})'}
-    if node is None:
-        return {'code': 'NIL_VAL'}
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
