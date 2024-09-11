@@ -1645,18 +1645,6 @@ Value lang_sqlite3_execute(Value db, Value sql_code) {
 # COMPILER
 ############################################
 
-class Keyword:
-
-    def __init__(self, name):
-        self.name = name
-
-    def __eq__(self, other):
-        try:
-            return self.name == other.name
-        except AttributeError:
-            return False
-
-
 class Symbol:
 
     def __init__(self, name):
@@ -1673,12 +1661,6 @@ class Symbol:
 
     def __repr__(self):
         return str(self)
-
-
-class Ratio:
-
-    def __init__(self, string):
-        self.numerator, self.denominator = string.split('/')
 
 
 class Var:
@@ -1717,7 +1699,6 @@ class TokenType(Enum):
     GREATER_EQUAL = auto()
     LESS = auto()
     LESS_EQUAL = auto()
-    KEYWORD = auto()
     SYMBOL = auto()
     STRING = auto()
     NUMBER = auto()
@@ -1745,8 +1726,6 @@ def _get_token(token_buffer):
         return {'type': TokenType.NIL}
     elif token_buffer == 'if':
         return {'type': TokenType.IF}
-    elif token_buffer.startswith(':'):
-        return {'type': TokenType.KEYWORD, 'lexeme': token_buffer}
     else:
         return {'type': TokenType.SYMBOL, 'lexeme': token_buffer}
 
@@ -1831,11 +1810,9 @@ def _get_node(token):
     elif token['type'] == TokenType.STRING:
         return {'type': 'string', 'lexeme': token['lexeme']}
     elif token['type'] == TokenType.RATIO:
-        return Ratio(string=token['lexeme'])
+        return {'type': 'ratio', 'lexeme': token['lexeme']}
     elif token['type'] == TokenType.SYMBOL:
         return Symbol(name=token['lexeme'])
-    elif token['type'] == TokenType.KEYWORD:
-        return Keyword(name=token['lexeme'])
     else:
         return token['type']
 
@@ -2840,6 +2817,9 @@ def compile_form(node, envs):
         elif type_ == 'string':
             name = new_string_c(node['lexeme'], envs=envs)
             return {'code': name}
+        elif type_ == 'ratio':
+            numerator, denominator = node['lexeme'].split('/')
+            return {'code': f'ratio_val({numerator}, {denominator})'}
         else:
             raise Exception(f'unhandled node type: {type_}')
     if isinstance(node, Map):
@@ -3061,8 +3041,6 @@ def compile_form(node, envs):
             elif 'c_name' in symbol:
                 return {'code': symbol['c_name']}
         raise Exception(f'unhandled symbol: {node}')
-    if isinstance(node, Ratio):
-        return {'code': f'ratio_val({node.numerator}, {node.denominator})'}
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
