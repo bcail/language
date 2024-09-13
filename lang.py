@@ -1829,19 +1829,19 @@ def parse(tokens):
         if token['type'] == TokenType.LEFT_PAREN:
             # start new grouping
             new_list = []
-            stack_of_lists[-1].append(new_list)
+            current_list.append(new_list)
             stack_of_lists.append(new_list)
             current_list = new_list
         elif token['type'] == TokenType.LEFT_BRACKET:
             # start new grouping
             new_vector = Vector()
-            stack_of_lists[-1].append(new_vector)
+            current_list.append(new_vector)
             stack_of_lists.append(new_vector)
             current_list = new_vector
         elif token['type'] == TokenType.LEFT_BRACE:
             # start new grouping
             new_dict = Map()
-            stack_of_lists[-1].append(new_dict)
+            current_list.append(new_dict)
             stack_of_lists.append(new_dict)
             current_list = new_dict
         elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET, TokenType.RIGHT_BRACE]:
