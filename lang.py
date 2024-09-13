@@ -1823,7 +1823,7 @@ class Map(list):
 
 def parse(tokens):
     ast = []
-    stack_of_lists = None
+    stack_of_lists = [ast]
     current_list = ast
     index = 0
     while index < len(tokens):
@@ -1831,16 +1831,12 @@ def parse(tokens):
         if token['type'] == TokenType.LEFT_PAREN:
             #start new expression
             new_list = []
-            if stack_of_lists is None:
-                stack_of_lists = [ast]
             stack_of_lists[-1].append(new_list)
             stack_of_lists.append(new_list)
             current_list = stack_of_lists[-1]
         elif token['type'] == TokenType.LEFT_BRACKET:
             #start new expression
             new_vector = Vector()
-            if stack_of_lists is None:
-                stack_of_lists = [ast]
             stack_of_lists[-1].append(new_vector)
             stack_of_lists.append(new_vector)
             current_list = stack_of_lists[-1]
@@ -1850,8 +1846,6 @@ def parse(tokens):
             current_list = stack_of_lists[-1]
         elif token['type'] == TokenType.LEFT_BRACE:
             new_dict = Map()
-            if stack_of_lists is None:
-                stack_of_lists = [ast]
             stack_of_lists[-1].append(new_dict)
             stack_of_lists.append(new_dict)
             current_list = stack_of_lists[-1]
@@ -1860,12 +1854,7 @@ def parse(tokens):
 
         index = index + 1
 
-    main_ast = []
-
-    for a in ast:
-        main_ast.append(a)
-
-    return main_ast
+    return ast
 
 
 ####### COMPILE TO C ##############
