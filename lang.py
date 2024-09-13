@@ -1814,35 +1814,26 @@ def _get_node(token):
 
 
 def parse(tokens):
-    ast = []
+    ast = {'type': 'list', 'nodes': []}
     stack_of_lists = [ast]
     current_list = ast
     for token in tokens:
         if token['type'] == TokenType.LEFT_PAREN:
             # start new grouping
             new_list = {'type': 'list', 'nodes': []}
-            if isinstance(current_list, dict):
-                current_list['nodes'].append(new_list)
-            else:
-                current_list.append(new_list)
+            current_list['nodes'].append(new_list)
             stack_of_lists.append(new_list)
             current_list = new_list
         elif token['type'] == TokenType.LEFT_BRACKET:
             # start new grouping
             new_vector = {'type': 'vector', 'nodes': []}
-            if isinstance(current_list, dict):
-                current_list['nodes'].append(new_vector)
-            else:
-                current_list.append(new_vector)
+            current_list['nodes'].append(new_vector)
             stack_of_lists.append(new_vector)
             current_list = new_vector
         elif token['type'] == TokenType.LEFT_BRACE:
             # start new grouping
             new_dict = {'type': 'map', 'nodes': []}
-            if isinstance(current_list, dict):
-                current_list['nodes'].append(new_dict)
-            else:
-                current_list.append(new_dict)
+            current_list['nodes'].append(new_dict)
             stack_of_lists.append(new_dict)
             current_list = new_dict
         elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET, TokenType.RIGHT_BRACE]:
@@ -1852,10 +1843,7 @@ def parse(tokens):
         else:
             # add to a grouping
             node = _get_node(token)
-            if isinstance(current_list, dict):
-                current_list['nodes'].append(node)
-            else:
-                current_list.append(node)
+            current_list['nodes'].append(node)
 
     return ast
 
@@ -3053,7 +3041,7 @@ def _compile_forms(source, program=None, source_file=None):
             'recur_points': [],
             'bindings': {},
         }
-    for f in ast:
+    for f in ast['nodes']:
         compile_form(f, envs=[program])
 
     return program
