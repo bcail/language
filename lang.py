@@ -1825,34 +1825,32 @@ def parse(tokens):
     ast = []
     stack_of_lists = [ast]
     current_list = ast
-    index = 0
-    while index < len(tokens):
-        token = tokens[index]
+    for token in tokens:
         if token['type'] == TokenType.LEFT_PAREN:
-            #start new expression
+            # start new grouping
             new_list = []
             stack_of_lists[-1].append(new_list)
             stack_of_lists.append(new_list)
             current_list = stack_of_lists[-1]
         elif token['type'] == TokenType.LEFT_BRACKET:
-            #start new expression
+            # start new grouping
             new_vector = Vector()
             stack_of_lists[-1].append(new_vector)
             stack_of_lists.append(new_vector)
             current_list = stack_of_lists[-1]
-        elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET, TokenType.RIGHT_BRACE]:
-            #finish an expression
-            stack_of_lists.pop(-1)
-            current_list = stack_of_lists[-1]
         elif token['type'] == TokenType.LEFT_BRACE:
+            # start new grouping
             new_dict = Map()
             stack_of_lists[-1].append(new_dict)
             stack_of_lists.append(new_dict)
             current_list = stack_of_lists[-1]
+        elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET, TokenType.RIGHT_BRACE]:
+            # finish a grouping
+            stack_of_lists.pop(-1)
+            current_list = stack_of_lists[-1]
         else:
+            # add to a grouping
             current_list.append(_get_node(token))
-
-        index = index + 1
 
     return ast
 
