@@ -1645,43 +1645,6 @@ Value lang_sqlite3_execute(Value db, Value sql_code) {
 # COMPILER
 ############################################
 
-class Symbol:
-
-    def __init__(self, name):
-        self.name = name
-
-    def __eq__(self, other):
-        try:
-            return self.name == other.name
-        except AttributeError:
-            return False
-
-    def __str__(self):
-        return f'<Symbol {self.name}>'
-
-    def __repr__(self):
-        return str(self)
-
-
-class Var:
-
-    def __init__(self, name, value=None):
-        self.name = name
-        self.value = value
-
-    def __eq__(self, other):
-        try:
-            return self.name == other.name
-        except AttributeError:
-            return False
-
-    def __str__(self):
-        return f'<Var {self.name}: {self.value}>'
-
-    def __repr__(self):
-        return str(self)
-
-
 class TokenType(Enum):
     LEFT_PAREN = auto()
     RIGHT_PAREN = auto()
@@ -1808,7 +1771,7 @@ def _get_node(token):
     elif token['type'] == TokenType.RATIO:
         return {'type': 'ratio', 'lexeme': token['lexeme']}
     elif token['type'] == TokenType.SYMBOL:
-        return Symbol(name=token['lexeme'])
+        return {'type': 'symbol', 'lexeme': token['lexeme']}
     else:
         return token['type']
 
@@ -1970,7 +1933,7 @@ def hash_c(params, envs):
 
 
 def def_c(params, envs):
-    name = params[0].name
+    name = params[0]['lexeme']
     local_env = {'temps': envs[-1]['temps'], 'code': [], 'post': [], 'bindings': {}}
     envs.append(local_env)
     result = compile_form(params[1], envs=envs)
@@ -2011,7 +1974,7 @@ def if_form_c(params, envs):
     true_code = '\n  if (is_truthy(%s)) {\n  ' % test_code
     if true_env['code']:
         true_code += '\n  '.join(true_env['code']) + '\n  '
-    if isinstance(true_result, tuple) and isinstance(true_result[0], Symbol) and true_result[0].name == 'recur':
+    if isinstance(true_result, tuple) and isinstance(true_result[0], dict) and true_result[0]['type'] == 'symbol' and true_result[0]['lexeme'] == 'recur':
         recur_name = envs[0]['recur_points'].pop()
         for r in true_result[1:]:
             true_code += f'  recur_add(AS_RECUR({recur_name}), {r["code"]});\n'
@@ -2035,7 +1998,7 @@ def if_form_c(params, envs):
         false_result = compile_form(params[2], envs=envs)
         if false_env['code']:
             false_code += '\n' + '\n  '.join(false_env['code'])
-        if isinstance(false_result, tuple) and isinstance(false_result[0], Symbol) and false_result[0].name == 'recur':
+        if isinstance(false_result, tuple) and isinstance(false_result[0], dict) and false_result[0]['type'] == 'symbol' and false_result[0]['lexeme'] == 'recur':
             recur_name = envs[0]['recur_points'].pop()
             for r in false_result[1:]:
                 false_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
@@ -2089,9 +2052,9 @@ def let_c(params, envs):
     envs.append(local_env)
     for binding in paired_bindings:
         result = compile_form(binding[1], envs=envs)
-        binding_name = _get_generated_name(base=binding[0].name, envs=envs)
+        binding_name = _get_generated_name(base=binding[0]['lexeme'], envs=envs)
         result['c_name'] = binding_name
-        local_env['bindings'][binding[0].name] = result
+        local_env['bindings'][binding[0]['lexeme']] = result
         local_env['code'].append(f'  Value {binding_name} = {result["code"]};\n')
 
     f_code = ''
@@ -2103,7 +2066,7 @@ def let_c(params, envs):
         f_code += '\n'.join(local_env['code']) + '\n'
 
     return_val = ''
-    if isinstance(final_result, tuple) and isinstance(final_result[0], Symbol) and final_result[0].name == 'recur':
+    if isinstance(final_result, tuple) and isinstance(final_result[0], dict) and final_result[0]['type'] == 'symbol' and final_result[0]['lexeme'] == 'recur':
         recur_name = envs[0]['recur_points'].pop()
         for r in final_result[1:]:
             f_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
@@ -2138,7 +2101,7 @@ def _has_recur(expr):
             if _has_recur(e):
                 return True
     else:
-        if isinstance(expr, Symbol) and expr.name == 'recur':
+        if isinstance(expr, dict) and expr['type'] == 'symbol' and expr['lexeme'] == 'recur':
             return True
     return False
 
@@ -2241,9 +2204,9 @@ def loop_c(params, envs):
     for index, loop_param in enumerate(loop_params):
         param_env = {'temps': envs[-1]['temps'], 'code': [], 'post': [], 'bindings': {}}
         envs.append(param_env)
-        c_name = _get_generated_name(base=loop_param.name, envs=envs)
+        c_name = _get_generated_name(base=loop_param['lexeme'], envs=envs)
         result = compile_form(initial_args[index], envs=envs)
-        local_env['bindings'][loop_param.name] = {
+        local_env['bindings'][loop_param['lexeme']] = {
             'code': result['code'],
             'c_name': c_name,
         }
@@ -2506,11 +2469,11 @@ def fn_c(params, envs, f_name=None):
     envs.append(local_env)
 
     for binding in bindings:
-        local_env['bindings'][binding.name] = {'c_name': binding.name}
+        local_env['bindings'][binding['lexeme']] = {'c_name': binding['lexeme']}
 
     loop_code = _loop(envs, list(local_env['bindings'].keys()), exprs)
 
-    f_params = ', '.join([f'Value {binding.name}' for binding in bindings])
+    f_params = ', '.join([f'Value {binding["lexeme"]}' for binding in bindings])
     if f_params:
         f_params = f'ObjMap* user_globals, {f_params}'
     else:
@@ -2526,7 +2489,7 @@ def fn_c(params, envs, f_name=None):
 
 
 def defn_c(params, envs):
-    name = params[0].name
+    name = params[0]['lexeme']
     f_name = _get_generated_name(base=f'u_{name}', envs=envs)
 
     current_ns = envs[0]['current_ns']
@@ -2763,21 +2726,22 @@ def new_map_c(node, envs):
 
 def _find_symbol(symbol, envs):
     current_ns = envs[0]['current_ns']
-    if symbol.name in global_ns:
-        return global_ns[symbol.name]
-    elif symbol.name in envs[0]['namespaces'][current_ns]:
-        return envs[0]['namespaces'][current_ns][symbol.name]
-    elif '/' in symbol.name:
-        refer, name = symbol.name.split('/')
+    symbol_name = symbol['lexeme']
+    if symbol_name in global_ns:
+        return global_ns[symbol_name]
+    elif symbol_name in envs[0]['namespaces'][current_ns]:
+        return envs[0]['namespaces'][current_ns][symbol_name]
+    elif '/' in symbol_name:
+        refer, name = symbol_name.split('/')
         if refer:
             for referred_as, ns in envs[0]['namespaces'].items():
                 if refer == referred_as:
                     if name in ns:
                         return ns[name]
     for env in envs:
-        if symbol.name in env.get('bindings', {}):
-            if env['bindings'][symbol.name]:
-                return env['bindings'][symbol.name]
+        if symbol_name in env.get('bindings', {}):
+            if env['bindings'][symbol_name]:
+                return env['bindings'][symbol_name]
             else:
                 # show that we found it, but all we have to return is the symbol itself
                 return symbol
@@ -2806,6 +2770,25 @@ def compile_form(node, envs):
         elif type_ == 'vector':
             name = new_vector_c(node['nodes'], envs=envs)
             return {'code': name}
+        elif type_ == 'symbol':
+            symbol = _find_symbol(node, envs)
+            if symbol:
+                if symbol.get('type') == 'var':
+                    symbol_name = node['lexeme']
+                    if '/' in symbol_name:
+                        full_reference = symbol_name
+                    else:
+                        full_reference = f'{envs[0]["current_ns"]}/{symbol_name}'
+                    name = _get_generated_name('user_global_lookup', envs=envs)
+                    envs[0]['temps'].add(name)
+                    code = f'  Value {name} = copy_string("{full_reference}", {len(full_reference)});'
+                    code += '\n  ' + f'if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }'
+                    envs[-1]['code'].append(code)
+                    envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'  dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
+                    return {'code': f'map_get(user_globals, {name}, NIL_VAL)'}
+                elif 'c_name' in symbol:
+                    return {'code': symbol['c_name']}
+            raise Exception(f'unhandled symbol: {node}')
         elif type_ == 'list':
             first = node['nodes'][0]
             rest = node['nodes'][1:]
@@ -2818,7 +2801,11 @@ def compile_form(node, envs):
                 envs[-1]['code'].append(f'  Value {result_name} = {results[0]["code"]}({args});')
                 envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
                 return {'code': result_name}
-            elif isinstance(first, Symbol):
+            elif isinstance(first, dict) and first['type'] == 'symbol':
+                if first['lexeme'] == 'recur':
+                    params = [compile_form(r, envs=envs) for r in rest]
+                    return (first, *params)
+
                 symbol = _find_symbol(first, envs)
                 if symbol and isinstance(symbol, dict):
                     if 'function' in symbol and callable(symbol['function']):
@@ -2835,13 +2822,13 @@ def compile_form(node, envs):
                         envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
                         return {'code': result_name}
                     else:
-                        raise Exception(f'symbol first in list and not callable: {first.name} -- {symbol}')
+                        raise Exception(f'symbol first in list and not callable: {first} -- {symbol}')
 
-                if first.name == 'for':
+                if first['lexeme'] == 'for':
                     bindings = rest[0]['nodes']
-                    binding_name = bindings[0].name
+                    binding_name = bindings[0]['lexeme']
                     c_name = _get_generated_name(f'u_{binding_name}', envs=envs)
-                    envs[-1]['bindings'][bindings[0].name] = {'c_name': c_name}
+                    envs[-1]['bindings'][binding_name] = {'c_name': c_name}
                     lst = compile_form(bindings[1], envs=envs)
                     lst_name = _get_generated_name('tmp_lst', envs=envs)
                     lst_count = _get_generated_name('tmp_lst_count', envs=envs)
@@ -2864,13 +2851,13 @@ def compile_form(node, envs):
                         envs[-1]['code'].append(code_line)
                     envs[-1]['code'].append('  }')
                     return {'code': 'NIL_VAL'}
-                elif first.name == 'do':
+                elif first['lexeme'] == 'do':
                     do_exprs = [compile_form(n, envs=envs) for n in rest]
 
                     do_result = _get_generated_name('do_result', envs)
 
                     f_code = f'  Value {do_result} = NIL_VAL;'
-                    if isinstance(do_exprs[-1], tuple) and isinstance(do_exprs[-1][0], Symbol) and do_exprs[-1][0].name == 'recur':
+                    if isinstance(do_exprs[-1], tuple) and isinstance(do_exprs[-1][0], dict) and do_exprs[-1][0]['type'] == 'symbol' and do_exprs[-1][0]['lexeme'] == 'recur':
                         recur_name = envs[0]['recur_points'].pop()
                         for r in do_exprs[-1][1:]:
                             f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
@@ -2882,21 +2869,21 @@ def compile_form(node, envs):
                     envs[-1]['code'].append(f_code)
                     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (do_result, do_result))
                     return {'code': do_result}
-                elif first.name == 'with':
+                elif first['lexeme'] == 'with':
                     bindings = rest[0]['nodes']
                     paired_bindings = []
                     for i in range(0, len(bindings), 2):
                         paired_bindings.append(bindings[i:i+2])
                     for binding in paired_bindings:
                         result = compile_form(binding[1], envs=envs)
-                        binding_name = _get_generated_name(base=binding[0].name, envs=envs)
+                        binding_name = _get_generated_name(base=binding[0]['lexeme'], envs=envs)
                         result['c_name'] = binding_name
-                        envs[-1]['bindings'][binding[0].name] = result
+                        envs[-1]['bindings'][binding[0]['lexeme']] = result
                         envs[-1]['code'].append(f'  Value {binding_name} = {result["code"]};\n')
                     exprs = [compile_form(n, envs=envs) for n in rest[1:]]
                     result = _get_generated_name('with_result', envs)
                     f_code = f'  Value {result} = NIL_VAL;'
-                    if isinstance(exprs[-1], tuple) and isinstance(exprs[-1][0], Symbol) and exprs[-1][0].name == 'recur':
+                    if isinstance(exprs[-1], tuple) and isinstance(exprs[-1][0], dict) and exprs[-1][0]['type'] == 'symbol' and exprs[-1][0]['lexeme'] == 'recur':
                         recur_name = envs[0]['recur_points'].pop()
                         for r in exprs[-1][1:]:
                             f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
@@ -2906,18 +2893,18 @@ def compile_form(node, envs):
                         f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (result, result)
                     # add destructors
                     for binding in paired_bindings:
-                        if binding[1]['nodes'][0].name == 'sqlite3/open':
-                            f_code += f'\n  lang_sqlite3_close({envs[-1]["bindings"][binding[0].name]["c_name"]});'
+                        if binding[1]['nodes'][0]['lexeme'] == 'sqlite3/open':
+                            f_code += f'\n  lang_sqlite3_close({envs[-1]["bindings"][binding[0]["lexeme"]]["c_name"]});'
                         else:
                             raise Exception(f'unrecognized with constructor: {binding}')
 
                     envs[-1]['code'].append(f_code)
                     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result, result))
                     return {'code': result}
-                elif first.name == 'not':
+                elif first['lexeme'] == 'not':
                     result = compile_form(rest[0], envs=envs)
                     return {'code': f'BOOL_VAL(!is_truthy({result["code"]}))'}
-                elif first.name == 'and':
+                elif first['lexeme'] == 'and':
                     params = [compile_form(r, envs=envs) for r in rest]
                     num_params = len(params)
                     and_result = _get_generated_name('and_result', envs)
@@ -2933,7 +2920,7 @@ def compile_form(node, envs):
                     envs[-1]['code'].append('    if(!is_truthy(%s)) { break; }' % and_result)
                     envs[-1]['code'].append('  }')
                     return {'code': and_result}
-                elif first.name == 'or':
+                elif first['lexeme'] == 'or':
                     params = [compile_form(r, envs=envs) for r in rest]
                     num_params = len(params)
                     or_result = _get_generated_name('or_result', envs)
@@ -2949,14 +2936,11 @@ def compile_form(node, envs):
                     envs[-1]['code'].append('    if(is_truthy(%s)) { break; }' % or_result)
                     envs[-1]['code'].append('  }')
                     return {'code': or_result}
-                elif first.name == 'recur':
-                    params = [compile_form(r, envs=envs) for r in rest]
-                    return (first, *params)
-                elif first.name == 'require':
+                elif first['lexeme'] == 'require':
                     for require in rest:
                         if isinstance(require, dict) and require['type'] == 'vector':
-                            if isinstance(require['nodes'][0], Symbol):
-                                module_name = require['nodes'][0].name
+                            if isinstance(require['nodes'][0], dict) and require['nodes'][0]['type'] == 'symbol':
+                                module_name = require['nodes'][0]['lexeme']
                             elif isinstance(require['nodes'][0], dict):
                                 if require['nodes'][0]['type'] == 'string':
                                     module_name = require['nodes'][0]['lexeme']
@@ -2964,7 +2948,7 @@ def compile_form(node, envs):
                                     raise Exception(f'unhandled require type: {require[0]}')
                             else:
                                 module_name = require['nodes'][0]
-                            referred_as = require['nodes'][1].name
+                            referred_as = require['nodes'][1]['lexeme']
                         else:
                             raise Exception(f'require argument needs to a vector')
                         if referred_as in envs[0]['namespaces']:
@@ -3003,24 +2987,6 @@ def compile_form(node, envs):
                 raise Exception(f'unhandled list: {node}')
         else:
             raise Exception(f'unhandled node type: {type_}')
-    if isinstance(node, Symbol):
-        symbol = _find_symbol(node, envs)
-        if symbol:
-            if symbol.get('type') == 'var':
-                if '/' in node.name:
-                    full_reference = node.name
-                else:
-                    full_reference = f'{envs[0]["current_ns"]}/{node.name}'
-                name = _get_generated_name('user_global_lookup', envs=envs)
-                envs[0]['temps'].add(name)
-                code = f'  Value {name} = copy_string("{full_reference}", {len(full_reference)});'
-                code += '\n  ' + f'if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }'
-                envs[-1]['code'].append(code)
-                envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'  dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
-                return {'code': f'map_get(user_globals, {name}, NIL_VAL)'}
-            elif 'c_name' in symbol:
-                return {'code': symbol['c_name']}
-        raise Exception(f'unhandled symbol: {node}')
     raise Exception(f'unhandled node: {type(node)} -- {node}')
 
 
