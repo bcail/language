@@ -1727,25 +1727,6 @@ def scan_tokens(source):
     return tokens
 
 
-def _get_node(token):
-    if token['type'] == 'nil':
-        return {'type': 'nil'}
-    elif token['type'] == 'true':
-        return {'type': 'true'}
-    elif token['type'] == 'false':
-        return {'type': 'false'}
-    elif token['type'] == 'number':
-        return {'type': 'number', 'lexeme': token['lexeme']}
-    elif token['type'] == 'string':
-        return {'type': 'string', 'lexeme': token['lexeme']}
-    elif token['type'] == 'ratio':
-        return {'type': 'ratio', 'lexeme': token['lexeme']}
-    elif token['type'] == 'symbol':
-        return {'type': 'symbol', 'lexeme': token['lexeme']}
-    else:
-        return token['type']
-
-
 def parse(tokens):
     ast = {'type': 'list', 'nodes': []}
     current_group = ast
@@ -1764,8 +1745,7 @@ def parse(tokens):
         elif token['type'] == 'end_group':
             current_group = current_group['parent']
         else:
-            node = _get_node(token)
-            current_group['nodes'].append(node)
+            current_group['nodes'].append(token)
 
     return ast
 
