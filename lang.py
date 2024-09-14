@@ -1775,31 +1775,29 @@ def _get_node(token):
 
 def parse(tokens):
     ast = {'type': 'list', 'nodes': []}
-    stack_of_lists = [ast]
     current_list = ast
     for token in tokens:
         if token['type'] == TokenType.LEFT_PAREN:
             # start new grouping
             new_list = {'type': 'list', 'nodes': []}
             current_list['nodes'].append(new_list)
-            stack_of_lists.append(new_list)
+            new_list['parent'] = current_list
             current_list = new_list
         elif token['type'] == TokenType.LEFT_BRACKET:
             # start new grouping
             new_vector = {'type': 'vector', 'nodes': []}
             current_list['nodes'].append(new_vector)
-            stack_of_lists.append(new_vector)
+            new_vector['parent'] = current_list
             current_list = new_vector
         elif token['type'] == TokenType.LEFT_BRACE:
             # start new grouping
             new_dict = {'type': 'map', 'nodes': []}
             current_list['nodes'].append(new_dict)
-            stack_of_lists.append(new_dict)
+            new_dict['parent'] = current_list
             current_list = new_dict
         elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET, TokenType.RIGHT_BRACE]:
             # finish a grouping
-            stack_of_lists.pop(-1)
-            current_list = stack_of_lists[-1]
+            current_list = current_list['parent']
         else:
             # add to a grouping
             node = _get_node(token)
