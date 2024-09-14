@@ -1664,16 +1664,18 @@ def _get_token(token_buffer):
         return {'type': 'symbol', 'lexeme': token_buffer}
 
 
-def scan_tokens(source):
-    tokens = []
+def parse(source):
+    ast = {'type': 'list', 'nodes': []}
+    current_group = ast
 
     inside_string = False
     inside_comment = False
     token_buffer = ''
+
     for c in source:
         if inside_string:
             if c == '"':
-                tokens.append({'type': 'string', 'lexeme': token_buffer})
+                current_group['nodes'].append({'type': 'string', 'lexeme': token_buffer})
                 token_buffer = ''
                 inside_string = False
             else:
@@ -1681,27 +1683,22 @@ def scan_tokens(source):
         elif inside_comment:
             if c in ['\n', '\r']:
                 inside_comment = False
-        elif c == '(':
-            tokens.append({'type': 'start_group', 'lexeme': '('})
-        elif c == ')':
+        elif c in ['(', '[', '{']:
+            if c == '[':
+                group_type = 'vector'
+            elif c == '{':
+                group_type = 'map'
+            else:
+                group_type = 'list'
+            new_group = {'type': group_type, 'nodes': []}
+            current_group['nodes'].append(new_group)
+            new_group['parent'] = current_group
+            current_group = new_group
+        elif c in [')', ']', '}']:
             if token_buffer:
-                tokens.append(_get_token(token_buffer))
+                current_group['nodes'].append(_get_token(token_buffer))
                 token_buffer = ''
-            tokens.append({'type': 'end_group', 'lexeme': ')'})
-        elif c == '[':
-            tokens.append({'type': 'start_group', 'lexeme': '['})
-        elif c == ']':
-            if token_buffer:
-                tokens.append(_get_token(token_buffer))
-                token_buffer = ''
-            tokens.append({'type': 'end_group', 'lexeme': ']'})
-        elif c == '{':
-            tokens.append({'type': 'start_group', 'lexeme': '{'})
-        elif c == '}':
-            if token_buffer:
-                tokens.append(_get_token(token_buffer))
-                token_buffer = ''
-            tokens.append({'type': 'end_group', 'lexeme': '}'})
+            current_group = current_group['parent']
         elif c in [',', '\n', '\r']:
             pass
         elif c == ':':
@@ -1712,40 +1709,17 @@ def scan_tokens(source):
             token_buffer += c
         elif c == ' ':
             if token_buffer:
-                tokens.append(_get_token(token_buffer))
+                current_group['nodes'].append(_get_token(token_buffer))
                 token_buffer = ''
         elif c == '"':
             inside_string = True
         elif c == ';':
             inside_comment = True
         else:
-            print(f'unknown char "{c}"')
+            print(f'unhandled char "{c}"')
 
     if token_buffer:
-        tokens.append(_get_token(token_buffer))
-
-    return tokens
-
-
-def parse(tokens):
-    ast = {'type': 'list', 'nodes': []}
-    current_group = ast
-    for token in tokens:
-        if token['type'] == 'start_group':
-            if token['lexeme'] == '[':
-                group_type = 'vector'
-            elif token['lexeme'] == '{':
-                group_type = 'map'
-            else:
-                group_type = 'list'
-            new_group = {'type': group_type, 'nodes': []}
-            current_group['nodes'].append(new_group)
-            new_group['parent'] = current_group
-            current_group = new_group
-        elif token['type'] == 'end_group':
-            current_group = current_group['parent']
-        else:
-            current_group['nodes'].append(token)
+        current_group['nodes'].append(_get_token(token_buffer))
 
     return ast
 
@@ -2926,8 +2900,7 @@ def compile_form(node, envs):
 
 
 def _compile_forms(source, program=None, source_file=None):
-    tokens = scan_tokens(source)
-    ast = parse(tokens)
+    ast = parse(source)
 
     if not program:
         program = {
