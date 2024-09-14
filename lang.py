@@ -1971,7 +1971,7 @@ def if_form_c(params, envs):
     true_code = '\n  if (is_truthy(%s)) {\n  ' % test_code
     if true_env['code']:
         true_code += '\n  '.join(true_env['code']) + '\n  '
-    if isinstance(true_result, tuple) and isinstance(true_result[0], dict) and true_result[0]['type'] == 'symbol' and true_result[0]['lexeme'] == 'recur':
+    if isinstance(true_result, tuple) and true_result[0]['type'] == 'symbol' and true_result[0]['lexeme'] == 'recur':
         recur_name = envs[0]['recur_points'].pop()
         for r in true_result[1:]:
             true_code += f'  recur_add(AS_RECUR({recur_name}), {r["code"]});\n'
@@ -1995,7 +1995,7 @@ def if_form_c(params, envs):
         false_result = compile_form(params[2], envs=envs)
         if false_env['code']:
             false_code += '\n' + '\n  '.join(false_env['code'])
-        if isinstance(false_result, tuple) and isinstance(false_result[0], dict) and false_result[0]['type'] == 'symbol' and false_result[0]['lexeme'] == 'recur':
+        if isinstance(false_result, tuple) and false_result[0]['type'] == 'symbol' and false_result[0]['lexeme'] == 'recur':
             recur_name = envs[0]['recur_points'].pop()
             for r in false_result[1:]:
                 false_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
@@ -2063,7 +2063,7 @@ def let_c(params, envs):
         f_code += '\n'.join(local_env['code']) + '\n'
 
     return_val = ''
-    if isinstance(final_result, tuple) and isinstance(final_result[0], dict) and final_result[0]['type'] == 'symbol' and final_result[0]['lexeme'] == 'recur':
+    if isinstance(final_result, tuple) and final_result[0]['type'] == 'symbol' and final_result[0]['lexeme'] == 'recur':
         recur_name = envs[0]['recur_points'].pop()
         for r in final_result[1:]:
             f_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
@@ -2093,12 +2093,12 @@ def let_c(params, envs):
 
 
 def _has_recur(expr):
-    if isinstance(expr, dict) and expr['type'] == 'list':
+    if expr['type'] == 'list':
         for e in expr['nodes']:
             if _has_recur(e):
                 return True
     else:
-        if isinstance(expr, dict) and expr['type'] == 'symbol' and expr['lexeme'] == 'recur':
+        if expr['type'] == 'symbol' and expr['lexeme'] == 'recur':
             return True
     return False
 
@@ -2745,246 +2745,242 @@ def _find_symbol(symbol, envs):
 
 
 def compile_form(node, envs):
-    if isinstance(node, dict):
-        type_ = node['type']
-        if type_ == 'nil':
-            return {'code': 'NIL_VAL'}
-        elif type_ == 'true':
-            return {'code': 'BOOL_VAL(true)'}
-        elif type_ == 'false':
-            return {'code': 'BOOL_VAL(false)'}
-        elif type_ == 'number':
-            return {'code': f'NUMBER_VAL({node["lexeme"]})'}
-        elif type_ == 'string':
-            name = new_string_c(node['lexeme'], envs=envs)
-            return {'code': name}
-        elif type_ == 'ratio':
-            numerator, denominator = node['lexeme'].split('/')
-            return {'code': f'ratio_val({numerator}, {denominator})'}
-        elif type_ == 'map':
-            name = new_map_c(node['nodes'], envs=envs)
-            return {'code': name}
-        elif type_ == 'vector':
-            name = new_vector_c(node['nodes'], envs=envs)
-            return {'code': name}
-        elif type_ == 'symbol':
-            symbol = _find_symbol(node, envs)
-            if symbol:
-                if symbol.get('type') == 'var':
-                    symbol_name = node['lexeme']
-                    if '/' in symbol_name:
-                        full_reference = symbol_name
-                    else:
-                        full_reference = f'{envs[0]["current_ns"]}/{symbol_name}'
-                    name = _get_generated_name('user_global_lookup', envs=envs)
-                    envs[0]['temps'].add(name)
-                    code = f'  Value {name} = copy_string("{full_reference}", {len(full_reference)});'
-                    code += '\n  ' + f'if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }'
-                    envs[-1]['code'].append(code)
-                    envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'  dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
-                    return {'code': f'map_get(user_globals, {name}, NIL_VAL)'}
-                elif 'c_name' in symbol:
-                    return {'code': symbol['c_name']}
-            raise Exception(f'unhandled symbol: {node}')
-        elif type_ == 'list':
-            first = node['nodes'][0]
-            rest = node['nodes'][1:]
-            if first['type'] == 'list':
-                results = [compile_form(n, envs=envs) for n in node['nodes']]
-                args = 'user_globals'
-                if len(results) > 1:
-                    args += ', ' + ', '.join([r['code'] for r in results[1:]])
-                result_name = _get_generated_name('fn_result', envs=envs)
-                envs[-1]['code'].append(f'  Value {result_name} = {results[0]["code"]}({args});')
-                envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
-                return {'code': result_name}
-            elif first['type'] == 'symbol':
-                if first['lexeme'] == 'recur':
-                    params = [compile_form(r, envs=envs) for r in rest]
-                    return (first, *params)
-                if first['lexeme'] == 'if':
-                    return if_form_c(rest, envs=envs)
-
-                symbol = _find_symbol(first, envs)
-                if symbol and isinstance(symbol, dict):
-                    if 'function' in symbol and callable(symbol['function']):
-                        return symbol['function'](rest, envs=envs)
-                    elif 'c_name' in symbol:
-                        f_name = symbol['c_name']
-                        results = [compile_form(n, envs=envs) for n in rest]
-                        args = 'user_globals'
-                        if results:
-                            args += ', ' + ', '.join([r['code'] for r in results])
-                        result_name = _get_generated_name('u_f_result', envs=envs)
-                        envs[-1]['temps'].add(result_name)
-                        envs[-1]['code'].append(f'  Value {result_name} = {f_name}({args});')
-                        envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
-                        return {'code': result_name}
-                    else:
-                        raise Exception(f'symbol first in list and not callable: {first} -- {symbol}')
-
-                if first['lexeme'] == 'for':
-                    bindings = rest[0]['nodes']
-                    binding_name = bindings[0]['lexeme']
-                    c_name = _get_generated_name(f'u_{binding_name}', envs=envs)
-                    envs[-1]['bindings'][binding_name] = {'c_name': c_name}
-                    lst = compile_form(bindings[1], envs=envs)
-                    lst_name = _get_generated_name('tmp_lst', envs=envs)
-                    lst_count = _get_generated_name('tmp_lst_count', envs=envs)
-                    envs[-1]['temps'].add(lst_name)
-                    envs[-1]['temps'].add(lst_count)
-                    envs[-1]['code'].append(f'  ObjList* {lst_name} = AS_LIST({lst["code"]});')
-                    envs[-1]['code'].append('  for(uint32_t i=0; i<%s->count; i++) {\n' % lst_name)
-                    envs[-1]['code'].append(f'    Value {c_name} = {lst_name}->values[i];')
-                    local_env = {'temps': envs[-1]['temps'], 'code': [], 'post': [], 'bindings': {}}
-                    envs.append(local_env)
-                    for expr in rest[1:]:
-                        compile_form(expr, envs=envs)
-                    code_lines = []
-                    if local_env['code']:
-                        code_lines.extend(local_env['code'])
-                    if local_env['post']:
-                        code_lines.extend(local_env['post'])
-                    envs.pop()
-                    for code_line in code_lines:
-                        envs[-1]['code'].append(code_line)
-                    envs[-1]['code'].append('  }')
-                    return {'code': 'NIL_VAL'}
-                elif first['lexeme'] == 'do':
-                    do_exprs = [compile_form(n, envs=envs) for n in rest]
-
-                    do_result = _get_generated_name('do_result', envs)
-
-                    f_code = f'  Value {do_result} = NIL_VAL;'
-                    if isinstance(do_exprs[-1], tuple) and isinstance(do_exprs[-1][0], dict) and do_exprs[-1][0]['type'] == 'symbol' and do_exprs[-1][0]['lexeme'] == 'recur':
-                        recur_name = envs[0]['recur_points'].pop()
-                        for r in do_exprs[-1][1:]:
-                            f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
-                        f_code += f'\n  {do_result} = {recur_name};'
-                    else:
-                        f_code += f'\n  {do_result} = {do_exprs[-1]["code"]};'
-                        f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (do_result, do_result)
-
-                    envs[-1]['code'].append(f_code)
-                    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (do_result, do_result))
-                    return {'code': do_result}
-                elif first['lexeme'] == 'with':
-                    bindings = rest[0]['nodes']
-                    paired_bindings = []
-                    for i in range(0, len(bindings), 2):
-                        paired_bindings.append(bindings[i:i+2])
-                    for binding in paired_bindings:
-                        result = compile_form(binding[1], envs=envs)
-                        binding_name = _get_generated_name(base=binding[0]['lexeme'], envs=envs)
-                        result['c_name'] = binding_name
-                        envs[-1]['bindings'][binding[0]['lexeme']] = result
-                        envs[-1]['code'].append(f'  Value {binding_name} = {result["code"]};\n')
-                    exprs = [compile_form(n, envs=envs) for n in rest[1:]]
-                    result = _get_generated_name('with_result', envs)
-                    f_code = f'  Value {result} = NIL_VAL;'
-                    if isinstance(exprs[-1], tuple) and isinstance(exprs[-1][0], dict) and exprs[-1][0]['type'] == 'symbol' and exprs[-1][0]['lexeme'] == 'recur':
-                        recur_name = envs[0]['recur_points'].pop()
-                        for r in exprs[-1][1:]:
-                            f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
-                        f_code += f'\n  {result} = {recur_name};'
-                    else:
-                        f_code += f'\n  {result} = {exprs[-1]["code"]};'
-                        f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (result, result)
-                    # add destructors
-                    for binding in paired_bindings:
-                        if binding[1]['nodes'][0]['lexeme'] == 'sqlite3/open':
-                            f_code += f'\n  lang_sqlite3_close({envs[-1]["bindings"][binding[0]["lexeme"]]["c_name"]});'
-                        else:
-                            raise Exception(f'unrecognized with constructor: {binding}')
-
-                    envs[-1]['code'].append(f_code)
-                    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result, result))
-                    return {'code': result}
-                elif first['lexeme'] == 'not':
-                    result = compile_form(rest[0], envs=envs)
-                    return {'code': f'BOOL_VAL(!is_truthy({result["code"]}))'}
-                elif first['lexeme'] == 'and':
-                    params = [compile_form(r, envs=envs) for r in rest]
-                    num_params = len(params)
-                    and_result = _get_generated_name('and_result', envs)
-                    and_params = _get_generated_name('and_params', envs)
-                    envs[-1]['temps'].add(and_result)
-                    envs[-1]['temps'].add(and_params)
-                    envs[-1]['code'].append(f'  Value {and_params}[{num_params}];')
-                    for index, p in enumerate(params):
-                        envs[-1]['code'].append(f'  {and_params}[{index}] = {p["code"]}; ')
-                    envs[-1]['code'].append(f'  Value {and_result} = BOOL_VAL(true);')
-                    envs[-1]['code'].append('  for (int i = 0; i<%s; i++) {' % num_params)
-                    envs[-1]['code'].append('    %s = %s[i];' % (and_result, and_params))
-                    envs[-1]['code'].append('    if(!is_truthy(%s)) { break; }' % and_result)
-                    envs[-1]['code'].append('  }')
-                    return {'code': and_result}
-                elif first['lexeme'] == 'or':
-                    params = [compile_form(r, envs=envs) for r in rest]
-                    num_params = len(params)
-                    or_result = _get_generated_name('or_result', envs)
-                    or_params = _get_generated_name('or_params', envs)
-                    envs[-1]['temps'].add(or_result)
-                    envs[-1]['temps'].add(or_params)
-                    envs[-1]['code'].append(f'  Value {or_params}[{num_params}];')
-                    for index, p in enumerate(params):
-                        envs[-1]['code'].append(f'  {or_params}[{index}] = {p["code"]}; ')
-                    envs[-1]['code'].append(f'  Value {or_result} = BOOL_VAL(true);')
-                    envs[-1]['code'].append('  for (int i = 0; i<%s; i++) {' % num_params)
-                    envs[-1]['code'].append('    %s = %s[i];' % (or_result, or_params))
-                    envs[-1]['code'].append('    if(is_truthy(%s)) { break; }' % or_result)
-                    envs[-1]['code'].append('  }')
-                    return {'code': or_result}
-                elif first['lexeme'] == 'require':
-                    for require in rest:
-                        if isinstance(require, dict) and require['type'] == 'vector':
-                            if isinstance(require['nodes'][0], dict) and require['nodes'][0]['type'] == 'symbol':
-                                module_name = require['nodes'][0]['lexeme']
-                            elif isinstance(require['nodes'][0], dict):
-                                if require['nodes'][0]['type'] == 'string':
-                                    module_name = require['nodes'][0]['lexeme']
-                                else:
-                                    raise Exception(f'unhandled require type: {require[0]}')
-                            else:
-                                module_name = require['nodes'][0]
-                            referred_as = require['nodes'][1]['lexeme']
-                        else:
-                            raise Exception(f'require argument needs to a vector')
-                        if referred_as in envs[0]['namespaces']:
-                            continue # already required, nothing to do
-
-                        # find the module
-                        if module_name.startswith('language.'):
-                            if module_name == 'language.string':
-                                envs[0]['namespaces'][referred_as] = copy.deepcopy(language_string_ns)
-                            elif module_name == 'language.math':
-                                envs[0]['namespaces'][referred_as] = copy.deepcopy(language_math_ns)
-                            elif module_name == 'language.sqlite3':
-                                envs[0]['namespaces'][referred_as] = copy.deepcopy(language_sqlite3_ns)
-                            elif module_name == 'language.os':
-                                envs[0]['namespaces'][referred_as] = copy.deepcopy(language_os_ns)
-                            else:
-                                raise Exception(f'system module {module_name} not found')
-                        else:
-                            # module_name is the file
-                            if os.path.exists(module_name):
-                                with open(module_name, 'rb') as module_file:
-                                    module_code = module_file.read().decode('utf8')
-                                old_ns = envs[0]['current_ns']
-                                envs[0]['current_ns'] = referred_as
-                                envs[0]['namespaces'][referred_as] = {}
-                                _compile_forms(module_code, program=envs[0], source_file=module_name)
-                                envs[0]['current_ns'] = old_ns
-                            else:
-                                raise Exception(f'module {module_name} not found')
-                    return {'code': ''}
+    type_ = node['type']
+    if type_ == 'nil':
+        return {'code': 'NIL_VAL'}
+    elif type_ == 'true':
+        return {'code': 'BOOL_VAL(true)'}
+    elif type_ == 'false':
+        return {'code': 'BOOL_VAL(false)'}
+    elif type_ == 'number':
+        return {'code': f'NUMBER_VAL({node["lexeme"]})'}
+    elif type_ == 'string':
+        name = new_string_c(node['lexeme'], envs=envs)
+        return {'code': name}
+    elif type_ == 'ratio':
+        numerator, denominator = node['lexeme'].split('/')
+        return {'code': f'ratio_val({numerator}, {denominator})'}
+    elif type_ == 'map':
+        name = new_map_c(node['nodes'], envs=envs)
+        return {'code': name}
+    elif type_ == 'vector':
+        name = new_vector_c(node['nodes'], envs=envs)
+        return {'code': name}
+    elif type_ == 'symbol':
+        symbol = _find_symbol(node, envs)
+        if symbol:
+            if symbol.get('type') == 'var':
+                symbol_name = node['lexeme']
+                if '/' in symbol_name:
+                    full_reference = symbol_name
                 else:
-                    raise Exception(f'unhandled symbol: {first}')
+                    full_reference = f'{envs[0]["current_ns"]}/{symbol_name}'
+                name = _get_generated_name('user_global_lookup', envs=envs)
+                envs[0]['temps'].add(name)
+                code = f'  Value {name} = copy_string("{full_reference}", {len(full_reference)});'
+                code += '\n  ' + f'if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }'
+                envs[-1]['code'].append(code)
+                envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'  dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
+                return {'code': f'map_get(user_globals, {name}, NIL_VAL)'}
+            elif 'c_name' in symbol:
+                return {'code': symbol['c_name']}
+        raise Exception(f'unhandled symbol: {node}')
+    elif type_ == 'list':
+        first = node['nodes'][0]
+        rest = node['nodes'][1:]
+        if first['type'] == 'list':
+            results = [compile_form(n, envs=envs) for n in node['nodes']]
+            args = 'user_globals'
+            if len(results) > 1:
+                args += ', ' + ', '.join([r['code'] for r in results[1:]])
+            result_name = _get_generated_name('fn_result', envs=envs)
+            envs[-1]['code'].append(f'  Value {result_name} = {results[0]["code"]}({args});')
+            envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+            return {'code': result_name}
+        elif first['type'] == 'symbol':
+            if first['lexeme'] == 'recur':
+                params = [compile_form(r, envs=envs) for r in rest]
+                return (first, *params)
+            if first['lexeme'] == 'if':
+                return if_form_c(rest, envs=envs)
+
+            symbol = _find_symbol(first, envs)
+            if symbol:
+                if 'function' in symbol and callable(symbol['function']):
+                    return symbol['function'](rest, envs=envs)
+                elif 'c_name' in symbol:
+                    f_name = symbol['c_name']
+                    results = [compile_form(n, envs=envs) for n in rest]
+                    args = 'user_globals'
+                    if results:
+                        args += ', ' + ', '.join([r['code'] for r in results])
+                    result_name = _get_generated_name('u_f_result', envs=envs)
+                    envs[-1]['temps'].add(result_name)
+                    envs[-1]['code'].append(f'  Value {result_name} = {f_name}({args});')
+                    envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
+                    return {'code': result_name}
+                else:
+                    raise Exception(f'symbol first in list and not callable: {first} -- {symbol}')
+
+            if first['lexeme'] == 'for':
+                bindings = rest[0]['nodes']
+                binding_name = bindings[0]['lexeme']
+                c_name = _get_generated_name(f'u_{binding_name}', envs=envs)
+                envs[-1]['bindings'][binding_name] = {'c_name': c_name}
+                lst = compile_form(bindings[1], envs=envs)
+                lst_name = _get_generated_name('tmp_lst', envs=envs)
+                lst_count = _get_generated_name('tmp_lst_count', envs=envs)
+                envs[-1]['temps'].add(lst_name)
+                envs[-1]['temps'].add(lst_count)
+                envs[-1]['code'].append(f'  ObjList* {lst_name} = AS_LIST({lst["code"]});')
+                envs[-1]['code'].append('  for(uint32_t i=0; i<%s->count; i++) {\n' % lst_name)
+                envs[-1]['code'].append(f'    Value {c_name} = {lst_name}->values[i];')
+                local_env = {'temps': envs[-1]['temps'], 'code': [], 'post': [], 'bindings': {}}
+                envs.append(local_env)
+                for expr in rest[1:]:
+                    compile_form(expr, envs=envs)
+                code_lines = []
+                if local_env['code']:
+                    code_lines.extend(local_env['code'])
+                if local_env['post']:
+                    code_lines.extend(local_env['post'])
+                envs.pop()
+                for code_line in code_lines:
+                    envs[-1]['code'].append(code_line)
+                envs[-1]['code'].append('  }')
+                return {'code': 'NIL_VAL'}
+            elif first['lexeme'] == 'do':
+                do_exprs = [compile_form(n, envs=envs) for n in rest]
+
+                do_result = _get_generated_name('do_result', envs)
+
+                f_code = f'  Value {do_result} = NIL_VAL;'
+                if isinstance(do_exprs[-1], tuple) and do_exprs[-1][0]['type'] == 'symbol' and do_exprs[-1][0]['lexeme'] == 'recur':
+                    recur_name = envs[0]['recur_points'].pop()
+                    for r in do_exprs[-1][1:]:
+                        f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
+                    f_code += f'\n  {do_result} = {recur_name};'
+                else:
+                    f_code += f'\n  {do_result} = {do_exprs[-1]["code"]};'
+                    f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (do_result, do_result)
+
+                envs[-1]['code'].append(f_code)
+                envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (do_result, do_result))
+                return {'code': do_result}
+            elif first['lexeme'] == 'with':
+                bindings = rest[0]['nodes']
+                paired_bindings = []
+                for i in range(0, len(bindings), 2):
+                    paired_bindings.append(bindings[i:i+2])
+                for binding in paired_bindings:
+                    result = compile_form(binding[1], envs=envs)
+                    binding_name = _get_generated_name(base=binding[0]['lexeme'], envs=envs)
+                    result['c_name'] = binding_name
+                    envs[-1]['bindings'][binding[0]['lexeme']] = result
+                    envs[-1]['code'].append(f'  Value {binding_name} = {result["code"]};\n')
+                exprs = [compile_form(n, envs=envs) for n in rest[1:]]
+                result = _get_generated_name('with_result', envs)
+                f_code = f'  Value {result} = NIL_VAL;'
+                if isinstance(exprs[-1], tuple) and exprs[-1][0]['type'] == 'symbol' and exprs[-1][0]['lexeme'] == 'recur':
+                    recur_name = envs[0]['recur_points'].pop()
+                    for r in exprs[-1][1:]:
+                        f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
+                    f_code += f'\n  {result} = {recur_name};'
+                else:
+                    f_code += f'\n  {result} = {exprs[-1]["code"]};'
+                    f_code += '\n  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (result, result)
+                # add destructors
+                for binding in paired_bindings:
+                    if binding[1]['nodes'][0]['lexeme'] == 'sqlite3/open':
+                        f_code += f'\n  lang_sqlite3_close({envs[-1]["bindings"][binding[0]["lexeme"]]["c_name"]});'
+                    else:
+                        raise Exception(f'unrecognized with constructor: {binding}')
+
+                envs[-1]['code'].append(f_code)
+                envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result, result))
+                return {'code': result}
+            elif first['lexeme'] == 'not':
+                result = compile_form(rest[0], envs=envs)
+                return {'code': f'BOOL_VAL(!is_truthy({result["code"]}))'}
+            elif first['lexeme'] == 'and':
+                params = [compile_form(r, envs=envs) for r in rest]
+                num_params = len(params)
+                and_result = _get_generated_name('and_result', envs)
+                and_params = _get_generated_name('and_params', envs)
+                envs[-1]['temps'].add(and_result)
+                envs[-1]['temps'].add(and_params)
+                envs[-1]['code'].append(f'  Value {and_params}[{num_params}];')
+                for index, p in enumerate(params):
+                    envs[-1]['code'].append(f'  {and_params}[{index}] = {p["code"]}; ')
+                envs[-1]['code'].append(f'  Value {and_result} = BOOL_VAL(true);')
+                envs[-1]['code'].append('  for (int i = 0; i<%s; i++) {' % num_params)
+                envs[-1]['code'].append('    %s = %s[i];' % (and_result, and_params))
+                envs[-1]['code'].append('    if(!is_truthy(%s)) { break; }' % and_result)
+                envs[-1]['code'].append('  }')
+                return {'code': and_result}
+            elif first['lexeme'] == 'or':
+                params = [compile_form(r, envs=envs) for r in rest]
+                num_params = len(params)
+                or_result = _get_generated_name('or_result', envs)
+                or_params = _get_generated_name('or_params', envs)
+                envs[-1]['temps'].add(or_result)
+                envs[-1]['temps'].add(or_params)
+                envs[-1]['code'].append(f'  Value {or_params}[{num_params}];')
+                for index, p in enumerate(params):
+                    envs[-1]['code'].append(f'  {or_params}[{index}] = {p["code"]}; ')
+                envs[-1]['code'].append(f'  Value {or_result} = BOOL_VAL(true);')
+                envs[-1]['code'].append('  for (int i = 0; i<%s; i++) {' % num_params)
+                envs[-1]['code'].append('    %s = %s[i];' % (or_result, or_params))
+                envs[-1]['code'].append('    if(is_truthy(%s)) { break; }' % or_result)
+                envs[-1]['code'].append('  }')
+                return {'code': or_result}
+            elif first['lexeme'] == 'require':
+                for require in rest:
+                    if require['type'] == 'vector':
+                        if require['nodes'][0]['type'] == 'symbol':
+                            module_name = require['nodes'][0]['lexeme']
+                        else:
+                            if require['nodes'][0]['type'] == 'string':
+                                module_name = require['nodes'][0]['lexeme']
+                            else:
+                                raise Exception(f'unhandled require type: {require["nodes"][0]}')
+                        referred_as = require['nodes'][1]['lexeme']
+                    else:
+                        raise Exception(f'require argument needs to a vector')
+                    if referred_as in envs[0]['namespaces']:
+                        continue # already required, nothing to do
+
+                    # find the module
+                    if module_name.startswith('language.'):
+                        if module_name == 'language.string':
+                            envs[0]['namespaces'][referred_as] = copy.deepcopy(language_string_ns)
+                        elif module_name == 'language.math':
+                            envs[0]['namespaces'][referred_as] = copy.deepcopy(language_math_ns)
+                        elif module_name == 'language.sqlite3':
+                            envs[0]['namespaces'][referred_as] = copy.deepcopy(language_sqlite3_ns)
+                        elif module_name == 'language.os':
+                            envs[0]['namespaces'][referred_as] = copy.deepcopy(language_os_ns)
+                        else:
+                            raise Exception(f'system module {module_name} not found')
+                    else:
+                        # module_name is the file
+                        if os.path.exists(module_name):
+                            with open(module_name, 'rb') as module_file:
+                                module_code = module_file.read().decode('utf8')
+                            old_ns = envs[0]['current_ns']
+                            envs[0]['current_ns'] = referred_as
+                            envs[0]['namespaces'][referred_as] = {}
+                            _compile_forms(module_code, program=envs[0], source_file=module_name)
+                            envs[0]['current_ns'] = old_ns
+                        else:
+                            raise Exception(f'module {module_name} not found')
+                return {'code': ''}
             else:
-                raise Exception(f'unhandled list: {node}')
+                raise Exception(f'unhandled symbol: {first}')
         else:
-            raise Exception(f'unhandled node type: {type_}')
-    raise Exception(f'unhandled node: {type(node)} -- {node}')
+            raise Exception(f'unhandled list: {node}')
+    else:
+        raise Exception(f'unhandled node type: {type_}')
 
 
 def _compile_forms(source, program=None, source_file=None):
