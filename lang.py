@@ -1764,6 +1764,8 @@ def _get_node(token):
         return {'type': 'true'}
     elif token['type'] == TokenType.FALSE:
         return {'type': 'false'}
+    elif token['type'] == TokenType.IF:
+        return {'type': 'if'}
     elif token['type'] == TokenType.NUMBER:
         return {'type': 'number', 'lexeme': token['lexeme']}
     elif token['type'] == TokenType.STRING:
@@ -2981,7 +2983,7 @@ def compile_form(node, envs):
                     return {'code': ''}
                 else:
                     raise Exception(f'unhandled symbol: {first}')
-            elif first == TokenType.IF:
+            elif first['type'] == 'if':
                 return if_form_c(rest, envs=envs)
             else:
                 raise Exception(f'unhandled list: {node}')
