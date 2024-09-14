@@ -1724,8 +1724,6 @@ def parse(source):
     return ast
 
 
-####### COMPILE TO C ##############
-
 def nil_c(params, envs):
     param = compile_form(params[0], envs=envs)
     return {'code': f'nil_Q_({param["code"]})'}
@@ -1941,7 +1939,7 @@ def if_form_c(params, envs):
     envs[-1]['code'].append(f_code)
     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
 
-    return {'code': result_name}
+    return result_name
 
 
 def let_c(params, envs):
@@ -2663,25 +2661,33 @@ def _find_symbol(symbol, envs):
 def compile_form(node, envs):
     type_ = node['type']
     if type_ == 'nil':
-        return {'code': 'NIL_VAL'}
+        node['code'] = 'NIL_VAL'
+        return node
     elif type_ == 'true':
-        return {'code': 'BOOL_VAL(true)'}
+        node['code'] = 'BOOL_VAL(true)'
+        return node
     elif type_ == 'false':
-        return {'code': 'BOOL_VAL(false)'}
+        node['code'] = 'BOOL_VAL(false)'
+        return node
     elif type_ == 'number':
-        return {'code': f'NUMBER_VAL({node["lexeme"]})'}
+        node['code'] = f'NUMBER_VAL({node["lexeme"]})'
+        return node
     elif type_ == 'string':
         name = new_string_c(node['lexeme'], envs=envs)
-        return {'code': name}
+        node['code'] = name
+        return node
     elif type_ == 'ratio':
         numerator, denominator = node['lexeme'].split('/')
-        return {'code': f'ratio_val({numerator}, {denominator})'}
+        node['code'] = f'ratio_val({numerator}, {denominator})'
+        return node
     elif type_ == 'map':
         name = new_map_c(node['nodes'], envs=envs)
-        return {'code': name}
+        node['code'] = name
+        return node
     elif type_ == 'vector':
         name = new_vector_c(node['nodes'], envs=envs)
-        return {'code': name}
+        node['code'] = name
+        return node
     elif type_ == 'symbol':
         symbol = _find_symbol(node, envs)
         if symbol:
@@ -2697,9 +2703,11 @@ def compile_form(node, envs):
                 code += '\n  ' + f'if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }'
                 envs[-1]['code'].append(code)
                 envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'  dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
-                return {'code': f'map_get(user_globals, {name}, NIL_VAL)'}
+                node['code'] = f'map_get(user_globals, {name}, NIL_VAL)'
+                return node
             elif 'c_name' in symbol:
-                return {'code': symbol['c_name']}
+                node['code'] = symbol['c_name']
+                return node
         raise Exception(f'unhandled symbol: {node}')
     elif type_ == 'list':
         first = node['nodes'][0]
@@ -2712,13 +2720,15 @@ def compile_form(node, envs):
             result_name = _get_generated_name('fn_result', envs=envs)
             envs[-1]['code'].append(f'  Value {result_name} = {results[0]["code"]}({args});')
             envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
-            return {'code': result_name}
+            node['code'] = result_name
+            return node
         elif first['type'] == 'symbol':
             if first['lexeme'] == 'recur':
                 params = [compile_form(r, envs=envs) for r in rest]
                 return (first, *params)
             if first['lexeme'] == 'if':
-                return if_form_c(rest, envs=envs)
+                node['code'] = if_form_c(rest, envs=envs)
+                return node
 
             symbol = _find_symbol(first, envs)
             if symbol:
@@ -2734,7 +2744,8 @@ def compile_form(node, envs):
                     envs[-1]['temps'].add(result_name)
                     envs[-1]['code'].append(f'  Value {result_name} = {f_name}({args});')
                     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
-                    return {'code': result_name}
+                    node['code'] = result_name
+                    return node
                 else:
                     raise Exception(f'symbol first in list and not callable: {first} -- {symbol}')
 
@@ -2764,7 +2775,8 @@ def compile_form(node, envs):
                 for code_line in code_lines:
                     envs[-1]['code'].append(code_line)
                 envs[-1]['code'].append('  }')
-                return {'code': 'NIL_VAL'}
+                node['code'] = 'NIL_VAL'
+                return node
             elif first['lexeme'] == 'do':
                 do_exprs = [compile_form(n, envs=envs) for n in rest]
 
@@ -2782,7 +2794,8 @@ def compile_form(node, envs):
 
                 envs[-1]['code'].append(f_code)
                 envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n  dec_ref_and_free(AS_OBJ(%s));\n  }' % (do_result, do_result))
-                return {'code': do_result}
+                node['code'] = do_result
+                return node
             elif first['lexeme'] == 'with':
                 bindings = rest[0]['nodes']
                 paired_bindings = []
@@ -2814,10 +2827,12 @@ def compile_form(node, envs):
 
                 envs[-1]['code'].append(f_code)
                 envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result, result))
-                return {'code': result}
+                node['code'] = result
+                return node
             elif first['lexeme'] == 'not':
                 result = compile_form(rest[0], envs=envs)
-                return {'code': f'BOOL_VAL(!is_truthy({result["code"]}))'}
+                node['code'] = f'BOOL_VAL(!is_truthy({result["code"]}))'
+                return node
             elif first['lexeme'] == 'and':
                 params = [compile_form(r, envs=envs) for r in rest]
                 num_params = len(params)
@@ -2833,7 +2848,8 @@ def compile_form(node, envs):
                 envs[-1]['code'].append('    %s = %s[i];' % (and_result, and_params))
                 envs[-1]['code'].append('    if(!is_truthy(%s)) { break; }' % and_result)
                 envs[-1]['code'].append('  }')
-                return {'code': and_result}
+                node['code'] = and_result
+                return node
             elif first['lexeme'] == 'or':
                 params = [compile_form(r, envs=envs) for r in rest]
                 num_params = len(params)
@@ -2849,7 +2865,8 @@ def compile_form(node, envs):
                 envs[-1]['code'].append('    %s = %s[i];' % (or_result, or_params))
                 envs[-1]['code'].append('    if(is_truthy(%s)) { break; }' % or_result)
                 envs[-1]['code'].append('  }')
-                return {'code': or_result}
+                node['code'] = or_result
+                return node
             elif first['lexeme'] == 'require':
                 for require in rest:
                     if require['type'] == 'vector':
@@ -2890,7 +2907,8 @@ def compile_form(node, envs):
                             envs[0]['current_ns'] = old_ns
                         else:
                             raise Exception(f'module {module_name} not found')
-                return {'code': ''}
+                node['code'] = ''
+                return node
             else:
                 raise Exception(f'unhandled symbol: {first}')
         else:
