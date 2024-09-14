@@ -1665,7 +1665,6 @@ class TokenType(Enum):
     TRUE = auto()
     FALSE = auto()
     NIL = auto()
-    IF = auto()
 
 
 RATIO_RE = re.compile(r'-?[0-9]+/-?[0-9]+')
@@ -1683,8 +1682,6 @@ def _get_token(token_buffer):
         return {'type': TokenType.FALSE}
     elif token_buffer == 'nil':
         return {'type': TokenType.NIL}
-    elif token_buffer == 'if':
-        return {'type': TokenType.IF}
     else:
         return {'type': TokenType.SYMBOL, 'lexeme': token_buffer}
 
@@ -1764,8 +1761,6 @@ def _get_node(token):
         return {'type': 'true'}
     elif token['type'] == TokenType.FALSE:
         return {'type': 'false'}
-    elif token['type'] == TokenType.IF:
-        return {'type': 'if'}
     elif token['type'] == TokenType.NUMBER:
         return {'type': 'number', 'lexeme': token['lexeme']}
     elif token['type'] == TokenType.STRING:
@@ -2794,7 +2789,7 @@ def compile_form(node, envs):
         elif type_ == 'list':
             first = node['nodes'][0]
             rest = node['nodes'][1:]
-            if isinstance(first, dict) and first['type'] == 'list':
+            if first['type'] == 'list':
                 results = [compile_form(n, envs=envs) for n in node['nodes']]
                 args = 'user_globals'
                 if len(results) > 1:
@@ -2803,10 +2798,12 @@ def compile_form(node, envs):
                 envs[-1]['code'].append(f'  Value {result_name} = {results[0]["code"]}({args});')
                 envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
                 return {'code': result_name}
-            elif isinstance(first, dict) and first['type'] == 'symbol':
+            elif first['type'] == 'symbol':
                 if first['lexeme'] == 'recur':
                     params = [compile_form(r, envs=envs) for r in rest]
                     return (first, *params)
+                if first['lexeme'] == 'if':
+                    return if_form_c(rest, envs=envs)
 
                 symbol = _find_symbol(first, envs)
                 if symbol and isinstance(symbol, dict):
@@ -2983,8 +2980,6 @@ def compile_form(node, envs):
                     return {'code': ''}
                 else:
                     raise Exception(f'unhandled symbol: {first}')
-            elif first['type'] == 'if':
-                return if_form_c(rest, envs=envs)
             else:
                 raise Exception(f'unhandled list: {node}')
         else:
