@@ -1645,45 +1645,23 @@ Value lang_sqlite3_execute(Value db, Value sql_code) {
 # COMPILER
 ############################################
 
-class TokenType(Enum):
-    LEFT_PAREN = auto()
-    RIGHT_PAREN = auto()
-    LEFT_BRACE = auto()
-    RIGHT_BRACE = auto()
-    LEFT_BRACKET = auto()
-    RIGHT_BRACKET = auto()
-    COMMA = auto()
-    DOT = auto()
-    GREATER = auto()
-    GREATER_EQUAL = auto()
-    LESS = auto()
-    LESS_EQUAL = auto()
-    SYMBOL = auto()
-    STRING = auto()
-    NUMBER = auto()
-    RATIO = auto()
-    TRUE = auto()
-    FALSE = auto()
-    NIL = auto()
-
-
 RATIO_RE = re.compile(r'-?[0-9]+/-?[0-9]+')
 NUMBER_RE = re.compile(r'-?[0-9]+\.?[0-9]*')
 
 
 def _get_token(token_buffer):
     if RATIO_RE.match(token_buffer):
-        return {'type': TokenType.RATIO, 'lexeme': token_buffer}
+        return {'type': 'ratio', 'lexeme': token_buffer}
     elif NUMBER_RE.match(token_buffer):
-        return {'type': TokenType.NUMBER, 'lexeme': token_buffer}
+        return {'type': 'number', 'lexeme': token_buffer}
     elif token_buffer == 'true':
-        return {'type': TokenType.TRUE}
+        return {'type': 'true'}
     elif token_buffer == 'false':
-        return {'type': TokenType.FALSE}
+        return {'type': 'false'}
     elif token_buffer == 'nil':
-        return {'type': TokenType.NIL}
+        return {'type': 'nil'}
     else:
-        return {'type': TokenType.SYMBOL, 'lexeme': token_buffer}
+        return {'type': 'symbol', 'lexeme': token_buffer}
 
 
 def scan_tokens(source):
@@ -1692,13 +1670,10 @@ def scan_tokens(source):
     inside_string = False
     inside_comment = False
     token_buffer = ''
-    index = 0
-    while index < len(source):
-        c = source[index]
-
+    for c in source:
         if inside_string:
             if c == '"':
-                tokens.append({'type': TokenType.STRING, 'lexeme': token_buffer})
+                tokens.append({'type': 'string', 'lexeme': token_buffer})
                 token_buffer = ''
                 inside_string = False
             else:
@@ -1707,26 +1682,26 @@ def scan_tokens(source):
             if c in ['\n', '\r']:
                 inside_comment = False
         elif c == '(':
-            tokens.append({'type': TokenType.LEFT_PAREN})
+            tokens.append({'type': 'start_group', 'lexeme': '('})
         elif c == ')':
             if token_buffer:
                 tokens.append(_get_token(token_buffer))
                 token_buffer = ''
-            tokens.append({'type': TokenType.RIGHT_PAREN})
+            tokens.append({'type': 'end_group', 'lexeme': ')'})
         elif c == '[':
-            tokens.append({'type': TokenType.LEFT_BRACKET})
+            tokens.append({'type': 'start_group', 'lexeme': '['})
         elif c == ']':
             if token_buffer:
                 tokens.append(_get_token(token_buffer))
                 token_buffer = ''
-            tokens.append({'type': TokenType.RIGHT_BRACKET})
+            tokens.append({'type': 'end_group', 'lexeme': ']'})
         elif c == '{':
-            tokens.append({'type': TokenType.LEFT_BRACE})
+            tokens.append({'type': 'start_group', 'lexeme': '{'})
         elif c == '}':
             if token_buffer:
                 tokens.append(_get_token(token_buffer))
                 token_buffer = ''
-            tokens.append({'type': TokenType.RIGHT_BRACE})
+            tokens.append({'type': 'end_group', 'lexeme': '}'})
         elif c in [',', '\n', '\r']:
             pass
         elif c == ':':
@@ -1746,8 +1721,6 @@ def scan_tokens(source):
         else:
             print(f'unknown char "{c}"')
 
-        index += 1
-
     if token_buffer:
         tokens.append(_get_token(token_buffer))
 
@@ -1755,19 +1728,19 @@ def scan_tokens(source):
 
 
 def _get_node(token):
-    if token['type'] == TokenType.NIL:
+    if token['type'] == 'nil':
         return {'type': 'nil'}
-    elif token['type'] == TokenType.TRUE:
+    elif token['type'] == 'true':
         return {'type': 'true'}
-    elif token['type'] == TokenType.FALSE:
+    elif token['type'] == 'false':
         return {'type': 'false'}
-    elif token['type'] == TokenType.NUMBER:
+    elif token['type'] == 'number':
         return {'type': 'number', 'lexeme': token['lexeme']}
-    elif token['type'] == TokenType.STRING:
+    elif token['type'] == 'string':
         return {'type': 'string', 'lexeme': token['lexeme']}
-    elif token['type'] == TokenType.RATIO:
+    elif token['type'] == 'ratio':
         return {'type': 'ratio', 'lexeme': token['lexeme']}
-    elif token['type'] == TokenType.SYMBOL:
+    elif token['type'] == 'symbol':
         return {'type': 'symbol', 'lexeme': token['lexeme']}
     else:
         return token['type']
@@ -1775,33 +1748,24 @@ def _get_node(token):
 
 def parse(tokens):
     ast = {'type': 'list', 'nodes': []}
-    current_list = ast
+    current_group = ast
     for token in tokens:
-        if token['type'] == TokenType.LEFT_PAREN:
-            # start new grouping
-            new_list = {'type': 'list', 'nodes': []}
-            current_list['nodes'].append(new_list)
-            new_list['parent'] = current_list
-            current_list = new_list
-        elif token['type'] == TokenType.LEFT_BRACKET:
-            # start new grouping
-            new_vector = {'type': 'vector', 'nodes': []}
-            current_list['nodes'].append(new_vector)
-            new_vector['parent'] = current_list
-            current_list = new_vector
-        elif token['type'] == TokenType.LEFT_BRACE:
-            # start new grouping
-            new_dict = {'type': 'map', 'nodes': []}
-            current_list['nodes'].append(new_dict)
-            new_dict['parent'] = current_list
-            current_list = new_dict
-        elif token['type'] in [TokenType.RIGHT_PAREN, TokenType.RIGHT_BRACKET, TokenType.RIGHT_BRACE]:
-            # finish a grouping
-            current_list = current_list['parent']
+        if token['type'] == 'start_group':
+            if token['lexeme'] == '[':
+                group_type = 'vector'
+            elif token['lexeme'] == '{':
+                group_type = 'map'
+            else:
+                group_type = 'list'
+            new_group = {'type': group_type, 'nodes': []}
+            current_group['nodes'].append(new_group)
+            new_group['parent'] = current_group
+            current_group = new_group
+        elif token['type'] == 'end_group':
+            current_group = current_group['parent']
         else:
-            # add to a grouping
             node = _get_node(token)
-            current_list['nodes'].append(node)
+            current_group['nodes'].append(node)
 
     return ast
 
