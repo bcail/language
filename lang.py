@@ -1726,7 +1726,7 @@ def parse(source):
 
 def nil_c(params, envs):
     param = compile_form(params[0], envs=envs)
-    return {'code': f'nil_Q_({param["code"]})'}
+    return f'nil_Q_({param["code"]})'
 
 
 def add_c(params, envs):
@@ -1745,7 +1745,7 @@ def add_c(params, envs):
 
         envs[-1]['code'].append(f'  Value {name} = add_list({numbers_list_name});')
         envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({numbers_list_name}));')
-    return {'code': name}
+    return name
 
 
 def subtract_c(params, envs):
@@ -1764,7 +1764,7 @@ def subtract_c(params, envs):
 
         envs[-1]['code'].append(f'  Value {name} = subtract_list({numbers_list_name});')
         envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({numbers_list_name}));')
-    return {'code': name}
+    return name
 
 
 def multiply_c(params, envs):
@@ -1783,7 +1783,7 @@ def multiply_c(params, envs):
 
         envs[-1]['code'].append(f'  Value {name} = multiply_list({numbers_list_name});')
         envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({numbers_list_name}));')
-    return {'code': name}
+    return name
 
 
 def divide_c(params, envs):
@@ -1802,37 +1802,37 @@ def divide_c(params, envs):
 
         envs[-1]['code'].append(f'  Value {name} = divide_list({numbers_list_name});')
         envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({numbers_list_name}));')
-    return {'code': name}
+    return name
 
 
 def equal_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'equal({c_params[0]}, {c_params[1]})'}
+    return f'equal({c_params[0]}, {c_params[1]})'
 
 
 def greater_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'greater(user_globals, {c_params[0]}, {c_params[1]})'}
+    return f'greater(user_globals, {c_params[0]}, {c_params[1]})'
 
 
 def greater_equal_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'greater_equal({c_params[0]}, {c_params[1]})'}
+    return f'greater_equal({c_params[0]}, {c_params[1]})'
 
 
 def less_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'less(user_globals, {c_params[0]}, {c_params[1]})'}
+    return f'less(user_globals, {c_params[0]}, {c_params[1]})'
 
 
 def less_equal_c(params, envs):
     c_params = [compile_form(p, envs=envs)['code'] for p in params]
-    return {'code': f'less_equal({c_params[0]}, {c_params[1]})'}
+    return f'less_equal({c_params[0]}, {c_params[1]})'
 
 
 def to_number_c(params, envs):
     param = compile_form(params[0], envs=envs)['code']
-    return {'code': f'to_number({param})'}
+    return f'to_number({param})'
 
 
 def hash_c(params, envs):
@@ -1840,7 +1840,7 @@ def hash_c(params, envs):
     hash_result = _get_generated_name('hash_result', envs=envs)
     envs[-1]['temps'].add(hash_result)
     envs[-1]['code'].append(f'  Value {hash_result} = hash({result["code"]});')
-    return {'code': hash_result}
+    return hash_result
 
 
 def def_c(params, envs):
@@ -1856,7 +1856,7 @@ def def_c(params, envs):
     if local_env['post']:
         envs[0]['post'].extend(local_env['post'])
     envs.pop()
-    return {'code': ''}
+    return ''
 
 
 def _get_previous_bindings(envs):
@@ -1885,9 +1885,9 @@ def if_form_c(params, envs):
     true_code = '\n  if (is_truthy(%s)) {\n  ' % test_code
     if true_env['code']:
         true_code += '\n  '.join(true_env['code']) + '\n  '
-    if isinstance(true_result, tuple) and true_result[0]['type'] == 'symbol' and true_result[0]['lexeme'] == 'recur':
+    if true_result['type'] == 'list' and true_result['nodes'][0]['type'] == 'symbol' and true_result['nodes'][0]['lexeme'] == 'recur':
         recur_name = envs[0]['recur_points'].pop()
-        for r in true_result[1:]:
+        for r in true_result['nodes'][1:]:
             true_code += f'  recur_add(AS_RECUR({recur_name}), {r["code"]});\n'
         true_code += f'    {result_name} = {recur_name};'
     else:
@@ -1909,9 +1909,9 @@ def if_form_c(params, envs):
         false_result = compile_form(params[2], envs=envs)
         if false_env['code']:
             false_code += '\n' + '\n  '.join(false_env['code'])
-        if isinstance(false_result, tuple) and false_result[0]['type'] == 'symbol' and false_result[0]['lexeme'] == 'recur':
+        if false_result['type'] == 'list' and false_result['nodes'][0]['type'] == 'symbol' and false_result['nodes'][0]['lexeme'] == 'recur':
             recur_name = envs[0]['recur_points'].pop()
-            for r in false_result[1:]:
+            for r in false_result['nodes'][1:]:
                 false_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
             false_code += f'\n    {result_name} = {recur_name};'
         else:
@@ -1977,9 +1977,9 @@ def let_c(params, envs):
         f_code += '\n'.join(local_env['code']) + '\n'
 
     return_val = ''
-    if isinstance(final_result, tuple) and final_result[0]['type'] == 'symbol' and final_result[0]['lexeme'] == 'recur':
+    if final_result['type'] == 'list' and final_result['nodes'][0]['type'] == 'symbol' and final_result['nodes'][0]['lexeme'] == 'recur':
         recur_name = envs[0]['recur_points'].pop()
-        for r in final_result[1:]:
+        for r in final_result['nodes'][1:]:
             f_code += f'\n    recur_add(AS_RECUR({recur_name}), {r["code"]});'
         return_val = recur_name
     else:
@@ -2003,7 +2003,7 @@ def let_c(params, envs):
     envs[-1]['code'].append(f'  Value {result_name} = {f_name}({f_args});')
     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
 
-    return {'code': result_name}
+    return result_name
 
 
 def _has_recur(expr):
@@ -2160,7 +2160,7 @@ def loop_c(params, envs):
     envs[-1]['code'].append(f'  Value {result_name} = {f_name}({c_initial_args});')
     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
 
-    return {'code': result_name}
+    return result_name
 
 
 def math_gcd_c(params, envs):
@@ -2169,7 +2169,7 @@ def math_gcd_c(params, envs):
     name = _get_generated_name('math_gcd_result', envs=envs)
     envs[-1]['temps'].add(name)
     envs[-1]['code'].append(f'  Value {name} = math_gcd({param_1}, {param_2});')
-    return {'code': name}
+    return name
 
 
 def str_c(params, envs):
@@ -2191,14 +2191,14 @@ def str_c(params, envs):
         envs[-1]['code'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));\n' + '  }')
         envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({tmp_list_name}));')
         envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({name}));\n' + '  }')
-        return {'code': name}
+        return name
 
     name = _get_generated_name('str', envs=envs)
     envs[-1]['temps'].add(name)
     envs[-1]['code'].append(f'  Value {name} = str_str({arg_name});')
     # envs[-1]['code'].append(f'  inc_ref(AS_OBJ({name}));')
     envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
-    return {'code': name}
+    return name
 
 
 def str_lower_c(params, envs):
@@ -2208,7 +2208,7 @@ def str_lower_c(params, envs):
     envs[-1]['code'].append(f'  Value {name} = str_lower({param_name});')
     envs[-1]['code'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }')
     envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
-    return {'code': name}
+    return name
 
 
 def str_blank_c(params, envs):
@@ -2216,7 +2216,7 @@ def str_blank_c(params, envs):
     param_name = result['code']
     name = _get_generated_name('str_blank_', envs=envs)
     envs[-1]['code'].append(f'  Value {name} = str_blank({param_name});')
-    return {'code': name}
+    return name
 
 
 def str_split_c(params, envs):
@@ -2226,7 +2226,7 @@ def str_split_c(params, envs):
     envs[-1]['code'].append(f'  Value {name} = str_split({param_name});')
     envs[-1]['code'].append(f'  inc_ref(AS_OBJ({name}));')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
-    return {'code': name}
+    return name
 
 
 def str_index_of_c(params, envs):
@@ -2238,7 +2238,7 @@ def str_index_of_c(params, envs):
         from_index_param = compile_form({'type': 'number', 'lexeme': '0'}, envs=envs)['code']
     name = _get_generated_name('str_index_of_result', envs=envs)
     envs[-1]['code'].append(f'  Value {name} = str_index_of({s_param}, {value_param}, {from_index_param});')
-    return {'code': name}
+    return name
 
 
 def str_subs_c(params, envs):
@@ -2252,40 +2252,40 @@ def str_subs_c(params, envs):
     envs[-1]['code'].append(f'  Value {name} = str_subs({s_param}, {start_param}, {end_param});')
     envs[-1]['code'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    inc_ref(AS_OBJ({name}));' + '\n  }')
     envs[-1]['post'].append(f'  if (IS_OBJ({name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({name}));' + '\n  }')
-    return {'code': name}
+    return name
 
 
 def nth_c(params, envs):
     lst = compile_form(params[0], envs=envs)['code']
     index = compile_form(params[1], envs=envs)['code']
-    return {'code': f'list_get({lst}, (int32_t) AS_NUMBER({index}))'}
+    return f'list_get({lst}, (int32_t) AS_NUMBER({index}))'
 
 
 def conj_c(params, envs):
     lst = compile_form(params[0], envs=envs)['code']
     item = compile_form(params[1], envs=envs)['code']
-    return {'code': f'list_conj({lst}, {item})'}
+    return f'list_conj({lst}, {item})'
 
 
 def remove_c(params, envs):
     lst = compile_form(params[0], envs=envs)
     index = compile_form(params[1], envs=envs)['code']
-    return {'code': f'list_remove({lst["code"]}, {index})'}
+    return f'list_remove({lst["code"]}, {index})'
 
 
 def sort_c(params, envs):
     if len(params) == 1:
         lst = compile_form(params[0], envs=envs)
-        return {'code': f'list_sort(user_globals, {lst["code"]}, *less)'}
+        return f'list_sort(user_globals, {lst["code"]}, *less)'
     else:
         compare = compile_form(params[0], envs=envs)
         lst = compile_form(params[1], envs=envs)
-        return {'code': f'list_sort(user_globals, {lst["code"]}, {compare["code"]})'}
+        return f'list_sort(user_globals, {lst["code"]}, {compare["code"]})'
 
 
 def count_c(params, envs):
     value = compile_form(params[0], envs=envs)['code']
-    return {'code': f'count({value})'}
+    return f'count({value})'
 
 
 def map_get_c(params, envs):
@@ -2299,13 +2299,13 @@ def map_get_c(params, envs):
     envs[-1]['code'].append('  if (IS_OBJ(%s)) {\n    inc_ref(AS_OBJ(%s));\n  }' % (name, name))
     envs[-1]['temps'].add(name)
     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (name, name))
-    return {'code': name}
+    return name
 
 
 def map_contains_c(params, envs):
     m = compile_form(params[0], envs=envs)['code']
     key = compile_form(params[1], envs=envs)['code']
-    return {'code': f'map_contains(AS_MAP({m}), {key})'}
+    return f'map_contains(AS_MAP({m}), {key})'
 
 
 def map_assoc_c(params, envs):
@@ -2314,7 +2314,7 @@ def map_assoc_c(params, envs):
     value = compile_form(params[2], envs=envs)['code']
     result_name = _get_generated_name('map_assoc', envs=envs)
     envs[-1]['code'].append(f'  Value {result_name} = map_set(AS_MAP({m}), {key}, {value});')
-    return {'code': result_name}
+    return result_name
 
 
 def map_dissoc_c(params, envs):
@@ -2323,7 +2323,7 @@ def map_dissoc_c(params, envs):
     result_name = _get_generated_name('map_dissoc', envs=envs)
     envs[-1]['temps'].add(result_name)
     envs[-1]['code'].append(f'  Value {result_name} = map_remove({m}, {key});')
-    return {'code': result_name}
+    return result_name
 
 
 def map_keys_c(params, envs):
@@ -2332,7 +2332,7 @@ def map_keys_c(params, envs):
     envs[-1]['code'].append(f'  Value {name} = map_keys(AS_MAP({m}));')
     envs[-1]['code'].append(f'  inc_ref(AS_OBJ({name}));')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
-    return {'code': name}
+    return name
 
 
 def map_vals_c(params, envs):
@@ -2341,7 +2341,7 @@ def map_vals_c(params, envs):
     envs[-1]['code'].append(f'  Value {name} = map_vals(AS_MAP({m}));')
     envs[-1]['code'].append(f'  inc_ref(AS_OBJ({name}));')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
-    return {'code': name}
+    return name
 
 
 def map_pairs_c(params, envs):
@@ -2350,7 +2350,7 @@ def map_pairs_c(params, envs):
     envs[-1]['code'].append(f'  Value {name} = map_pairs(AS_MAP({m}));')
     envs[-1]['code'].append(f'  inc_ref(AS_OBJ({name}));')
     envs[-1]['post'].append(f'  dec_ref_and_free(AS_OBJ({name}));')
-    return {'code': name}
+    return name
 
 
 def print_c(params, envs):
@@ -2360,7 +2360,7 @@ def print_c(params, envs):
     envs[-1]['temps'].add(name)
     envs[-1]['code'].append(f'  Value {name} = print({param_name});')
     # print always returns NIL_VAL, so don't need to dec_ref_and_free at the end
-    return {'code': name}
+    return name
 
 
 def println_c(params, envs):
@@ -2369,7 +2369,7 @@ def println_c(params, envs):
     name = _get_generated_name('println_result', envs=envs)
     envs[-1]['temps'].add(name)
     envs[-1]['code'].append(f'  Value {name} = println({param_name});')
-    return {'code': name}
+    return name
 
 
 def fn_c(params, envs, f_name=None):
@@ -2396,7 +2396,7 @@ def fn_c(params, envs, f_name=None):
 
     envs.pop()
 
-    return {'code': f_name}
+    return f_name
 
 
 def defn_c(params, envs):
@@ -2408,7 +2408,7 @@ def defn_c(params, envs):
 
     fn_result = fn_c(params[1:], envs, f_name=f_name)
 
-    return {'code': ''}
+    return ''
 
 
 def readline_c(params, envs):
@@ -2416,11 +2416,11 @@ def readline_c(params, envs):
     envs[-1]['temps'].add(result_name)
     envs[-1]['code'].append(f'  Value {result_name} = readline();')
     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
-    return {'code': result_name}
+    return result_name
 
 
 def cli_args_c(params, envs):
-    return {'code': 'OBJ_VAL(cli_args)'}
+    return 'OBJ_VAL(cli_args)'
 
 
 def file_open_c(params, envs):
@@ -2434,7 +2434,7 @@ def file_open_c(params, envs):
     result_name = _get_generated_name('file_obj', envs=envs)
     envs[-1]['temps'].add(result_name)
     envs[-1]['code'].append(f'  Value {result_name} = file_open({path}, "{mode}");')
-    return {'code': result_name}
+    return result_name
 
 
 def file_read_c(params, envs):
@@ -2443,7 +2443,7 @@ def file_read_c(params, envs):
     envs[-1]['temps'].add(result_name)
     envs[-1]['code'].append(f'  Value {result_name} = file_read({file_obj});')
     envs[-1]['post'].append('  if (IS_OBJ(%s)) {\n    dec_ref_and_free(AS_OBJ(%s));\n  }' % (result_name, result_name))
-    return {'code': result_name}
+    return result_name
 
 
 def file_write_c(params, envs):
@@ -2452,7 +2452,7 @@ def file_write_c(params, envs):
     result_name = _get_generated_name('file_write_result', envs=envs)
     envs[-1]['temps'].add(result_name)
     envs[-1]['code'].append(f'  Value {result_name} = file_write({file_obj}, {data});')
-    return {'code': result_name}
+    return result_name
 
 
 def file_close_c(params, envs):
@@ -2460,7 +2460,7 @@ def file_close_c(params, envs):
     result_name = _get_generated_name('file_close_result', envs=envs)
     envs[-1]['temps'].add(result_name)
     envs[-1]['code'].append(f'  Value {result_name} = file_close({file_obj});')
-    return {'code': result_name}
+    return result_name
 
 
 def os_mkdir_c(params, envs):
@@ -2468,7 +2468,7 @@ def os_mkdir_c(params, envs):
     result_name = _get_generated_name('dir_name', envs=envs)
     envs[-1]['temps'].add(result_name)
     envs[-1]['code'].append(f'  Value {result_name} = os_mkdir({path});')
-    return {'code': result_name}
+    return result_name
 
 
 def sqlite3_version_c(params, envs):
@@ -2477,7 +2477,7 @@ def sqlite3_version_c(params, envs):
     envs[0]['use_sqlite3'] = True
     envs[-1]['code'].append(f'  Value {result_name} = lang_sqlite3_version();')
     envs[-1]['post'].append(f'  if (IS_OBJ({result_name})) ' + '{\n' + f'    dec_ref_and_free(AS_OBJ({result_name}));\n' + '  }')
-    return {'code': result_name}
+    return result_name
 
 
 def sqlite3_open_c(params, envs):
@@ -2486,7 +2486,7 @@ def sqlite3_open_c(params, envs):
     envs[-1]['temps'].add(result_name)
     envs[0]['use_sqlite3'] = True
     envs[-1]['code'].append(f'  Value {result_name} = lang_sqlite3_open({file_name});')
-    return {'code': result_name}
+    return result_name
 
 
 def sqlite3_close_c(params, envs):
@@ -2495,7 +2495,7 @@ def sqlite3_close_c(params, envs):
     envs[-1]['temps'].add(result_name)
     envs[0]['use_sqlite3'] = True
     envs[-1]['code'].append(f'  Value {result_name} = lang_sqlite3_close({db});')
-    return {'code': result_name}
+    return result_name
 
 
 def sqlite3_execute_c(params, envs):
@@ -2505,7 +2505,7 @@ def sqlite3_execute_c(params, envs):
     envs[-1]['temps'].add(result_name)
     envs[0]['use_sqlite3'] = True
     envs[-1]['code'].append(f'  Value {result_name} = lang_sqlite3_execute({db}, {sql_code});')
-    return {'code': result_name}
+    return result_name
 
 
 global_ns = {
@@ -2724,8 +2724,8 @@ def compile_form(node, envs):
             return node
         elif first['type'] == 'symbol':
             if first['lexeme'] == 'recur':
-                params = [compile_form(r, envs=envs) for r in rest]
-                return (first, *params)
+                node['nodes'] = [first] + [compile_form(r, envs=envs) for r in rest]
+                return node
             if first['lexeme'] == 'if':
                 node['code'] = if_form_c(rest, envs=envs)
                 return node
@@ -2733,7 +2733,8 @@ def compile_form(node, envs):
             symbol = _find_symbol(first, envs)
             if symbol:
                 if 'function' in symbol and callable(symbol['function']):
-                    return symbol['function'](rest, envs=envs)
+                    node['code'] = symbol['function'](rest, envs=envs)
+                    return node
                 elif 'c_name' in symbol:
                     f_name = symbol['c_name']
                     results = [compile_form(n, envs=envs) for n in rest]
@@ -2783,9 +2784,11 @@ def compile_form(node, envs):
                 do_result = _get_generated_name('do_result', envs)
 
                 f_code = f'  Value {do_result} = NIL_VAL;'
-                if isinstance(do_exprs[-1], tuple) and do_exprs[-1][0]['type'] == 'symbol' and do_exprs[-1][0]['lexeme'] == 'recur':
+                if 'type' not in do_exprs[-1]:
+                    raise Exception(f'no type: {do_exprs[-1]}')
+                if do_exprs[-1]['type'] == 'list' and do_exprs[-1]['nodes'][0]['type'] == 'symbol' and do_exprs[-1]['nodes'][0]['lexeme'] == 'recur':
                     recur_name = envs[0]['recur_points'].pop()
-                    for r in do_exprs[-1][1:]:
+                    for r in do_exprs[-1]['nodes'][1:]:
                         f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
                     f_code += f'\n  {do_result} = {recur_name};'
                 else:
@@ -2810,9 +2813,9 @@ def compile_form(node, envs):
                 exprs = [compile_form(n, envs=envs) for n in rest[1:]]
                 result = _get_generated_name('with_result', envs)
                 f_code = f'  Value {result} = NIL_VAL;'
-                if isinstance(exprs[-1], tuple) and exprs[-1][0]['type'] == 'symbol' and exprs[-1][0]['lexeme'] == 'recur':
+                if exprs[-1]['type'] == 'list' and exprs[-1]['nodes'][0]['type'] == 'symbol' and exprs[-1]['nodes'][0]['lexeme'] == 'recur':
                     recur_name = envs[0]['recur_points'].pop()
-                    for r in exprs[-1][1:]:
+                    for r in exprs[-1]['nodes'][1:]:
                         f_code += f'\n  recur_add(AS_RECUR({recur_name}), {r["code"]});'
                     f_code += f'\n  {result} = {recur_name};'
                 else:
