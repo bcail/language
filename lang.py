@@ -22,6 +22,12 @@ INCLUDES = '''
 #include <stdbool.h>
 #include <string.h>
 #include <math.h>
+
+#if defined(_WIN32)
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 '''
 
 LANG_C_CODE = '''
@@ -1535,7 +1541,7 @@ Value file_close(Value file) {
 }
 
 Value os_mkdir(Value dir_name) {
-#if defined(WINDOWS)
+#if defined(_WIN32)
   int result = _mkdir(AS_CSTRING(dir_name));
 #else
   int result = mkdir(AS_CSTRING(dir_name), 0755);
@@ -2946,12 +2952,6 @@ def _compile(source, source_file=None):
     program = _compile_forms(source, source_file=source_file)
 
     c_code = INCLUDES
-
-    if platform.system() == 'Windows':
-        c_code += '#include <direct.h>\n'
-        c_code += '#define WINDOWS 1\n'
-    else:
-        c_code += '#include <sys/stat.h>\n'
 
     if program['use_sqlite3']:
         c_code += f'#include "sqlite3.h"\n\n'
